@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up - Safe Route App</title>
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --main-blue: #1b4e8a;
+      --main-green: #6ad13a;
+      --main-cyan: #00b6c9;
+      --main-dark: #181c2f;
+      --main-light: #eaf6fb;
+      --main-gradient: linear-gradient(135deg, #eaf6fb 0%, #1b4e8a 100%);
+      --accent-gradient: linear-gradient(90deg, #1b4e8a 0%, #6ad13a 100%);
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: 'Montserrat', Arial, sans-serif;
+      background: var(--main-gradient);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px 0 rgba(27, 78, 138, 0.18);
+      display: flex;
+      width: 800px;
+      max-width: 95vw;
+      min-height: 450px;
+      overflow: hidden;
+    }
+    .signup-section {
+      flex: 1;
+      padding: 40px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(234, 246, 251, 0.97);
+    }
+    .signup-section .logo {
+      display: flex;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .signup-section .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      border: 2px solid var(--main-blue);
+    }
+    .signup-section .logo-text {
+      color: var(--main-blue);
+      font-weight: bold;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+    .signup-section .avatar {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: var(--main-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 25px;
+      border: 2px solid var(--main-blue);
+    }
+    .signup-section .avatar svg {
+      width: 40px;
+      height: 40px;
+      fill: var(--main-blue);
+    }
+    .signup-section form {
+      width: 100%;
+      max-width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .input-group {
+      position: relative;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      border-radius: 25px;
+      border: 1.5px solid var(--main-cyan);
+      background: #fff;
+      color: var(--main-blue);
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.2s, background 0.2s;
+      box-sizing: border-box;
+    }
+    .input-group input:focus {
+      background: #eaf6fb;
+      border: 1.5px solid var(--main-green);
+    }
+    .input-group .icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--main-cyan);
+      font-size: 1.1rem;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .signup-section button {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent-gradient);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+    .signup-section button:hover {
+      background: linear-gradient(90deg, #6ad13a 0%, #1b4e8a 100%);
+    }
+    .signup-section .options {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 0.95rem;
+      color: var(--main-blue);
+    }
+    .signup-section .options a {
+      color: var(--main-green);
+      text-decoration: none;
+      transition: color 0.2s;
+      margin-left: 5px;
+    }
+    .signup-section .options a:hover {
+      color: var(--main-blue);
+      text-decoration: underline;
+    }
+    .signup-section .login-link {
+      text-align: center;
+      margin-top: 25px;
+      color: var(--main-blue);
+      font-size: 0.97rem;
+    }
+    .signup-section .login-link a {
+      color: var(--main-cyan);
+      font-weight: bold;
+      text-decoration: none;
+      margin-left: 5px;
+      transition: color 0.2s;
+    }
+    .signup-section .login-link a:hover {
+      color: var(--main-green);
+      text-decoration: underline;
+    }
+    .error-message {
+      color: #ff4d6d;
+      text-align: center;
+      margin-top: 10px;
+      font-size: 0.98rem;
+    }
+    .welcome-section {
+      flex: 1.3;
+      background: linear-gradient(120deg, #eaf6fb 0%, #b8e2f2 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 60px 50px;
+      position: relative;
+      overflow: hidden;
+    }
+    .welcome-section .welcome-title {
+      color: #fff;
+      font-size: 2.7rem;
+      font-weight: bold;
+      margin-bottom: 18px;
+      margin-top: 60px;
+      letter-spacing: 1px;
+      background: var(--accent-gradient);
+      padding: 12px 32px;
+      border-radius: 18px;
+      display: inline-block;
+      box-shadow: 0 4px 24px 0 rgba(27,78,138,0.10);
+    }
+    .welcome-section .welcome-desc {
+      color: var(--main-blue);
+      font-size: 1.1rem;
+      max-width: 350px;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+    .welcome-section .login-now {
+      color: var(--main-blue);
+      font-size: 1rem;
+      margin-top: 20px;
+    }
+    .welcome-section .login-now a {
+      color: var(--main-green);
+      font-weight: bold;
+      text-decoration: none;
+      margin-left: 5px;
+      transition: color 0.2s;
+    }
+    .welcome-section .login-now a:hover {
+      color: var(--main-blue);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="signup-section">
+      <div class="logo">
+        <div class="logo-icon">
+          <img src="contents/image.png" alt="User Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+        </div>
+        <span class="logo-text" style="font-size:2rem;">My Safety</span>
+      </div>
+      <div class="avatar">
+        <!-- User icon SVG -->
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/></svg>
+      </div>
+      <form id="signupForm" autocomplete="off" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
+          <span class="icon">
+            <img src="contents/username.png" alt="Username Icon" style="width:18px; height:18px; object-fit:contain;">
+          </span>
+          <input type="text" id="username" name="username" placeholder="Username" required>
+        </div>
+        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
+          <span class="icon">
+            <img src="contents/email.jpg" alt="Email Icon" style="width:18px; height:18px; object-fit:contain;">
+          </span>
+          <input type="email" id="email" name="email" placeholder="Email" required>
+        </div>
+        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
+          <span class="icon">
+            <img src="contents/password.jpeg" alt="Password Icon" style="width:18px; height:18px; object-fit:contain;">
+          </span>
+          <input type="password" id="password" name="password" placeholder="Password" required>
+        </div>
+        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
+          <span class="icon">
+            <img src="contents/confirm.webp" alt="Confirm Password Icon" style="width:18px; height:18px; object-fit:contain;">
+          </span>
+          <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+        </div>
+        <button type="submit" style="max-width:260px;">SIGN UP</button>
+        <div class="options" style="max-width:260px;">
+          Already have an account?
+          <a href="login.html">Login</a>
+        </div>
+        <div class="error-message" id="error-message"></div>
+      </form>
+    </div>
+    <div class="welcome-section">
+      <div class="welcome-title">Welcome</div>
+      <div class="welcome-desc">
+        Join My Safety to access safe routes and city crime records. Sign up to get started!
+      </div>
+      <div class="login-now">
+        Already a member?
+        <a href="login.html">Login now</a>
+      </div>
+    </div>
+  </div>
+    <script>
+    document.getElementById('signupForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const confirm = document.getElementById('confirm_password').value.trim();
+    const errorMsg = document.getElementById('error-message');
+
+    if (password !== confirm) {
+        errorMsg.textContent = "Passwords do not match.";
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8000/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+        });
+        const result = await response.json();
+        if (response.ok) {
+        alert(result.message);
+        window.location.href = "login.html";
+        } else {
+        errorMsg.textContent = result.detail || "Signup failed";
+        }
+    } catch (err) {
+        errorMsg.textContent = "Server error";
+    }
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" class="light"> <!-- Default to light mode -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Route Finder - Bangladesh</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+    
+    <!-- Leaflet.js for OpenStreetMap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Leaflet.heat for heatmap layer -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    
+    <style>
+        @import url('https://rsms.me/inter/inter.css');
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .loader {
+            border-top-color: #8b5cf6; /* Purple */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 4px; }
+        html.dark ::-webkit-scrollbar-thumb { background-color: rgba(107, 114, 128, 0.5); }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .leaflet-container .leaflet-control-attribution {
+            background: rgba(255,255,255,0.7) !important;
+            color: #333;
+        }
+        html.dark .leaflet-container .leaflet-control-attribution {
+            background: rgba(0,0,0,0.7) !important;
+            color: #ccc;
+        }
+    </style>
+    <script>
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-black text-gray-800 dark:text-gray-200">
+
+    <div class="flex h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-20 flex flex-col items-center bg-white dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-800 p-4 space-y-6">
+            <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
+                 <i data-lucide="shield-half" class="w-8 h-8"></i>
+            </div>
+            <nav class="flex flex-col items-center space-y-4 flex-grow">
+                <a href="#" class="p-3 bg-purple-100 dark:bg-purple-800/50 text-purple-600 dark:text-purple-400 rounded-lg" title="Home">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                </a>
+                <a href="#" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Search">
+                    <i data-lucide="search" class="w-6 h-6"></i>
+                </a>
+                <a href="#" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Zones">
+                    <i data-lucide="map" class="w-6 h-6"></i>
+                </a>
+                <a href="#" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Privacy">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </a>
+            </nav>
+            <div class="flex flex-col items-center space-y-4">
+                <button id="theme-toggle" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+                    <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+                </button>
+                <a href="#" class="p-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Settings">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 grid grid-cols-12 gap-6 p-6 overflow-y-auto">
+            
+            <div class="col-span-12 lg:col-span-4 xl:col-span-3">
+                <div class="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 h-full flex flex-col">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">Safe Route Planner</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mb-6">Your safety guide for navigating Bangladesh.</p>
+                    
+                    <form id="route-form" class="space-y-4">
+                        <div>
+                            <label for="start" class="text-sm font-medium text-gray-700 dark:text-gray-300">Start Location</label>
+                            <div class="mt-1 relative">
+                                <i data-lucide="navigation" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                <input type="text" id="start" name="start" class="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-lg pl-10 p-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Getting location..." required>
+                                <button type="button" id="get-location-btn" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-purple-600 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                                    <i data-lucide="crosshair" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="destination" class="text-sm font-medium text-gray-700 dark:text-gray-300">Destination</label>
+                            <div class="mt-1 relative">
+                                <i data-lucide="map-pin" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                <input type="text" id="destination" name="destination" class="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-lg pl-10 p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="e.g., Gulshan, Dhaka" required>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                           <div>
+                                <label for="time" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time of Visit</label>
+                                <div class="mt-1 relative">
+                                    <i data-lucide="clock" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                    <input type="time" id="time" name="time" class="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-lg pl-10 p-3" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="age" class="text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
+                                <input type="number" id="age" name="age" class="mt-1 w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="25" min="1" max="120" required>
+                            </div>
+                        </div>
+                        
+                        <div>
+                             <label for="gender" class="text-sm font-medium text-gray-700 dark:text-gray-300">Gender</label>
+                             <select id="gender" name="gender" class="mt-1 w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                 <option>Female</option>
+                                 <option>Male</option>
+                                 <option>Other</option>
+                             </select>
+                        </div>
+
+                        <button type="submit" class="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-lg text-white font-semibold bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-gray-900 transition-all shadow-lg shadow-purple-500/20">
+                            <i data-lucide="navigation"></i>
+                            Find Safest Route
+                        </button>
+                    </form>
+
+                    <div id="results-container" class="mt-6 flex-grow">
+                        <div id="placeholder" class="h-full flex flex-col justify-center items-center text-center text-gray-400 dark:text-gray-600">
+                             <i data-lucide="route" class="w-12 h-12 mb-2"></i>
+                             <p class="font-medium">Route details appear here</p>
+                        </div>
+                        <div id="loading" class="hidden h-full flex flex-col justify-center items-center text-center">
+                            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 dark:border-gray-700 h-12 w-12"></div>
+                             <p class="mt-4 text-gray-500 dark:text-gray-400">Analyzing routes...</p>
+                        </div>
+                        <div id="results-content" class="hidden">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Recommended Route</h3>
+                            <div id="route-details" class="p-4 rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-12 lg:col-span-8 xl:col-span-9 bg-gray-200 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div id="map"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            let map;
+            let tileLayer;
+            let heatLayer = null;
+            let routeLine = null;
+            let startMarker = null;
+            let userCoords = null;
+            const dhakaCoords = [23.8103, 90.4125];
+
+            const lightTiles = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const tileAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+            
+            function initializeMap() {
+                map = L.map('map').setView(dhakaCoords, 13);
+                const isDarkMode = document.documentElement.classList.contains('dark');
+                const tileUrl = isDarkMode ? darkTiles : lightTiles;
+                tileLayer = L.tileLayer(tileUrl, { attribution: tileAttribution }).addTo(map);
+            }
+
+            initializeMap();
+
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => {
+                const html = document.documentElement;
+                html.classList.toggle('dark');
+                const isDarkMode = html.classList.contains('dark');
+                localStorage.theme = isDarkMode ? 'dark' : 'light';
+                tileLayer.setUrl(isDarkMode ? darkTiles : lightTiles);
+            });
+
+            // --- Geolocation & Time ---
+            const startInput = document.getElementById('start');
+            const timeInput = document.getElementById('time');
+            const getLocationBtn = document.getElementById('get-location-btn');
+
+            function setDefaultTime() {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                timeInput.value = `${hours}:${minutes}`;
+            }
+
+            function fetchUserLocation() {
+                startInput.value = 'Getting location...';
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        userCoords = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                        startInput.value = `Your Current Location`;
+                        if(startMarker) map.removeLayer(startMarker);
+                        startMarker = L.marker([userCoords.lat, userCoords.lon]).addTo(map)
+                            .bindPopup('Your Location').openPopup();
+                        map.setView([userCoords.lat, userCoords.lon], 15);
+                    }, error => {
+                        console.error("Geolocation error:", error);
+                        userCoords = null; 
+                        startInput.value = 'Location access denied';
+                        showModal("Location access denied. Please enter a starting location manually.");
+                    });
+                } else {
+                    startInput.value = "Geolocation not supported";
+                    userCoords = null;
+                    showModal('Your browser does not support geolocation. Please enter a starting location manually.');
+                }
+            }
+
+            getLocationBtn.addEventListener('click', fetchUserLocation);
+            fetchUserLocation();
+            setDefaultTime();
+
+            function showModal(message) {
+                 const modal = document.createElement('div');
+                 modal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+                     <div style="background: white; padding: 2rem; border-radius: 0.5rem; text-align: center; color: black; max-width: 90%; width: 400px;">
+                         <p>${message}</p>
+                         <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #8b5cf6; color: white; border: none; border-radius: 0.25rem; cursor: pointer;">OK</button>
+                     </div>
+                 </div>`;
+                 document.body.appendChild(modal);
+            }
+
+            document.getElementById('route-form').addEventListener('submit', async function(event) {
+                event.preventDefault();
+                
+                document.getElementById('placeholder').classList.add('hidden');
+                document.getElementById('results-content').classList.add('hidden');
+                document.getElementById('loading').classList.remove('hidden');
+
+                let startCoords;
+                const startLocationText = startInput.value;
+
+                if (startLocationText.toLowerCase() === 'your current location' && userCoords) {
+                    startCoords = { lat: userCoords.lat, lon: userCoords.lon };
+                } else {
+                    const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocationText + ', Bangladesh')}&limit=1`;
+                    try {
+                        const geoResponse = await fetch(geocodeUrl);
+                        const geoData = await geoResponse.json();
+                        if (geoData && geoData.length > 0) {
+                            startCoords = { lat: parseFloat(geoData[0].lat), lon: parseFloat(geoData[0].lon) };
+                        } else {
+                             showModal(`Could not find coordinates for "${startLocationText}". Please try a different location.`);
+                             document.getElementById('loading').classList.add('hidden');
+                             document.getElementById('placeholder').classList.remove('hidden');
+                             return;
+                        }
+                    } catch (e) {
+                        showModal('Failed to geocode the start location. Please check your connection.');
+                        document.getElementById('loading').classList.add('hidden');
+                        document.getElementById('placeholder').classList.remove('hidden');
+                        return;
+                    }
+                }
+
+                if (!startCoords) {
+                    showModal('Invalid start location. Please allow location access or enter a valid address.');
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('placeholder').classList.remove('hidden');
+                    return;
+                }
+
+                const formData = {
+                    start_lat: startCoords.lat,
+                    start_lon: startCoords.lon,
+                    destination: document.getElementById('destination').value,
+                    age: parseInt(document.getElementById('age').value, 10),
+                    gender: document.getElementById('gender').value,
+                    visit_time: document.getElementById('time').value,
+                };
+                
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/suggest-route', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData),
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+
+                    const routeEl = document.getElementById('route-details');
+                    const route = data.route;
+                    routeEl.className = `p-4 rounded-lg border-l-4 ${route.theme.bg} ${route.theme.border} ${route.theme.text}`;
+                    routeEl.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-lg">${route.name}</h4>
+                            <span class="text-xs font-medium uppercase px-2 py-1 rounded-full bg-${route.risk_color}-500 text-white">${route.risk}</span>
+                        </div>
+                        <p class="mt-1 text-sm">${route.details}</p>
+                        <p class="mt-2 text-sm font-semibold">Estimated Time: ${route.eta}</p>
+                    `;
+
+                    if (heatLayer) map.removeLayer(heatLayer);
+                    if (routeLine) map.removeLayer(routeLine);
+
+                    heatLayer = L.heatLayer(data.heatmap, { 
+                        radius: 25, blur: 15, max: 1.0,
+                        gradient: {0.1: 'blue', 0.4: 'lime', 0.8: 'red'}
+                    }).addTo(map);
+
+                    routeLine = L.polyline(data.route_coords, { 
+                        color: route.risk_color === 'green' ? '#22c55e' : '#ef4444',
+                        weight: 5, opacity: 0.8
+                    }).addTo(map);
+                    
+                    map.flyToBounds(routeLine.getBounds(), { padding: L.point(50, 50) });
+
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('results-content').classList.remove('hidden');
+
+                } catch (error) {
+                    console.error("Error fetching route:", error);
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('placeholder').classList.remove('hidden');
+                    showModal(`Could not retrieve route suggestion. Is the backend server running?`);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
