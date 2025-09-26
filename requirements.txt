@@ -3,4 +3,5 @@ uvicorn
 pydantic
 httpx
 sqlalchemy
+pymysql
 mysqlclient
