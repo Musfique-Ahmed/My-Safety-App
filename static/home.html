@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Safety - Navigate Your World Safely</title>
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  
+  <style>
+    :root {
+      --dark-bg: #0f0f0f;
+      --dark-surface: #1a1a1a;
+      --dark-card: #2a2a2a;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666666;
+      --accent-purple: #8b5cf6;
+      --accent-gray: #6b7280;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-blue: #3b82f6;
+      --border-color: #333333;
+      /* NEW COLOR VARIABLES based on image a22f2e.png */
+      --deep-navy: #151b2c; /* Original deeper background color for the stats section */
+      --card-deep-navy: #1a233b; /* Slightly darker card color */
+      --bar-blue-deep: #4d7a96;
+      --bar-teal: #6eb793;
+      --bar-white: white;
+      --bar-lavender: #a7d0c3;
+      --bar-light-blue: #9c92cc;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: var(--dark-bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* Remove padding-bottom, let the footer sit at content end */
+      padding-bottom: 0; 
+    }
+    
+    /* --- HEADER STYLES --- */
+    .header {
+      background: var(--dark-surface);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky; /* Sticky header */
+      top: 0;
+      z-index: 10; /* Ensure header stays above content when scrolling */
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-purple);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .nav-links {
+      display: none; /* Removed links as requested */
+      gap: 2rem;
+      align-items: center;
+      flex-grow: 1; 
+      justify-content: flex-start;
+      margin-left: 2rem; 
+    }
+    .nav-links a {
+      color: white; /* Changed to white to match the image */
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+      padding: 0.25rem 0.5rem;
+    }
+    .nav-links a:hover {
+      color: var(--text-secondary);
+    }
+    .login-btn { 
+      background: transparent; /* Changed to transparent to match the image */
+      color: white;
+      border: 1px solid white; /* White border to match the image */
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .login-btn:hover { 
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* --- HERO SECTION STYLES (Retained) --- */
+    .hero {
+      background: var(--dark-surface);
+      padding: 6rem 2rem;
+      text-align: center;
+      /* Background image URL updated */
+      background-image: url('contents/city.jpg');
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      color: white;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7); 
+      z-index: 1;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      line-height: 1.1;
+    }
+    .hero-subtitle {
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: #ccc;
+      margin-bottom: 2rem;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+    .btn-hero-primary {
+      background: white;
+      color: var(--dark-bg);
+      border: none;
+    }
+    .btn-hero-secondary {
+      background: var(--dark-card);
+      color: white;
+      border: 1px solid var(--border-color);
+    }
+    
+    /* --- STATS & PLACES SECTION STYLES (UPDATED COLORS) --- */
+    .stats-section {
+      /* CHANGED: Using --dark-bg for pure black background */
+      background: var(--dark-bg); 
+      padding: 3rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      flex-grow: 1;
+      width: 100%;
+    }
+    .stats-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 3rem;
+      gap: 3rem;
+    }
+    .stats-title-group {
+        flex: 1;
+    }
+    .stats-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .stats-subtitle {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+    .stats-content-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    .stat-card {
+      /* Card background should remain the deep navy for contrast against the new black background */
+      background: var(--card-deep-navy); 
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 120px;
+      border: 1px solid var(--card-deep-navy);
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover {
+        border-color: var(--accent-purple);
+    }
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    /* NEW: Make emojis in stat headers bigger */
+    .stat-header span:last-child {
+        font-size: 1.5rem; /* Increased emoji size */
+    }
+    
+    .stat-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+    .stat-change {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .positive-change {
+      color: var(--accent-green);
+    }
+    .negative-change {
+      color: var(--accent-red);
+    }
+    
+    /* Top 5 Dangerous Places Bar Chart Styles */
+    .top-places-container {
+      flex: 1;
+      max-width: 55%; 
+    }
+    .top-places-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+    .bar-chart {
+      /* Bar chart container background should also be deep navy for contrast */
+      background: var(--card-deep-navy); 
+      padding: 1.5rem;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .bar-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .bar-label {
+      width: 100px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      /* FIX: Ensure label text doesn't wrap awkwardly and is aligned */
+      line-height: 1.2;
+    }
+    .bar-wrapper {
+      flex-grow: 1;
+      height: 25px;
+      border-radius: 4px;
+      background: var(--dark-surface);
+      overflow: visible; /* Important for tooltips */
+      display: flex;
+      align-items: center;
+      position: relative;
+      cursor: pointer; /* Indicate hover effect/tooltip presence */
+      transition: opacity 0.2s;
+      /* Remove native title attribute styles */
+      text-decoration: none; 
+      color: inherit;
+    }
+    .bar-wrapper:hover {
+        opacity: 0.9;
+    }
+    .bar {
+      height: 100%;
+      transition: width 1s ease-out;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    /* Dynamic Bar Colors (Matching new image colors) */
+    .bar-1 { background-color: var(--bar-blue-deep); width: 95%; } 
+    .bar-2 { background-color: var(--bar-teal); width: 85%; } 
+    .bar-3 { background-color: var(--bar-white); color: var(--dark-bg); width: 75%; } 
+    .bar-4 { background-color: var(--bar-lavender); width: 65%; } 
+    .bar-5 { background-color: var(--bar-light-blue); width: 55%; } 
+
+    /* --- CUSTOM TOOLTIP STYLES (NEW) --- */
+    #custom-tooltip {
+        position: fixed; /* Use fixed for accurate positioning relative to the screen */
+        pointer-events: none;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 50;
+        opacity: 0;
+        transition: opacity 0.2s, transform 0.1s;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+    /* --- END CUSTOM TOOLTIP STYLES --- */
+
+
+    /* --- MAP / HEATMAP SECTION STYLES --- */
+    .map-section {
+        padding: 3rem 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+        width: 100%;
+        /* Setting map section to match main background for visual separation */
+        background: var(--dark-bg); 
+    }
+    .map-container-grid {
+        display: flex;
+        gap: 2rem;
+        height: 600px; /* Fixed height for the map view */
+    }
+    .sidebar-panel {
+        width: 350px;
+        /* CHANGED: Use the deep navy card color for consistency with section 2 */
+        background: var(--card-deep-navy); 
+        border-radius: 12px;
+        padding: 2.5rem 2rem; /* Increased vertical padding */
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Add shadow for depth */
+    }
+    .map-wrapper {
+        flex-grow: 1;
+        background: var(--dark-surface);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+    #heatmap-map {
+        height: 100%;
+        width: 100%;
+        border-radius: 12px;
+    }
+    .lock-icon {
+        font-size: 3rem; /* Made lock icon bigger */
+        margin-bottom: 1.5rem; /* Increased margin */
+        color: var(--accent-purple);
+    }
+    .panel-title {
+        font-size: 1.6rem; /* Slightly bigger title */
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-align: left; /* Align title and description left */
+        width: 100%;
+    }
+    .panel-description {
+        color: var(--text-secondary);
+        margin-bottom: 2rem; /* Increased margin */
+        text-align: left; /* Align title and description left */
+        width: 100%;
+    }
+    .sidebar-panel .btn {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
+    /* Custom button styles for the panel */
+    .sidebar-panel .btn-primary { 
+        background: white;
+        color: var(--dark-bg);
+        font-weight: 600;
+    }
+    .sidebar-panel .btn-secondary {
+        /* Keep secondary button color consistent with dark theme */
+        background: var(--dark-card); 
+        color: white;
+        border: 1px solid var(--border-color);
+    }
+
+    /* --- FOOTER STYLES --- */
+    .footer {
+      /* Sticky footer: sits at the bottom of content, not the viewport */
+      width: 100%;
+      background: var(--dark-surface);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border-color); 
+      margin-top: auto; /* Push footer to the bottom */
+      z-index: 5;
+    }
+    .footer-icon {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-purple);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    /* --- GENERAL & UTILITY STYLES --- */
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      justify-content: center;
+    }
+    .btn-action {
+        background: var(--accent-purple);
+        color: white;
+    }
+
+    /* Custom Modal Styles (for non-blocking UI) */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: none; 
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+        opacity: 1;
+    }
+    
+    .modal-content {
+        background: var(--dark-card);
+        border-radius: 12px;
+        padding: 1.5rem;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        transform: translateY(-20px);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .modal-overlay.show .modal-content {
+        transform: translateY(0);
+    }
+
+    .modal-message {
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-primary);
+    }
+    .modal-icon {
+        font-size: 2rem;
+        color: var(--accent-purple);
+        margin-bottom: 1rem;
+    }
+
+    .modal-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    /* Adjust button styles for modal */
+    .modal-buttons .btn {
+        padding: 0.6rem 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    .modal-buttons .btn-secondary {
+        background: var(--dark-surface);
+        color: var(--text-primary);
+    }
+    .modal-buttons .btn-secondary:hover {
+        background: var(--border-color);
+    }
+    /* End Custom Modal Styles */
+
+
+    /* Responsive adjustments */
+    @media (max-width: 1024px) {
+        .stats-header {
+            flex-direction: column;
+        }
+        .stats-title-group, .top-places-container {
+            max-width: 100%; /* Full width on smaller screens */
+        }
+        .stats-content-grid {
+            grid-template-columns: 1fr;
+        }
+        .map-container-grid {
+            flex-direction: column;
+            height: auto;
+        }
+        .sidebar-panel {
+            width: 100%;
+            height: auto;
+        }
+        .map-wrapper {
+            height: 400px; /* Allow map to take up less space on mobile/tablet */
+        }
+    }
+    @media (max-width: 640px) {
+        .hero {
+            padding: 4rem 1rem;
+        }
+        .hero-title {
+            font-size: 2.5rem;
+        }
+        .hero-actions {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .stats-section, .map-section {
+            padding: 1.5rem 1rem;
+        }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Leaflet and Heatmap JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  
+  <!-- CUSTOM TOOLTIP CONTAINER -->
+  <div id="custom-tooltip"></div>
+
+  <!-- Custom Modal HTML Structure -->
+  <div id="custom-modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content">
+      <div id="modal-icon" class="modal-icon" style="text-align: center;"></div>
+      <div id="modal-message" class="modal-message" style="text-align: center;"></div>
+      <div id="modal-buttons" class="modal-buttons">
+        <!-- Buttons injected by JS -->
+      </div>
+    </div>
+  </div>
+  <!-- End Custom Modal HTML Structure -->
+
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">My Safety</div>
+    </div>
+    <!-- Removed nav-links div -->
+    <a href="login.html" class="login-btn">
+      <span>→</span>
+      Login
+    </a>
+  </div>
+
+  <!-- HERO SECTION -->
+  <div class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">Navigate Your World Safely</h1>
+      <p class="hero-subtitle">Get AI-powered safest routes, view crime heatmaps, and contribute to a safer community.</p>
+      <div class="hero-actions">
+        <!-- Buttons trigger modal, modal's login button redirects to login.html -->
+        <a href="#" class="btn btn-primary btn-hero-primary" onclick="checkLoginRequirement(event, 'Safe Route Finder')">Find a Safe Route</a>
+        <a href="#" class="btn btn-secondary btn-hero-secondary" onclick="checkLoginRequirement(event, 'Incident Report Form')">Report an Incident</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS AND TOP PLACES SECTION -->
+  <div class="stats-section">
+    
+    <div class="stats-header">
+      
+      <!-- Left Column: Community Safety Stats -->
+      <div class="stats-title-group">
+        <h2 class="stats-title">Community Safety at a Glance</h2>
+        <p class="stats-subtitle">Stay informed with the latest statistics and trends in your area.</p>
+        
+        <div class="stats-content-grid">
+          
+          <!-- Stat 1: Active Cases -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Active Cases</span>
+              <span>📈</span>
+            </div>
+            <div class="stat-value">3,150</div>
+            <div class="stat-change positive-change">+19.5% from last month</div>
+          </div>
+          
+          <!-- Stat 2: Criminals Caught -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Criminals Caught</span>
+              <span>👮</span>
+            </div>
+            <div class="stat-value">120</div>
+            <div class="stat-change positive-change">+12.1% from last month</div>
+          </div>
+          
+          <!-- Stat 3: Reports Filed -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Reports Filed</span>
+              <span>📄</span>
+            </div>
+            <div class="stat-value">5,890</div>
+            <div class="stat-change positive-change">+7.2% from last month</div>
+          </div>
+          
+          <!-- Stat 4: Community Rating -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Community Rating</span>
+              <span>ⓘ</span>
+            </div>
+            <div class="stat-value">3.9/5</div>
+            <div class="stat-change negative-change">-0.1 from last month</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right Column: Top 5 Dangerous Places Bar Chart -->
+      <div class="top-places-container">
+        <h2 class="top-places-title">Top 5 Dangerous Places</h2>
+        <p class="stats-subtitle">Reported incidents in the last 30 days.</p>
+
+        <div class="bar-chart">
+          <!-- Note: Removed native title, added data attributes, added onmouseover/onmouseout events -->
+          <!-- Bar 1 (95 incidents) -->
+          <div class="bar-item">
+            <div class="bar-label">Jatrabari</div>
+            <div class="bar-wrapper" data-place="Jatrabari" data-incidents="95" onmousemove="showTooltip(event, this)" onmouseout="hideTooltip()">
+              <div class="bar bar-1" style="width: 95%;"></div> 
+            </div>
+          </div>
+          <!-- Bar 2 (85 incidents) -->
+          <div class="bar-item">
+            <div class="bar-label">Mohammadpur</div>
+            <div class="bar-wrapper" data-place="Mohammadpur" data-incidents="85" onmousemove="showTooltip(event, this)" onmouseout="hideTooltip()">
+              <div class="bar bar-2" style="width: 85%;"></div>
+            </div>
+          </div>
+          <!-- Bar 3 (75 incidents) -->
+          <div class="bar-item">
+            <div class="bar-label">Old Dhaka</div>
+            <div class="bar-wrapper" data-place="Old Dhaka" data-incidents="75" onmousemove="showTooltip(event, this)" onmouseout="hideTooltip()">
+              <div class="bar bar-3" style="width: 75%;"></div>
+            </div>
+          </div>
+          <!-- Bar 4 (65 incidents) -->
+          <div class="bar-item">
+            <div class="bar-label">Mirpur</div>
+            <div class="bar-wrapper" data-place="Mirpur" data-incidents="65" onmousemove="showTooltip(event, this)" onmouseout="hideTooltip()">
+              <div class="bar bar-4" style="width: 65%;"></div>
+            </div>
+          </div>
+          <!-- Bar 5 (55 incidents) -->
+          <div class="bar-item">
+            <div class="bar-label">Gulshan</div>
+            <div class="bar-wrapper" data-place="Gulshan" data-incidents="55" onmousemove="showTooltip(event, this)" onmouseout="hideTooltip()">
+              <div class="bar bar-5" style="width: 55%;"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+  
+  <!-- MAP / HEATMAP SECTION -->
+  <div class="map-section">
+      <div class="map-container-grid">
+          
+          <!-- Sidebar Panel (Login Requirement) -->
+          <div class="sidebar-panel">
+              <span class="lock-icon">🔒</span>
+              <h3 class="panel-title">Find Your Safest Route</h3>
+              <p class="panel-description">You need to be logged in to access this feature.</p>
+              <!-- Links call login screen -->
+              <a href="login.html" class="btn btn-primary" style="margin-top: 1rem;">Login</a>
+              <a href="signup.html" class="btn btn-secondary">Create an Account</a>
+          </div>
+          
+          <!-- Leaflet Map Container -->
+          <div class="map-wrapper">
+              <div id="heatmap-map"></div>
+          </div>
+      </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-icon">N</div>
+    <span>©2025 My Safety. All rights reserved.</span>
+  </div>
+
+  <script>
+    // --- Custom Modal Functions (Replacing alert and confirm/prompt) ---
+    const modalOverlay = document.getElementById('custom-modal-overlay');
+    const modalMessage = document.getElementById('modal-message');
+    const modalButtons = document.getElementById('modal-buttons');
+    const modalIcon = document.getElementById('modal-icon');
+
+    function closeModal(event) {
+        // Only close if clicking the overlay itself, not content inside
+        if (event && event.target !== modalOverlay) {
+            return;
+        }
+        modalOverlay.classList.remove('show');
+    }
+
+    /**
+     * Shows a custom alert modal.
+     * @param {string} message - The message to display.
+     */
+    function showAlert(message) {
+        modalIcon.innerHTML = '⚠️';
+        modalMessage.innerHTML = message;
+        modalButtons.innerHTML = ''; // Clear previous buttons
+
+        const okButton = document.createElement('button');
+        okButton.className = 'btn btn-action';
+        okButton.textContent = 'OK';
+        okButton.onclick = closeModal;
+        modalButtons.appendChild(okButton);
+
+        modalOverlay.classList.add('show');
+    }
+
+    /**
+     * Custom modal to require user login.
+     * @param {string} featureName - The name of the feature the user tried to access.
+     */
+    function checkLoginRequirement(event, featureName) {
+        event.preventDefault();
+
+        modalIcon.innerHTML = '🔒';
+        modalMessage.innerHTML = `You must be **logged in** to use the ${featureName}. Please log in or create an account.`;
+        modalButtons.innerHTML = '';
+
+        const loginButton = document.createElement('a');
+        loginButton.href = 'login.html'; // Redirect to login page
+        loginButton.className = 'btn btn-primary btn-action';
+        loginButton.textContent = 'Login';
+        // Remove closeModal, allow redirect
+        
+        const cancelButton = document.createElement('button');
+        cancelButton.className = 'btn btn-secondary';
+        cancelButton.textContent = 'Cancel';
+        cancelButton.onclick = closeModal;
+
+        modalButtons.appendChild(cancelButton);
+        modalButtons.appendChild(loginButton);
+        modalOverlay.classList.add('show');
+    }
+
+    // --- Tooltip Functions (NEW) ---
+    const tooltip = document.getElementById('custom-tooltip');
+
+    /**
+     * Shows the custom tooltip near the mouse cursor, centered vertically on the bar.
+     * @param {MouseEvent} event - The mouse event.
+     * @param {HTMLElement} element - The bar wrapper element being hovered.
+     */
+    function showTooltip(event, element) {
+        const place = element.getAttribute('data-place');
+        const incidents = element.getAttribute('data-incidents');
+
+        // 1. Set Tooltip Content
+        tooltip.innerHTML = `
+            <div style="font-weight: 700;">${place}</div>
+            <div style="font-size: 0.8rem; color: var(--accent-purple);">
+                ${incidents} Incidents
+            </div>
+        `;
+        
+        // 2. Get the position and dimensions of the bar wrapper (relative to viewport)
+        const rect = element.getBoundingClientRect();
+        
+        // 3. Calculate position relative to the viewport:
+        
+        // X position: 10 pixels to the right of the bar wrapper
+        const x = rect.right + 10; 
+        
+        // Y position: Vertically centered relative to the bar element's viewport position.
+        requestAnimationFrame(() => {
+            const tooltipHeight = tooltip.offsetHeight;
+            const y = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+            
+            // Apply calculated position and make visible
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+            tooltip.style.opacity = '1';
+        });
+    }
+
+    /**
+     * Hides the custom tooltip.
+     */
+    function hideTooltip() {
+        tooltip.style.opacity = '0';
+    }
+    // --- End Tooltip Functions ---
+
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // CRITICAL FIX: Wrap map initialization in a timeout to let the DOM settle and calculate map dimensions
+        setTimeout(function() {
+            // --- Leaflet Map Initialization ---
+            
+            // Coordinates for Dhaka, Bangladesh (Used as the center for the map)
+            const DHAKA_LAT = 23.777176;
+            const DHAKA_LNG = 90.399452;
+            const INITIAL_ZOOM = 12;
+
+            const map = L.map('heatmap-map', {
+                center: [DHAKA_LAT, DHAKA_LNG],
+                zoom: INITIAL_ZOOM,
+            });
+
+            // Force recalculate size before adding layers
+            map.invalidateSize();
+
+            // Add OSM (OpenStreetMap) tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18,
+                // Adjust opacity and tone to fit the dark theme slightly
+                opacity: 0.8,
+                className: 'map-tiles'
+            }).addTo(map);
+
+            // --- Mock Crime Data for Heatmap ---
+            // Format: [lat, lng, intensity]
+            const crimePoints = [
+                [23.7548, 90.3908, 0.8], // Dhanmondi (Theft)
+                [23.7809, 90.4137, 0.9], // Gulshan (High intensity, high-density reporting)
+                [23.7088, 90.4093, 0.6], // Jatrabari (Medium intensity)
+                [23.8103, 90.4125, 0.7], // Mirpur (Medium intensity)
+                [23.7562, 90.3676, 0.5], // Mohammadpur (Medium intensity)
+                [23.7291, 90.4079, 1.0], // Old Dhaka (Highest intensity)
+                [23.7634, 90.4011, 0.4], // Moghbazar
+                [23.7431, 90.3804, 0.3], // Panthapath
+                [23.7850, 90.3700, 0.6], // Cantonment Area
+                [23.8000, 90.3550, 0.5], // Mirpur 12
+            ];
+
+            // Add Heatmap Layer
+            L.heatLayer(crimePoints, { 
+                radius: 25, 
+                blur: 15,
+                maxZoom: 17,
+                gradient: {0.4: 'blue', 0.65: 'lime', 1.0: 'red'} // Blue/Green/Red intensity gradient
+            }).addTo(map);
+            
+        }, 50); // Small delay to allow CSS layout to complete
+    });
+  </script>
+</body>
+</html>
