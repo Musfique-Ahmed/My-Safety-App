@@ -19,6 +19,18 @@
         }
         #user-menu {
             z-index: 1000 !important; /* Much higher than map */
+            position: absolute !important;
+        }
+        #user-menu-button {
+            z-index: 1001 !important;
+            position: relative;
+        }
+        #panic-btn {
+            z-index: 1001 !important;
+            position: relative;
+        }
+        header {
+            z-index: 1002 !important;
         }
         .card { transition: transform 0.2s; }
         .card:hover { transform: translateY(-3px); }
@@ -63,6 +75,25 @@
                 2px 2px 4px rgba(0, 0, 0, 0.15);
         }
 
+        /* Custom style for Leaflet popups */
+        .leaflet-popup-content-wrapper {
+            border-radius: 0.75rem; /* rounded-xl */
+            padding: 1rem; /* p-4 */
+        }
+        .leaflet-popup-content-wrapper .popup-content h4 {
+            font-weight: 700; /* font-bold */
+            font-size: 1.125rem; /* text-lg */
+            margin-bottom: 0.5rem;
+            color: #4c1d95; /* purple-800 */
+        }
+
+        /* Ensure header and user menu are always above the map */
+        header, #user-menu, #user-menu-button, #panic-btn {
+            z-index: 105 !important;
+        }
+        #user-menu {
+            position: absolute !important;
+        }
     </style>
     <script>
         // Theme toggle logic
@@ -98,18 +129,24 @@
         </a>
     </nav>
 
-    <div class="flex items-center space-x-4 relative">
+    <div class="flex items-center space-x-4 relative" style="z-index:105;">
+        <!-- Panic Button: moved left of User ID -->
+        <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg z-[106] relative" title="Send Panic Alert" style="margin-right:0.5rem;">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        </button>
+
         <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
             <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
             <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
         </button>
 
-        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-50">
+        <!-- User ID Button (always above map) -->
+        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-[107] relative" style="position:relative;">
             <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
             <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
         </button>
 
-        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden z-50" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button">
+        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden z-[108]" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" style="position:absolute;">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                 <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
                 <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
@@ -163,28 +200,171 @@
                         <option>Other</option>
                     </select>
                 </div>
-                <button type="submit" class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-purple-600 hover:bg-purple-700">Find Safest Area</button>
+                <button type="submit" class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-purple-600 hover:bg-purple-700">Find Safest Route</button>
             </form>
         </div>
 
         <div class="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 flex-1 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Crime Cases by Area</h2>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Crime Cases in Area</h2>
+            <p id="crime-status" class="text-gray-500 dark:text-gray-400">Enter a destination to view local crime data.</p>
             <div id="areas" class="space-y-4"></div>
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-8 xl:col-span-9 bg-gray-200 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-visible">
+    <div class="col-span-12 lg:col-span-8 xl:col-span-9 bg-gray-200 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div id="map"></div>
     </div>
 </main>
 
 <script>
+// --- Helper Functions and Data Setup ---
+
+// Haversine formula to calculate distance between two lat/lng points in kilometers
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of Earth in kilometers
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in kilometers
+}
+
+// Authentic area and sub-area data for Dhaka
+const authenticAreas = {
+    'gulshan': {
+        center: [23.7949, 90.4137],
+        subareas: [
+            { name: "Gulshan-1", lat: 23.7806, lng: 90.4167 },
+            { name: "Gulshan-2", lat: 23.7925, lng: 90.4078 },
+            { name: "Banani", lat: 23.7975, lng: 90.4100 }
+        ]
+    },
+    'dhanmondi': {
+        center: [23.7462, 90.3776],
+        subareas: [
+            { name: "Shankar", lat: 23.7432, lng: 90.3698 },
+            { name: "Dhanmondi-15", lat: 23.7475, lng: 90.3742 },
+            { name: "Abahani Field", lat: 23.7510, lng: 90.3770 }
+        ]
+    },
+    'uttara': {
+        center: [23.8759, 90.3979],
+        subareas: [
+            { name: "Sector 4", lat: 23.8765, lng: 90.3950 },
+            { name: "Sector 7", lat: 23.8800, lng: 90.4000 },
+            { name: "Sector 10", lat: 23.8850, lng: 90.4020 }
+        ]
+    },
+    'motijheel': {
+        center: [23.7275, 90.4109],
+        subareas: [
+            { name: "Motijheel Colony", lat: 23.7280, lng: 90.4120 },
+            { name: "Dilkusha", lat: 23.7300, lng: 90.4090 }
+        ]
+    },
+    'ramna': {
+        center: [23.7383, 90.4005],
+        subareas: [
+            { name: "Ramna Park", lat: 23.7365, lng: 90.4012 },
+            { name: "Bangla Motor", lat: 23.7410, lng: 90.3980 }
+        ]
+    },
+    'badda': {
+        center: [23.7845, 90.4124],
+        subareas: [
+            { name: "Middle Badda", lat: 23.7830, lng: 90.4150 },
+            { name: "North Badda", lat: 23.7860, lng: 90.4130 }
+        ]
+    },
+    'mirpur': {
+        center: [23.8062, 90.3601],
+        subareas: [
+            { name: "Mirpur-1", lat: 23.8030, lng: 90.3530 },
+            { name: "Mirpur-10", lat: 23.8100, lng: 90.3620 },
+            { name: "Pallabi", lat: 23.8150, lng: 90.3650 }
+        ]
+    },
+    'mohammadpur': {
+        center: [23.7608, 90.3580],
+        subareas: [
+            { name: "Mohammadpur Bus Stand", lat: 23.7580, lng: 90.3560 },
+            { name: "Adabor", lat: 23.7650, lng: 90.3600 },
+            { name: "Town Hall", lat: 23.7620, lng: 90.3540 }
+        ]
+    }
+};
+
+// Simulated Geocoding Function
+async function geocodeDestination(destination) {
+    const key = destination.toLowerCase().split(',')[0].trim();
+    if (authenticAreas[key]) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return { lat: authenticAreas[key].center[0], lng: authenticAreas[key].center[1], areaKey: key };
+    }
+    // Default fallback: central Dhaka
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { lat: 23.7770, lng: 90.3952, areaKey: null };
+}
+
+// Generate Dummy Crime Data for authentic sub-areas
+const investigationStages = ["FIR Registered","Crime Scene Investigation","Evidence Collection","Suspect Identification","Interrogation","Case Filed","Court Trial"];
+const crimeTypes = ["Robbery", "Assault", "Theft", "Arson", "Vandalism", "Pickpocketing", "Homicide"];
+
+function createAuthenticDummyCrimes() {
+    const data = [];
+    Object.entries(authenticAreas).forEach(([areaKey, areaObj]) => {
+        areaObj.subareas.forEach(sub => {
+            // Generate 5-10 crimes per subarea
+            const crimeCount = Math.floor(Math.random() * 6) + 5;
+            const solved = [];
+            const unsolved = [];
+            for (let i = 0; i < crimeCount; i++) {
+                const crimeTitle = crimeTypes[Math.floor(Math.random() * crimeTypes.length)];
+                const isSolved = Math.random() < 0.3;
+                const dateOffset = Math.floor(Math.random() * 90);
+                const date = new Date();
+                date.setDate(date.getDate() - dateOffset);
+                const crime = {
+                    id: `${areaKey}-${sub.name}-${i}`,
+                    name: sub.name,
+                    area: areaKey,
+                    lat: sub.lat + (Math.random() - 0.5) * 0.002, // Slight random offset
+                    lng: sub.lng + (Math.random() - 0.5) * 0.002,
+                    title: crimeTitle,
+                    date: date.toISOString().split('T')[0],
+                    details: `Incident: ${crimeTitle}. Happened near ${sub.name}, ${areaKey.charAt(0).toUpperCase() + areaKey.slice(1)}.`,
+                    solved: isSolved
+                };
+                if (!isSolved) {
+                    const stageIndex = Math.floor(Math.random() * investigationStages.length);
+                    crime.state = investigationStages[stageIndex];
+                    unsolved.push(crime);
+                } else {
+                    solved.push(crime);
+                }
+            }
+            data.push({
+                name: sub.name,
+                area: areaKey,
+                lat: sub.lat,
+                lng: sub.lng,
+                solved,
+                unsolved
+            });
+        });
+    });
+    return data;
+}
+
+const allCrimesData = createAuthenticDummyCrimes();
+
+// Global variable to hold Leaflet marker/circle layers for easy clearing
+let currentCrimeLayers = [];
+
+// --- Main Script Logic ---
 document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
-
-    // Theme Toggle Logic
-    const themeToggle = document.getElementById('theme-toggle');
-    const html = document.documentElement;
 
     // Auto-fill current time in "Time of Visit"
     const timeInput = document.getElementById("time");
@@ -195,33 +375,166 @@ document.addEventListener('DOMContentLoaded', () => {
         timeInput.value = `${hours}:${minutes}`;
     }
 
-    // Leaflet Map Setup
+    // --- Leaflet Map Setup ---
     const dhakaCoords = [23.8103, 90.4125];
     const map = L.map('map').setView(dhakaCoords, 13);
     const lightTiles = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    let tileLayer = L.tileLayer(html.classList.contains('dark') ? darkTiles : lightTiles).addTo(map);
+    let tileLayer = L.tileLayer(document.documentElement.classList.contains('dark') ? darkTiles : lightTiles).addTo(map);
 
-    themeToggle.addEventListener('click', () => {
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+        const html = document.documentElement;
         html.classList.toggle('dark');
         localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
         tileLayer.setUrl(html.classList.contains('dark') ? darkTiles : lightTiles);
     });
 
-    // User Menu Toggle Logic
-    const userMenuButton = document.getElementById('user-menu-button');
-    const userMenu = document.getElementById('user-menu');
-    userMenuButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        userMenu.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-        // Close menu if click is outside the button and outside the menu
-        if (!userMenu.contains(e.target) && !userMenuButton.contains(e.target)) {
-            userMenu.classList.add('hidden');
+    // Helper function to create the HTML for solved/unsolved sections in the popup
+    const buildCrimeListHtml = (area) => {
+        let html = '<div class="popup-content">';
+        html += `<h4 class="text-purple-800 dark:text-purple-300 text-lg font-bold">${area.name} (${area.area.charAt(0).toUpperCase() + area.area.slice(1)})</h4>`;
+
+        const totalCrimes = area.unsolved.length + area.solved.length;
+        html += `<p class="text-sm mb-3">Total Incidents: <span class="font-semibold">${totalCrimes}</span></p>`;
+
+        if (area.unsolved.length > 0) {
+            html += `<p class="font-semibold text-red-600 dark:text-red-400 mt-2">Unsolved Cases (${area.unsolved.length}):</p>`;
+            html += `<ul class="list-disc list-inside text-sm ml-2">`;
+            area.unsolved.forEach(c => {
+                html += `<li>${c.title} (${c.date}) - Stage: <span class="font-medium">${c.state}</span></li>`;
+            });
+            html += `</ul>`;
+        } else {
+             html += `<p class="text-sm text-green-600 dark:text-green-400 mt-2">All recent cases are resolved. ✅</p>`;
+        }
+
+         if (area.solved.length > 0) {
+            html += `<p class="font-semibold text-green-600 dark:text-green-400 mt-2">Solved Cases (${area.solved.length}):</p>`;
+            html += `<ul class="list-disc list-inside text-sm ml-2">`;
+            area.solved.forEach(c => {
+                html += `<li>${c.title} (${c.date})</li>`;
+            });
+            html += `</ul>`;
+        }
+
+        html += '</div>';
+        return html;
+    };
+
+    // --- Core Rendering Function ---
+    function filterAndRenderCrimes(centerLat, centerLng, radiusKm = 2.5) {
+        const container = document.getElementById('areas');
+        const statusElement = document.getElementById('crime-status');
+        container.innerHTML = '';
+
+        // 1. Clear existing layers from map
+        currentCrimeLayers.forEach(layer => map.removeLayer(layer));
+        currentCrimeLayers = [];
+
+        // 2. Filter crimes within the radius
+        const filteredAreas = allCrimesData.filter(area => {
+            const distance = getDistance(centerLat, centerLng, area.lat, area.lng);
+            return distance <= radiusKm;
+        });
+
+        // 3. Update Status and Center Map
+        map.setView([centerLat, centerLng], 14); // Zoom in on the destination
+        statusElement.textContent = filteredAreas.length > 0 
+            ? `Showing ${filteredAreas.length} crime zones within ${radiusKm} km.`
+            : `No recent crime zones found within ${radiusKm} km.`;
+
+        // 4. Render Sidebar and Map Markers for Filtered Data
+        filteredAreas.forEach(area => {
+            // Sidebar Rendering
+            const card=document.createElement('div');
+            card.className="card bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800";
+
+            // Build sidebar content dynamically
+            const solvedHTML=area.solved.map(c=>`
+                <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-700">
+                    <strong>${c.title}</strong> <span class="text-gray-500 dark:text-gray-400">(${c.date})</span><br>
+                    <span class="text-gray-700 dark:text-gray-300">${c.details}</span>
+                </div>`).join('');
+
+            const unsolvedHTML=area.unsolved.map(c=>{
+                const stageIndex=investigationStages.indexOf(c.state) + 1 || 3;
+                const progress=Math.round(stageIndex/investigationStages.length*100);
+                return `<div class="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg border border-red-200 dark:border-red-700">
+                            <strong>${c.title}</strong> <span class="text-gray-500 dark:text-gray-400">(${c.date})</span><br>
+                            <span class="text-gray-700 dark:text-gray-300">${c.details}</span><br>
+                            <span class="text-sm font-semibold text-gray-600 dark:text-gray-400">Current Stage: ${c.state}</span>
+                            <div class="progress-bg mt-1">
+                                <div class="bar bg-red-600" style="width:${progress}%">${progress}%</div>
+                            </div>
+                        </div>`;
+            }).join('');
+
+            card.innerHTML=`
+                <h3 class="font-bold text-gray-900 dark:text-white mb-2">${area.name} <span class="text-xs text-gray-500">(${area.area.charAt(0).toUpperCase() + area.area.slice(1)})</span></h3>
+                <button class="w-full text-left font-semibold text-green-600 mb-1" onclick="toggleSection(this)">Solved Cases (${area.solved.length})</button>
+                <div class="pl-4 space-y-2 hidden">${solvedHTML}</div>
+                <button class="w-full text-left font-semibold text-red-600 mt-2 mb-1" onclick="toggleSection(this)">Unsolved Cases (${area.unsolved.length})</button>
+                <div class="pl-4 space-y-2 hidden">${unsolvedHTML}</div>`;
+
+            container.appendChild(card);
+
+            // Map Marker Rendering (CircleMarker size reflects total crimes)
+            const totalCrimes = area.solved.length + area.unsolved.length;
+            const marker=L.circleMarker([area.lat,area.lng],{
+                color:'red',
+                radius: 5 + totalCrimes * 2,
+                fillOpacity:0.7
+            }).addTo(map);
+
+            // Map Click/Popup Logic
+            marker.bindPopup(buildCrimeListHtml(area));
+
+            // Add a permanent click handler to show the popup
+            marker.on('click', function (e) {
+                map.setView(e.latlng, 15);
+                this.openPopup();
+            });
+
+            currentCrimeLayers.push(marker);
+        });
+
+        // Add a circle on the map to show the search radius (Filled, Transparent Blue)
+        const radiusCircle = L.circle([centerLat, centerLng], {
+            color: '#3b82f6', // Tailwind blue-500
+            weight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.25, // Transparent blue fill
+            opacity: 0.7, // Border opacity
+            radius: radiusKm * 1000 // Leaflet uses meters
+        }).addTo(map);
+        currentCrimeLayers.push(radiusCircle);
+    }
+    
+    // --- Event Listeners ---
+    
+    // Route Form Submission
+    document.getElementById("route-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const destinationInput = document.getElementById("destination").value;
+        const submitButton = e.target.querySelector('button[type="submit"]');
+
+        submitButton.textContent = "Searching...";
+        submitButton.disabled = true;
+
+        try {
+            const { lat, lng } = await geocodeDestination(destinationInput);
+            
+            // Filter crimes within a 2.5 km radius
+            filterAndRenderCrimes(lat, lng, 2.5); 
+
+        } catch (error) {
+            alert("Could not find location or process request. Try a common area like 'Gulshan'.");
+            console.error(error);
+        } finally {
+            submitButton.textContent = "Find Safest Route";
+            submitButton.disabled = false;
         }
     });
-
 
     // Get current location
     document.getElementById("get-location").addEventListener("click", () => {
@@ -230,8 +543,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 pos => {
                     const { latitude, longitude } = pos.coords;
                     document.getElementById("start").value = `${latitude}, ${longitude}`;
-                    map.setView([latitude, longitude], 14);
-                    L.marker([latitude, longitude]).addTo(map).bindPopup("You are here").openPopup();
+                    
+                    // Automatically filter crimes around current location too
+                    filterAndRenderCrimes(latitude, longitude, 2.5); 
+                    
                 },
                 err => alert("Unable to fetch location: " + err.message)
             );
@@ -239,60 +554,23 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Geolocation is not supported by this browser.");
         }
     });
-
-    const investigationStages = ["FIR Registered","Crime Scene Investigation","Evidence Collection","Suspect Identification","Interrogation","Case Filed","Court Trial"];
-
-    const areas = [
-        {
-            name:"Gulistan",
-            lat:23.7289, lng:90.4171,
-            solved:[{title:"Robbery",date:"2025-09-01",details:"Bank safe broken, cash stolen. Suspects caught."}],
-            unsolved:[{title:"Arson",date:"2025-09-10",details:"Warehouse fire suspected arson.",state:"Evidence Collection"}]
-        },
-        {
-            name:"Dhanmondi-27",
-            lat:23.7510, lng:90.3690,
-            solved:[{title:"Assault",date:"2025-08-20",details:"Fight at street corner, suspects arrested."}],
-            unsolved:[{title:"Theft",date:"2025-09-08",details:"Car window smashed, items stolen.",state:"Investigation Ongoing"}]
+    
+    // User Menu Toggle Logic (Kept for completeness)
+    const userMenuButton = document.getElementById('user-menu-button');
+    const userMenu = document.getElementById('user-menu');
+    userMenuButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userMenu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!userMenu.contains(e.target) && !userMenuButton.contains(e.target)) {
+            userMenu.classList.add('hidden');
         }
-    ];
+    });
 
-    const container = document.getElementById('areas');
-
-    areas.forEach(area=>{
-        const card=document.createElement('div');
-        card.className="card bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800";
-
-        const solvedHTML=area.solved.map(c=>`
-            <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-700">
-                <strong>${c.title}</strong> <span class="text-gray-500 dark:text-gray-400">(${c.date})</span><br>
-                <span class="text-gray-700 dark:text-gray-300">${c.details}</span>
-            </div>`).join('');
-
-        const unsolvedHTML=area.unsolved.map(c=>{
-            const stageIndex=investigationStages.indexOf(c.state)+1 || 3;
-            const progress=Math.round(stageIndex/investigationStages.length*100);
-            return `<div class="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg border border-red-200 dark:border-red-700">
-                        <strong>${c.title}</strong> <span class="text-gray-500 dark:text-gray-400">(${c.date})</span><br>
-                        <span class="text-gray-700 dark:text-gray-300">${c.details}</span><br>
-                        <span class="text-sm font-semibold text-gray-600 dark:text-gray-400">Current Stage: ${c.state}</span>
-                        <div class="progress-bg mt-1">
-                            <div class="bar bg-red-600" style="width:${progress}%">${progress}%</div>
-                        </div>
-                    </div>`;
-        }).join('');
-
-        card.innerHTML=`
-            <h3 class="font-bold text-gray-900 dark:text-white mb-2">${area.name}</h3>
-            <button class="w-full text-left font-semibold text-green-600 mb-1" onclick="toggleSection(this)">Solved Cases (${area.solved.length})</button>
-            <div class="pl-4 space-y-2 hidden">${solvedHTML}</div>
-            <button class="w-full text-left font-semibold text-red-600 mt-2 mb-1" onclick="toggleSection(this)">Unsolved Cases (${area.unsolved.length})</button>
-            <div class="pl-4 space-y-2 hidden">${unsolvedHTML}</div>`;
-        
-        container.appendChild(card);
-
-        const marker=L.circleMarker([area.lat,area.lng],{color:'red',radius:10,fillOpacity:0.7}).addTo(map);
-        marker.bindPopup(`<strong>${area.name}</strong><br>Total Crimes: ${area.solved.length+area.unsolved.length}`);
+    // Panic Button logic
+    document.getElementById('panic-btn').addEventListener('click', function() {
+        alert('Panic alert sent! Help is on the way.');
     });
 
     window.toggleSection=function(button){button.nextElementSibling.classList.toggle('hidden');};
