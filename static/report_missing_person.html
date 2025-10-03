@@ -12,18 +12,19 @@
 
     /* Shadow button style */
     .shadow-button {
-      border-radius: 9999px;
-      padding: 0.75rem 1.5rem;
-      background-color: rgba(147, 51, 234, 0.2);
-      color: #d8b4fe;
-      font-weight: 600;
-      box-shadow: -4px -4px 8px rgb(255, 255, 255),
-                  4px 4px 8px rgba(255, 255, 255, 0.765);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      transition: all 0.2s ease-in-out;
+        border-radius: 9999px;
+        padding: 0.75rem 1.5rem;
+        background-color: #fff;
+        color: #4c1d95;
+        font-weight: 600;
+        box-shadow:
+            -4px -4px 8px rgb(255, 255, 255),
+            4px 4px 8px rgba(255, 255, 255, 0.5);
+        transition: all 0.2s ease-in-out;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
     }
     .light .shadow-button {
       background-color: #f3f4f6;
@@ -50,14 +51,40 @@
       <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
         <i data-lucide="shield" class="w-8 h-8"></i>
       </div>
-      <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">Safe Route Dashboard</h1>
+      <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
     </div>
 
     <nav class="hidden lg:flex items-center space-x-4">
-      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="route" class="w-4 h-4 mr-2"></i> Safe Area</a>
-      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="siren" class="w-4 h-4 mr-2"></i> Report to Police</a>
-      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="users" class="w-4 h-4 mr-2"></i> Wanted Criminals</a>
-      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="search" class="w-4 h-4 mr-2"></i> Missing Persons & Items</a>
+        <a href="index.html" class="shadow-button text-sm">
+            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
+        </a>
+        
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
+        <div id="report-dropdown" class="relative">
+            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
+            </button>
+            <div id="report-dropdown-menu" 
+                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
+                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
+                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
+                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Crime
+                </a>
+                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
+                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Missing Person
+                </a>
+            </div>
+        </div>
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
+        
+        <a href="wanted_criminal.html" class="shadow-button text-sm">
+            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
+        </a>
+        <a href="missing_person.html" class="shadow-button text-sm">
+            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
+        </a>
     </nav>
 
     <div class="flex items-center space-x-4 relative">
@@ -214,6 +241,35 @@
     alert("✅ Report submitted successfully!");
     e.target.reset();
   });
+
+// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
+const reportDropdownMenu = document.getElementById('report-dropdown-menu');
+const reportDropdown = document.getElementById('report-dropdown');
+
+// 1. Event listener for clicking the button to TOGGLE the menu
+document.getElementById('report-button').addEventListener('click', (e) => {
+    e.preventDefault(); 
+    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
+    reportDropdownMenu.classList.toggle('hidden');
+});
+
+// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
+document.addEventListener('click', (e) => {
+    // If the menu is visible AND the click target is NOT inside the entire dropdown container
+    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
+        reportDropdownMenu.classList.add('hidden');
+    }
+});
+
+// 3. Add click listener to close menu when an item is selected 
+reportDropdownMenu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+        reportDropdownMenu.classList.add('hidden');
+    });
+});
+// Removed mouseover and mouseout handlers as requested.
+// --- END UPDATED DROPDOWN LOGIC ---
+
 </script>
 </body>
 </html>
