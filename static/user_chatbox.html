@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat with Admin - My Safety</title>
-    <!-- Load Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configure Tailwind to use the 'Inter' font and dark mode colors -->
+    <!-- Add Lucide icons CDN -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -15,67 +15,146 @@
                         sans: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        'primary-dark': '#111827', // Background
-                        'card-dark': '#1F2937',    // Main chat/conversation panel
-                        'input-dark': '#374151',   // Input field
-                        'accent-blue': '#3B82F6',  // User message bubble color
-                        'admin-bubble': '#4B5563', // Admin message bubble color
+                        'primary-dark': '#111827',
+                        'card-dark': '#1F2937',
+                        'input-dark': '#374151',
+                        'accent-blue': '#3B82F6',
+                        'admin-bubble': '#4B5563',
                     }
                 }
             }
         }
     </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .shadow-button {
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            background-color: #fff;
+            color: #4c1d95;
+            font-weight: 600;
+            box-shadow:
+                -4px -4px 8px rgb(255, 255, 255),
+                4px 4px 8px rgba(255, 255, 255, 0.5);
+            transition: all 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .shadow-button:hover {
+            box-shadow:
+                -2px -2px 4px rgba(255, 255, 255, 0.1),
+                2px 2px 4px rgba(0, 0, 0, 0.6);
+            transform: scale(0.98);
+            background-color: #f3f4f6;
+        }
+    </style>
 </head>
+<body class="bg-primary-dark text-white min-h-screen font-sans">
 
-<body class="bg-primary-dark text-white min-h-screen font-sans p-4 sm:p-8 flex justify-center items-start">
-
-    <!-- Chat Container -->
-    <div class="w-full max-w-7xl mx-auto rounded-xl shadow-2xl overflow-hidden bg-card-dark" style="height: 85vh;">
+<!-- Header styled exactly like report.html -->
+<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
+  <div class="flex items-center space-x-3">
+    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
+      <i data-lucide="shield" class="w-8 h-8"></i>
+    </div>
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
+  </div>
+  <nav class="hidden lg:flex items-center space-x-4">
+        <a href="index.html" class="shadow-button text-sm">
+            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
+        </a>
         
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
+        <div id="report-dropdown" class="relative">
+            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
+            </button>
+            <div id="report-dropdown-menu" 
+                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
+                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
+                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
+                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Crime
+                </a>
+                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
+                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Missing Person
+                </a>
+            </div>
+        </div>
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
+        
+        <a href="wanted_criminal.html" class="shadow-button text-sm">
+            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
+        </a>
+        <a href="missing_person.html" class="shadow-button text-sm">
+            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
+        </a>
+    </nav>
+  <div class="flex items-center space-x-4 relative">
+    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
+      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+    </button>
+    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+    </button>
+    <div class="relative">
+      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
+        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
+        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
+      </button>
+      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+          <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
+        </div>
+        <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
+          Chat with Admin
+        </a>
+        <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Center the chat container vertically and horizontally -->
+<div class="flex justify-center items-center min-h-[calc(100vh-80px)]">
+    <div class="w-full max-w-7xl mx-auto rounded-xl shadow-2xl overflow-hidden bg-card-dark" style="height: 85vh;">
         <header class="p-6 border-b border-gray-700">
             <h1 class="text-3xl font-bold text-white">Report Communication Center</h1>
             <p class="text-sm text-gray-400">Secure chat for follow-up questions regarding your submitted reports.</p>
         </header>
-
-        <!-- Main Chat Layout (Split Screen) -->
-        <div class="flex h-[calc(85vh-5rem)]"> 
-            
+        <div class="flex h-[calc(85vh-5rem)]">
             <!-- LEFT PANEL: Active Conversations List -->
             <div id="conversation-list" class="w-1/4 min-w-[200px] border-r border-gray-700 overflow-y-auto">
                 <div class="p-4 bg-gray-700/30 font-semibold text-lg border-b border-gray-700">Active Reports</div>
-                
-                <!-- Conversation Item (Active/Selected) -->
                 <div id="conv-1" class="conversation-item p-4 border-b border-gray-700 bg-gray-700/50 cursor-pointer transition duration-150" onclick="loadConversation(1)">
                     <p class="font-semibold">Report: UR-001</p>
                     <p class="text-xs text-gray-400">Theft at Dhanmondi</p>
                 </div>
-                
-                <!-- Conversation Item (Inactive) -->
                 <div id="conv-2" class="conversation-item p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition duration-150" onclick="loadConversation(2)">
                     <p class="font-semibold">Report: UR-002</p>
                     <p class="text-xs text-gray-400">Mugging incident</p>
                 </div>
-
-                <!-- Conversation Item (Inactive) -->
                 <div id="conv-3" class="conversation-item p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition duration-150" onclick="loadConversation(3)">
                     <p class="font-semibold">Report: UR-003</p>
                     <p class="text-xs text-gray-400">Cyber Crime Report</p>
                 </div>
-
             </div>
-
             <!-- RIGHT PANEL: Chat Message Window -->
             <div class="flex-1 flex flex-col">
-                
-                <!-- Message Display Area -->
                 <div id="messages-container" class="flex-1 p-6 space-y-4 overflow-y-auto">
-                    <!-- Messages will be populated here by JavaScript -->
                     <div class="text-center text-gray-400 pt-10" id="chat-placeholder">
                         Select a report on the left to view the conversation.
                     </div>
                 </div>
-
-                <!-- Message Input Footer -->
                 <div id="message-input-area" class="p-4 border-t border-gray-700 flex space-x-3 bg-gray-800/50">
                     <input type="text" id="message-input" placeholder="Type your message..." class="flex-1 rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
                     <button id="send-button" onclick="sendMessage()" class="bg-accent-blue hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-opacity-50">
@@ -83,161 +162,180 @@
                     </button>
                 </div>
             </div>
-
         </div>
     </div>
+</div>
 
-    <script>
-        // --- Dummy Data (Replace with Firestore/DBMS Integration) ---
+<script>
+    // --- Dummy Data (Replace with Firestore/DBMS Integration) ---
+    const conversationData = {
+        1: {
+            title: "Theft at Dhanmondi",
+            messages: [
+                { sender: 'user', text: "I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?", time: "2 hours ago" },
+                { sender: 'admin', text: "Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?", time: "1 hour ago" },
+                { sender: 'user', text: "Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a phone.", time: "30 minutes ago" },
+                { sender: 'admin', text: "Understood. We'll update the case file with this information. We appreciate your cooperation.", time: "5 minutes ago" }
+            ]
+        },
+        2: {
+            title: "Mugging incident",
+            messages: [
+                { sender: 'admin', text: "We noticed your report on the mugging. Are you able to identify the suspect if shown a picture?", time: "Yesterday" }
+            ]
+        },
+        3: {
+            title: "Cyber Crime Report",
+            messages: [
+                { sender: 'user', text: "I suspect my bank details were compromised after a phishing attempt.", time: "2 days ago" }
+            ]
+        }
+    };
 
-        const conversationData = {
-            1: {
-                title: "Theft at Dhanmondi",
-                messages: [
-                    { sender: 'user', text: "I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?", time: "2 hours ago" },
-                    { sender: 'admin', text: "Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?", time: "1 hour ago" },
-                    { sender: 'user', text: "Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a phone.", time: "30 minutes ago" },
-                    { sender: 'admin', text: "Understood. We'll update the case file with this information. We appreciate your cooperation.", time: "5 minutes ago" }
-                ]
-            },
-            2: {
-                title: "Mugging incident",
-                messages: [
-                    { sender: 'admin', text: "We noticed your report on the mugging. Are you able to identify the suspect if shown a picture?", time: "Yesterday" }
-                ]
-            },
-            3: {
-                title: "Cyber Crime Report",
-                messages: [
-                    { sender: 'user', text: "I suspect my bank details were compromised after a phishing attempt.", time: "2 days ago" }
-                ]
-            }
-        };
+    let activeConversationId = 1; // Default to the first conversation
+    let automationSent = {}; // Track if automation message sent per conversation
 
-        let activeConversationId = 1; // Default to the first conversation
-
-        // --- Utility Functions ---
-
-        /**
-         * Renders a single message bubble into the chat window.
-         * @param {Object} message - { sender: 'user'|'admin', text: string, time: string }
-         */
-        function renderMessage(message) {
-            const container = document.getElementById('messages-container');
-            const isUser = message.sender === 'user';
-            
-            // Choose colors based on sender
-            const bgColor = isUser ? 'bg-accent-blue' : 'bg-admin-bubble';
-            const alignment = isUser ? 'self-end' : 'self-start';
-            const borderRadius = isUser ? 'rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl' : 'rounded-tr-xl rounded-bl-xl rounded-tl-sm rounded-br-xl';
-
-            const messageHtml = `
-                <div class="flex flex-col ${alignment} max-w-xs sm:max-w-md">
+    function renderMessage(message) {
+        const container = document.getElementById('messages-container');
+        const isUser = message.sender === 'user';
+        const bgColor = isUser ? 'bg-accent-blue' : 'bg-admin-bubble';
+        // Make user messages stick to the right wall
+        const alignment = isUser ? 'items-end justify-end' : 'items-start justify-start';
+        const borderRadius = isUser ? 'rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl' : 'rounded-tr-xl rounded-bl-xl rounded-tl-sm rounded-br-xl';
+        const messageHtml = `
+            <div class="flex ${alignment} w-full">
+                <div class="flex flex-col max-w-xs sm:max-w-md">
                     <div class="p-3 text-sm ${bgColor} text-white ${borderRadius} shadow-md">
                         ${message.text}
                     </div>
                     <span class="text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}">${message.time}</span>
                 </div>
-            `;
-            container.innerHTML += messageHtml;
-            container.scrollTop = container.scrollHeight; // Scroll to bottom
-        }
+            </div>
+        `;
+        container.innerHTML += messageHtml;
+        container.scrollTop = container.scrollHeight;
+    }
 
-        /**
-         * Loads and displays the messages for a selected conversation ID.
-         * @param {number} id - The ID of the conversation to load.
-         */
-        function loadConversation(id) {
-            activeConversationId = id;
-            const container = document.getElementById('messages-container');
-            const chatPlaceholder = document.getElementById('chat-placeholder');
-            const data = conversationData[id];
-
-            // Update conversation list visual state
-            document.querySelectorAll('.conversation-item').forEach(el => {
-                el.classList.remove('bg-gray-700/50');
-            });
-            document.getElementById(`conv-${id}`).classList.add('bg-gray-700/50');
-
-            // Clear chat window
-            container.innerHTML = '';
-            
-            if (data && data.messages.length > 0) {
-                // Render all messages in the selected conversation
-                data.messages.forEach(renderMessage);
-            } else {
-                // Show initial message if conversation is empty
-                container.innerHTML = `
-                    <div class="text-center text-gray-400 pt-10">
-                        Start a new conversation for Report UR-00${id} by sending the first message!
-                    </div>
-                `;
-            }
-        }
-
-        /**
-         * Simulates sending a message from the user.
-         */
-        function sendMessage() {
-            const input = document.getElementById('message-input');
-            const text = input.value.trim();
-
-            if (text === "" || activeConversationId === null) {
-                return;
-            }
-
-            // Create new message object
-            const newMessage = {
-                sender: 'user',
-                text: text,
-                time: 'Just now' // Use a library like moment.js for real time formatting
-            };
-
-            // 1. Render the message
-            renderMessage(newMessage);
-
-            // 2. Add to dummy data (in a real app, this goes to Firestore/DBMS)
-            if (!conversationData[activeConversationId]) {
-                conversationData[activeConversationId] = { title: `Report UR-00${activeConversationId}`, messages: [] };
-            }
-            conversationData[activeConversationId].messages.push(newMessage);
-
-            // 3. Clear input
-            input.value = '';
-            input.focus();
-
-            // 4. Simulate Admin response (for demonstration only)
-            setTimeout(simulateAdminResponse, 1500, activeConversationId);
-        }
-
-        /**
-         * Simulates an admin response after a brief delay.
-         */
-        function simulateAdminResponse(id) {
-            const adminMessage = {
-                sender: 'admin',
-                text: "Received. We will verify the details and respond shortly. Thank you for your patience.",
-                time: 'A moment ago'
-            };
-             if (activeConversationId === id) {
-                renderMessage(adminMessage);
-                conversationData[id].messages.push(adminMessage);
-            }
-        }
-
-        // Initialize the view on load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load the first conversation by default
-            loadConversation(activeConversationId); 
-
-            // Enable sending message on Enter key press
-            document.getElementById('message-input').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
+    function loadConversation(id) {
+        activeConversationId = id;
+        const container = document.getElementById('messages-container');
+        const data = conversationData[id];
+        document.querySelectorAll('.conversation-item').forEach(el => {
+            el.classList.remove('bg-gray-700/50');
         });
-    </script>
+        document.getElementById(`conv-${id}`).classList.add('bg-gray-700/50');
+        container.innerHTML = '';
+        if (data && data.messages.length > 0) {
+            data.messages.forEach(renderMessage);
+        } else {
+            container.innerHTML = `
+                <div class="text-center text-gray-400 pt-10">
+                    Start a new conversation for Report UR-00${id} by sending the first message!
+                </div>
+            `;
+        }
+        automationSent[id] = false; // Reset automation for new conversation
+    }
 
+    function sendMessage() {
+        const input = document.getElementById('message-input');
+        const text = input.value.trim();
+        if (text === "" || activeConversationId === null) {
+            return;
+        }
+        const newMessage = {
+            sender: 'user',
+            text: text,
+            time: 'Just now'
+        };
+        renderMessage(newMessage);
+        if (!conversationData[activeConversationId]) {
+            conversationData[activeConversationId] = { title: `Report UR-00${activeConversationId}`, messages: [] };
+        }
+        conversationData[activeConversationId].messages.push(newMessage);
+        input.value = '';
+        input.focus();
+
+        // Show automation only for the first user message in this conversation
+        if (!automationSent[activeConversationId]) {
+            setTimeout(() => {
+                const adminMessage = {
+                    sender: 'admin',
+                    text: "Received. We will verify the details and respond shortly. Thank you for your patience.",
+                    time: 'A moment ago'
+                };
+                renderMessage(adminMessage);
+                conversationData[activeConversationId].messages.push(adminMessage);
+                automationSent[activeConversationId] = true;
+            }, 1000);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadConversation(activeConversationId);
+        document.getElementById('message-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        lucide.createIcons();
+
+        // User menu toggle
+        const userMenuButton = document.getElementById("user-menu-button");
+        const userMenu = document.getElementById("user-menu");
+        userMenuButton.addEventListener("click", () => {
+            userMenu.classList.toggle("hidden");
+        });
+        document.addEventListener("click", (e) => {
+            if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
+                userMenu.classList.add("hidden");
+            }
+        });
+
+        // Theme toggle
+        const themeToggle = document.getElementById("theme-toggle");
+        themeToggle.addEventListener("click", () => {
+            document.documentElement.classList.toggle("dark");
+            if (document.documentElement.classList.contains("dark")) {
+                localStorage.theme = "dark";
+            } else {
+                localStorage.theme = "light";
+            }
+            lucide.createIcons();
+        });
+    });
+
+
+
+// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
+const reportDropdownMenu = document.getElementById('report-dropdown-menu');
+const reportDropdown = document.getElementById('report-dropdown');
+
+// 1. Event listener for clicking the button to TOGGLE the menu
+document.getElementById('report-button').addEventListener('click', (e) => {
+    e.preventDefault(); 
+    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
+    reportDropdownMenu.classList.toggle('hidden');
+});
+
+// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
+document.addEventListener('click', (e) => {
+    // If the menu is visible AND the click target is NOT inside the entire dropdown container
+    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
+        reportDropdownMenu.classList.add('hidden');
+    }
+});
+
+// 3. Add click listener to close menu when an item is selected 
+reportDropdownMenu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+        reportDropdownMenu.classList.add('hidden');
+    });
+});
+// Removed mouseover and mouseout handlers as requested.
+// --- END UPDATED DROPDOWN LOGIC ---
+
+
+</script>
 </body>
 </html>

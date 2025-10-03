@@ -91,35 +91,36 @@
         </a>
     </nav>
 
-  <div class="flex items-center space-x-4 relative">
-    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
-      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-    </button>
-    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
-      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
-    </button>
-    <div class="relative">
-      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
-        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
-        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
-      </button>
-      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-          <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
-        </div>
-        <a href="#" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
-          Chat with Admin
-        </a>
-        <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
-          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
-          Logout
+    <div class="flex items-center space-x-4 relative" style="z-index:105;">
+        <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg z-[106] relative" title="Send Panic Alert" style="margin-right:0.5rem;">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
         </button>
-      </div>
+
+        <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+            <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+            <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+        </button>
+
+        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-[107] relative" style="position:relative;">
+            <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
+            <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
+        </button>
+
+        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden z-[108]" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" style="position:absolute;">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
+            </div>
+            <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
+                Chat with Admin
+            </a>
+            <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+                <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
+                Logout
+            </button>
+        </div>
     </div>
-  </div>
 </header>
 
 <!-- ===== CONTENT ===== -->
