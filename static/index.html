@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safe Route Dashboard - Bangladesh</title>
+    <title>My Safety</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet-heat@0.2.0/dist/leaflet-heat.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         #map {
             height: 100%;
             width: 100%;
             position: relative;
-            z-index: 10; /* Lower than user menu */
+            z-index: 10;
         }
         #user-menu {
-            z-index: 1000 !important; /* Much higher than map */
+            z-index: 1000 !important;
             position: absolute !important;
         }
         #user-menu-button {
@@ -32,6 +32,12 @@
         header {
             z-index: 1002 !important;
         }
+        /* --- NEW DROPDOWN STYLE --- */
+        #report-dropdown-menu {
+            z-index: 1040 !important; /* Higher z-index for dropdown */
+            min-width: 14rem;
+        }
+        /* -------------------------- */
         .card { transition: transform 0.2s; }
         .card:hover { transform: translateY(-3px); }
         .bar { height:16px; border-radius:12px; overflow:hidden; font-size:10px; line-height:16px; color:white; text-align:right; padding-right:2px; }
@@ -39,14 +45,14 @@
 
         /* Custom Shadow UI Button Style */
         .shadow-button {
-            border-radius: 9999px; /* Pill shape */
-            padding: 0.75rem 1.5rem; /* py-3 px-6 */
-            background-color: rgba(147, 51, 234, 0.2); /* Purple-600 with opacity for base */
-            color: #d8b4fe; /* Light purple text */
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            background-color: rgba(147, 51, 234, 0.2);
+            color: #d8b4fe;
             font-weight: 600;
             box-shadow: 
-                -4px -4px 8px rgba(255, 255, 255, 0.05), /* Light source for dark mode */
-                4px 4px 8px rgba(0, 0, 0, 0.5); /* Shadow for dark mode */
+                -4px -4px 8px rgba(255, 255, 255, 0.05),
+                4px 4px 8px rgba(0, 0, 0, 0.5);
             transition: all 0.2s ease-in-out;
             display: inline-flex;
             align-items: center;
@@ -55,11 +61,11 @@
         }
 
         .light .shadow-button {
-            background-color: #f3f4f6; /* Gray-100 for light mode */
-            color: #4c1d95; /* Deep purple text */
+            background-color: #f3f4f6;
+            color: #4c1d95;
             box-shadow: 
-                -4px -4px 8px rgba(255, 255, 255, 1), /* Light source for light mode */
-                4px 4px 8px rgba(0, 0, 0, 0.1); /* Shadow for light mode */
+                -4px -4px 8px rgba(255, 255, 255, 1),
+                4px 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .shadow-button:hover {
@@ -76,23 +82,77 @@
         }
 
         /* Custom style for Leaflet popups */
-        .leaflet-popup-content-wrapper {
-            border-radius: 0.75rem; /* rounded-xl */
-            padding: 1rem; /* p-4 */
-        }
-        .leaflet-popup-content-wrapper .popup-content h4 {
-            font-weight: 700; /* font-bold */
-            font-size: 1.125rem; /* text-lg */
-            margin-bottom: 0.5rem;
-            color: #4c1d95; /* purple-800 */
-        }
+        .leaflet-popup-content-wrapper { border-radius: 0.75rem; padding: 1rem; }
+        .leaflet-popup-content-wrapper .popup-content h4 { font-weight: 700; font-size: 1.125rem; margin-bottom: 0.5rem; color: #4c1d95; }
 
-        /* Ensure header and user menu are always above the map */
-        header, #user-menu, #user-menu-button, #panic-btn {
-            z-index: 105 !important;
+        .dark .leaflet-popup-content-wrapper { background-color: #1f2937; color: #f9fafb; }
+        .dark .leaflet-popup-tip { background: #1f2937; }
+        
+        /* --- LIGHTBOX (MODAL) STYLES --- */
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: none; /* Controlled by JS */
+            align-items: center;
+            justify-content: center;
         }
-        #user-menu {
-            position: absolute !important;
+        .lightbox-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column; /* To stack image and caption */
+        }
+        .lightbox-image, .lightbox-video {
+            display: none;
+            max-width: 100%;
+            max-height: 80vh; /* Leave room for caption */
+            border-radius: 1rem;
+        }
+        .lightbox-image.active, .lightbox-video.active {
+            display: block;
+        }
+        .lightbox-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+            z-index: 10000;
+        }
+        .lightbox-button:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        #lightbox-prev { left: 20px; }
+        #lightbox-next { right: 20px; }
+        #lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #e0e0e0;
+            color: #333;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.25rem;
+            z-index: 10001;
+            line-height: 1;
+            font-weight: bold;
         }
     </style>
     <script>
@@ -111,26 +171,43 @@
         <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
             <i data-lucide="shield-half" class="w-8 h-8"></i>
         </div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">Safe Route Dashboard</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
     </div>
 
     <nav class="hidden lg:flex items-center space-x-4">
-        <a href="#" class="shadow-button text-sm">
+        <a href="index.html" class="shadow-button text-sm">
             <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
         </a>
-        <a href="#" class="shadow-button text-sm">
-            <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
-        </a>
-        <a href="#" class="shadow-button text-sm">
+        
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
+        <div id="report-dropdown" class="relative">
+            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
+            </button>
+            <div id="report-dropdown-menu" 
+                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
+                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
+                <a href="user_report.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
+                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Crime
+                </a>
+                <a href="missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
+                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
+                    Report a Missing Person
+                </a>
+            </div>
+        </div>
+        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
+        
+        <a href="wanted_criminal.html" class="shadow-button text-sm">
             <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
         </a>
-        <a href="wanted_criminal.html" class="shadow-button text-sm">
-            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons & Items
+        <a href="missing_person.html" class="shadow-button text-sm">
+            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
         </a>
     </nav>
 
     <div class="flex items-center space-x-4 relative" style="z-index:105;">
-        <!-- Panic Button: moved left of User ID -->
         <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg z-[106] relative" title="Send Panic Alert" style="margin-right:0.5rem;">
             <i data-lucide="alert-triangle" class="w-6 h-6"></i>
         </button>
@@ -140,7 +217,6 @@
             <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
         </button>
 
-        <!-- User ID Button (always above map) -->
         <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-[107] relative" style="position:relative;">
             <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
             <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
@@ -155,7 +231,7 @@
                 <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
                 Chat with Admin
             </a>
-            <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+            <button onclick="console.warn('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
                 <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
                 Logout
             </button>
@@ -200,14 +276,14 @@
                         <option>Other</option>
                     </select>
                 </div>
-                <button type="submit" class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-purple-600 hover:bg-purple-700">Find Safest Route</button>
+                <button type="submit" class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-purple-600 hover:bg-purple-700">Find Safest Area</button>
             </form>
         </div>
 
         <div class="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 flex-1 overflow-y-auto">
             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Crime Cases in Area</h2>
             <p id="crime-status" class="text-gray-500 dark:text-gray-400">Enter a destination to view local crime data.</p>
-            <div id="areas" class="space-y-4"></div>
+            <div id="areas" class="space-y-4 max-h-[400px] overflow-y-auto"></div>
         </div>
     </div>
 
@@ -216,8 +292,25 @@
     </div>
 </main>
 
+<div id="lightbox" class="lightbox">
+    <span id="lightbox-close">✖</span>
+    <div id="lightbox-content" class="lightbox-content">
+        </div>
+    <button id="lightbox-prev" class="lightbox-button p-2" onclick="navigateMedia(-1)">
+        <i data-lucide="chevron-left" class="w-8 h-8"></i>
+    </button>
+    <button id="lightbox-next" class="lightbox-button p-2" onclick="navigateMedia(1)">
+        <i data-lucide="chevron-right" class="w-8 h-8"></i>
+    </button>
+</div>
 <script>
 // --- Helper Functions and Data Setup ---
+
+// DEMO IMAGE URLS (Updated to use img1.jpg and img2.jpg)
+const DEMO_IMAGE_URLS = [
+    'img1.jpg', 
+    'img2.jpg'
+];
 
 // Haversine formula to calculate distance between two lat/lng points in kilometers
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -302,12 +395,11 @@ async function geocodeDestination(destination) {
         await new Promise(resolve => setTimeout(resolve, 500));
         return { lat: authenticAreas[key].center[0], lng: authenticAreas[key].center[1], areaKey: key };
     }
-    // Default fallback: central Dhaka
     await new Promise(resolve => setTimeout(resolve, 500));
     return { lat: 23.7770, lng: 90.3952, areaKey: null };
 }
 
-// Generate Dummy Crime Data for authentic sub-areas
+// Generate Dummy Crime Data with Media Array
 const investigationStages = ["FIR Registered","Crime Scene Investigation","Evidence Collection","Suspect Identification","Interrogation","Case Filed","Court Trial"];
 const crimeTypes = ["Robbery", "Assault", "Theft", "Arson", "Vandalism", "Pickpocketing", "Homicide"];
 
@@ -315,7 +407,6 @@ function createAuthenticDummyCrimes() {
     const data = [];
     Object.entries(authenticAreas).forEach(([areaKey, areaObj]) => {
         areaObj.subareas.forEach(sub => {
-            // Generate 5-10 crimes per subarea
             const crimeCount = Math.floor(Math.random() * 6) + 5;
             const solved = [];
             const unsolved = [];
@@ -329,12 +420,19 @@ function createAuthenticDummyCrimes() {
                     id: `${areaKey}-${sub.name}-${i}`,
                     name: sub.name,
                     area: areaKey,
-                    lat: sub.lat + (Math.random() - 0.5) * 0.002, // Slight random offset
+                    lat: sub.lat + (Math.random() - 0.5) * 0.002, 
                     lng: sub.lng + (Math.random() - 0.5) * 0.002,
                     title: crimeTitle,
                     date: date.toISOString().split('T')[0],
                     details: `Incident: ${crimeTitle}. Happened near ${sub.name}, ${areaKey.charAt(0).toUpperCase() + areaKey.slice(1)}.`,
-                    solved: isSolved
+                    solved: isSolved,
+                    // *** MEDIA DATA ***
+                    media: [
+                        { type: 'image', url: DEMO_IMAGE_URLS[0], caption: 'CCTV still / Public Photo 1' },
+                        { type: 'image', url: DEMO_IMAGE_URLS[1], caption: 'Evidence collected at the scene / Public Photo 2' },
+                        { type: 'video', url: '', caption: 'Public video footage (No URL for demo)' } 
+                    ]
+                    // ********************
                 };
                 if (!isSolved) {
                     const stageIndex = Math.floor(Math.random() * investigationStages.length);
@@ -359,8 +457,97 @@ function createAuthenticDummyCrimes() {
 
 const allCrimesData = createAuthenticDummyCrimes();
 
-// Global variable to hold Leaflet marker/circle layers for easy clearing
 let currentCrimeLayers = [];
+let heatLayer = null;
+
+// --- LIGHTBOX/MODAL LOGIC (NEW) ---
+let currentMediaList = [];
+let currentMediaIndex = 0;
+const lightbox = document.getElementById('lightbox');
+const lightboxContent = document.getElementById('lightbox-content');
+const lightboxClose = document.getElementById('lightbox-close');
+
+function openMediaLightbox(mediaListJson, startIndex = 0) {
+    const mediaList = JSON.parse(mediaListJson);
+    // Filter to only include media with a URL (i.e., exclude the blank video entry for now)
+    currentMediaList = mediaList.filter(m => m.url); 
+    
+    // IMPORTANT: Custom alert replacement
+    if (currentMediaList.length === 0) {
+        // Since we cannot use alert(), log to console or use a custom modal
+        console.warn("No evidence photos or videos available for this case.");
+        return;
+    }
+    
+    currentMediaIndex = Math.min(startIndex, currentMediaList.length - 1); 
+    
+    updateLightboxContent();
+    lightbox.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    lucide.createIcons(); // Ensure icons for navigation are rendered
+}
+
+function updateLightboxContent() {
+    lightboxContent.innerHTML = '';
+    const media = currentMediaList[currentMediaIndex];
+    let mediaElement;
+
+    if (media.type === 'image') {
+        mediaElement = document.createElement('img');
+        mediaElement.src = media.url;
+        mediaElement.alt = media.caption;
+        mediaElement.className = 'lightbox-image active shadow-2xl';
+    } else if (media.type === 'video') {
+        mediaElement = document.createElement('video');
+        mediaElement.src = media.url;
+        mediaElement.controls = true;
+        mediaElement.className = 'lightbox-video active shadow-2xl';
+        mediaElement.autoplay = true;
+        mediaElement.loop = true;
+    }
+
+    if (mediaElement) {
+        lightboxContent.appendChild(mediaElement);
+        const caption = document.createElement('p');
+        caption.textContent = `Evidence ${currentMediaIndex + 1} of ${currentMediaList.length}: ${media.caption}`;
+        caption.className = 'p-3 text-center text-white bg-black/50 w-full mt-2 rounded-xl';
+        lightboxContent.appendChild(caption);
+    }
+
+    // Show/Hide navigation buttons
+    document.getElementById('lightbox-prev').style.display = currentMediaList.length > 1 ? 'flex' : 'none';
+    document.getElementById('lightbox-next').style.display = currentMediaList.length > 1 ? 'flex' : 'none';
+}
+
+window.navigateMedia = function(direction) {
+    currentMediaIndex = (currentMediaIndex + direction + currentMediaList.length) % currentMediaList.length;
+    updateLightboxContent();
+}
+
+function closeLightbox() {
+    lightbox.style.display = 'none';
+    document.body.style.overflow = 'auto'; // Restore scrolling
+    // Pause any playing media
+    const video = lightboxContent.querySelector('video');
+    if (video) video.pause();
+}
+
+lightboxClose.addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (e) => {
+    // Close when clicking the dark backdrop
+    if (e.target.id === 'lightbox') {
+        closeLightbox();
+    }
+});
+
+// ESC key to close
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+        closeLightbox();
+    }
+});
+// --- END LIGHTBOX/MODAL LOGIC ---
+
 
 // --- Main Script Logic ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -393,7 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const buildCrimeListHtml = (area) => {
         let html = '<div class="popup-content">';
         html += `<h4 class="text-purple-800 dark:text-purple-300 text-lg font-bold">${area.name} (${area.area.charAt(0).toUpperCase() + area.area.slice(1)})</h4>`;
-
         const totalCrimes = area.unsolved.length + area.solved.length;
         html += `<p class="text-sm mb-3">Total Incidents: <span class="font-semibold">${totalCrimes}</span></p>`;
 
@@ -405,18 +591,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             html += `</ul>`;
         } else {
-             html += `<p class="text-sm text-green-600 dark:text-green-400 mt-2">All recent cases are resolved. ✅</p>`;
+            html += `<p class="text-sm text-green-600 dark:text-green-400 mt-2">All recent cases are resolved. ✅</p>`;
         }
 
-         if (area.solved.length > 0) {
+        if (area.solved.length > 0) {
             html += `<p class="font-semibold text-green-600 dark:text-green-400 mt-2">Solved Cases (${area.solved.length}):</p>`;
-            html += `<ul class="list-disc list-inside text-sm ml-2">`;
+            html += `<ul class-="list-disc list-inside text-sm ml-2">`;
             area.solved.forEach(c => {
                 html += `<li>${c.title} (${c.date})</li>`;
             });
             html += `</ul>`;
         }
-
         html += '</div>';
         return html;
     };
@@ -430,32 +615,93 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Clear existing layers from map
         currentCrimeLayers.forEach(layer => map.removeLayer(layer));
         currentCrimeLayers = [];
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
+            heatLayer = null;
+        }
 
-        // 2. Filter crimes within the radius
+        // 2. Filter crimes within the radius and collect ALL crime points
+        const crimesInArea = [];
         const filteredAreas = allCrimesData.filter(area => {
             const distance = getDistance(centerLat, centerLng, area.lat, area.lng);
-            return distance <= radiusKm;
+            if (distance <= radiusKm) {
+                area.unsolved.forEach(crime => {
+                    crimesInArea.push([crime.lat, crime.lng, 1]); 
+                });
+                return true;
+            }
+            return false;
         });
 
         // 3. Update Status and Center Map
-        map.setView([centerLat, centerLng], 14); // Zoom in on the destination
+        map.setView([centerLat, centerLng], 14);
         statusElement.textContent = filteredAreas.length > 0 
-            ? `Showing ${filteredAreas.length} crime zones within ${radiusKm} km.`
+            ? `Showing ${filteredAreas.length} crime zones within ${radiusKm} km. Total incidents: ${crimesInArea.length}`
             : `No recent crime zones found within ${radiusKm} km.`;
+        
+        // 4. Render Heatmap
+        if (crimesInArea.length > 0) {
+            heatLayer = L.heatLayer(crimesInArea, { 
+                radius: 35, 
+                blur: 25, 
+                maxZoom: 16, 
+                gradient: {0.0: 'lime', 0.5: 'gold', 1.0: 'crimson'} 
+            }).addTo(map);
+            currentCrimeLayers.push(heatLayer);
 
-        // 4. Render Sidebar and Map Markers for Filtered Data
+            // Add invisible markers for interactive popups
+            filteredAreas.forEach(area => {
+                const totalUnsolvedCrimes = area.unsolved.length;
+                if (totalUnsolvedCrimes > 0) {
+                    const marker = L.circleMarker([area.lat, area.lng], {
+                        radius: 1, opacity: 0, fillOpacity: 0 
+                    }).addTo(map);
+                    marker.bindPopup(buildCrimeListHtml(area));
+                    marker.on('click', function (e) {
+                           map.setView(e.latlng, 15);
+                           this.openPopup();
+                    });
+                    currentCrimeLayers.push(marker);
+                }
+            });
+        }
+        
+        // 5. Render Sidebar for Filtered Data
+        
+        // Helper to create media buttons
+        const createMediaButtons = (crime) => {
+            const hasImages = crime.media.filter(m => m.type === 'image' && m.url).length;
+            const hasVideos = crime.media.filter(m => m.type === 'video' && m.url).length;
+            const mediaJson = JSON.stringify(crime.media);
+
+            return `
+                <div class="flex space-x-2 mt-2">
+                    <button class="flex items-center text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-700 disabled:opacity-50"
+                        onclick='openMediaLightbox(\`${mediaJson}\`, 0)'>
+                        <i data-lucide="camera" class="w-3 h-3 mr-1"></i>
+                        Photos (${hasImages})
+                    </button>
+                    <button class="flex items-center text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700 disabled:opacity-50"
+                        onclick='openMediaLightbox(\`${mediaJson}\`, ${hasImages})'
+                        ${!hasVideos ? 'disabled title="No video evidence available"' : ''}>
+                        <i data-lucide="video" class="w-3 h-3 mr-1"></i>
+                        Videos (0)
+                    </button>
+                </div>
+            `;
+        };
+        // END Helper
+        
         filteredAreas.forEach(area => {
-            // Sidebar Rendering
-            const card=document.createElement('div');
-            card.className="card bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800";
-
-            // Build sidebar content dynamically
+            // Build solved crime list HTML with media buttons
             const solvedHTML=area.solved.map(c=>`
                 <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-700">
                     <strong>${c.title}</strong> <span class="text-gray-500 dark:text-gray-400">(${c.date})</span><br>
                     <span class="text-gray-700 dark:text-gray-300">${c.details}</span>
+                    ${createMediaButtons(c)}
                 </div>`).join('');
 
+            // Build unsolved crime list HTML with media buttons
             const unsolvedHTML=area.unsolved.map(c=>{
                 const stageIndex=investigationStages.indexOf(c.state) + 1 || 3;
                 const progress=Math.round(stageIndex/investigationStages.length*100);
@@ -466,9 +712,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="progress-bg mt-1">
                                 <div class="bar bg-red-600" style="width:${progress}%">${progress}%</div>
                             </div>
+                            ${createMediaButtons(c)}
                         </div>`;
             }).join('');
 
+            // The main area card structure
+            const card=document.createElement('div');
+            card.className="card bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800";
             card.innerHTML=`
                 <h3 class="font-bold text-gray-900 dark:text-white mb-2">${area.name} <span class="text-xs text-gray-500">(${area.area.charAt(0).toUpperCase() + area.area.slice(1)})</span></h3>
                 <button class="w-full text-left font-semibold text-green-600 mb-1" onclick="toggleSection(this)">Solved Cases (${area.solved.length})</button>
@@ -477,35 +727,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="pl-4 space-y-2 hidden">${unsolvedHTML}</div>`;
 
             container.appendChild(card);
-
-            // Map Marker Rendering (CircleMarker size reflects total crimes)
-            const totalCrimes = area.solved.length + area.unsolved.length;
-            const marker=L.circleMarker([area.lat,area.lng],{
-                color:'red',
-                radius: 5 + totalCrimes * 2,
-                fillOpacity:0.7
-            }).addTo(map);
-
-            // Map Click/Popup Logic
-            marker.bindPopup(buildCrimeListHtml(area));
-
-            // Add a permanent click handler to show the popup
-            marker.on('click', function (e) {
-                map.setView(e.latlng, 15);
-                this.openPopup();
-            });
-
-            currentCrimeLayers.push(marker);
+            
+            // Re-run Lucide icons for the newly created media buttons
+            lucide.createIcons();
         });
 
-        // Add a circle on the map to show the search radius (Filled, Transparent Blue)
+        // Add a circle on the map to show the search radius
         const radiusCircle = L.circle([centerLat, centerLng], {
-            color: '#3b82f6', // Tailwind blue-500
+            color: '#3b82f6', 
             weight: 2,
             fillColor: '#3b82f6',
-            fillOpacity: 0.25, // Transparent blue fill
-            opacity: 0.7, // Border opacity
-            radius: radiusKm * 1000 // Leaflet uses meters
+            fillOpacity: 0.1,
+            opacity: 0.7,
+            radius: radiusKm * 1000
         }).addTo(map);
         currentCrimeLayers.push(radiusCircle);
     }
@@ -523,13 +757,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const { lat, lng } = await geocodeDestination(destinationInput);
-            
-            // Filter crimes within a 2.5 km radius
             filterAndRenderCrimes(lat, lng, 2.5); 
-
         } catch (error) {
-            alert("Could not find location or process request. Try a common area like 'Gulshan'.");
-            console.error(error);
+            // IMPORTANT: Custom alert replacement
+            console.error("Could not find location or process request. Try a common area like 'Gulshan'.", error);
         } finally {
             submitButton.textContent = "Find Safest Route";
             submitButton.disabled = false;
@@ -543,25 +774,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 pos => {
                     const { latitude, longitude } = pos.coords;
                     document.getElementById("start").value = `${latitude}, ${longitude}`;
-                    
-                    // Automatically filter crimes around current location too
-                    filterAndRenderCrimes(latitude, longitude, 2.5); 
-                    
+                    filterAndRenderCrimes(latitude, longitude, 2.5);
+
+                    // Remove previous location pin if exists
+                    if (window.myLocationPin) {
+                        window.myLocationPin.remove();
+                    }
+                    // Add a pin (marker) for user's location
+                    window.myLocationPin = L.marker([latitude, longitude], {
+                        icon: L.icon({
+                            iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png",
+                            shadowSize: [41, 41]
+                        })
+                    }).addTo(map).bindPopup("Your Location").openPopup();
                 },
-                err => alert("Unable to fetch location: " + err.message)
+                err => {
+                    // IMPORTANT: Custom alert replacement
+                    console.error("Unable to fetch location: " + err.message);
+                }
             );
         } else {
-            alert("Geolocation is not supported by this browser.");
+            // IMPORTANT: Custom alert replacement
+            console.error("Geolocation is not supported by this browser.");
         }
     });
     
-    // User Menu Toggle Logic (Kept for completeness)
+    // User Menu Toggle Logic
     const userMenuButton = document.getElementById('user-menu-button');
     const userMenu = document.getElementById('user-menu');
     userMenuButton.addEventListener('click', (e) => {
         e.stopPropagation();
         userMenu.classList.toggle('hidden');
     });
+    // Global click handler for User Menu
     document.addEventListener('click', (e) => {
         if (!userMenu.contains(e.target) && !userMenuButton.contains(e.target)) {
             userMenu.classList.add('hidden');
@@ -570,8 +819,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Panic Button logic
     document.getElementById('panic-btn').addEventListener('click', function() {
-        alert('Panic alert sent! Help is on the way.');
+        // IMPORTANT: Custom alert replacement
+        console.warn('Panic alert sent! Help is on the way.');
     });
+
+    // --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
+    const reportDropdownMenu = document.getElementById('report-dropdown-menu');
+    const reportDropdown = document.getElementById('report-dropdown');
+    
+    // 1. Event listener for clicking the button to TOGGLE the menu
+    document.getElementById('report-button').addEventListener('click', (e) => {
+        e.preventDefault(); 
+        e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
+        reportDropdownMenu.classList.toggle('hidden');
+    });
+
+    // 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
+    document.addEventListener('click', (e) => {
+        // If the menu is visible AND the click target is NOT inside the entire dropdown container
+        if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
+            reportDropdownMenu.classList.add('hidden');
+        }
+    });
+    
+    // 3. Add click listener to close menu when an item is selected 
+    reportDropdownMenu.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            reportDropdownMenu.classList.add('hidden');
+        });
+    });
+    // Removed mouseover and mouseout handlers as requested.
+    // --- END UPDATED DROPDOWN LOGIC ---
+
 
     window.toggleSection=function(button){button.nextElementSibling.classList.toggle('hidden');};
 });

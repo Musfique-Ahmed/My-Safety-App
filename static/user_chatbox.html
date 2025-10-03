@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with Admin - My Safety</title>
+    <!-- Load Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind to use the 'Inter' font and dark mode colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-dark': '#111827', // Background
+                        'card-dark': '#1F2937',    // Main chat/conversation panel
+                        'input-dark': '#374151',   // Input field
+                        'accent-blue': '#3B82F6',  // User message bubble color
+                        'admin-bubble': '#4B5563', // Admin message bubble color
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-primary-dark text-white min-h-screen font-sans p-4 sm:p-8 flex justify-center items-start">
+
+    <!-- Chat Container -->
+    <div class="w-full max-w-7xl mx-auto rounded-xl shadow-2xl overflow-hidden bg-card-dark" style="height: 85vh;">
+        
+        <header class="p-6 border-b border-gray-700">
+            <h1 class="text-3xl font-bold text-white">Report Communication Center</h1>
+            <p class="text-sm text-gray-400">Secure chat for follow-up questions regarding your submitted reports.</p>
+        </header>
+
+        <!-- Main Chat Layout (Split Screen) -->
+        <div class="flex h-[calc(85vh-5rem)]"> 
+            
+            <!-- LEFT PANEL: Active Conversations List -->
+            <div id="conversation-list" class="w-1/4 min-w-[200px] border-r border-gray-700 overflow-y-auto">
+                <div class="p-4 bg-gray-700/30 font-semibold text-lg border-b border-gray-700">Active Reports</div>
+                
+                <!-- Conversation Item (Active/Selected) -->
+                <div id="conv-1" class="conversation-item p-4 border-b border-gray-700 bg-gray-700/50 cursor-pointer transition duration-150" onclick="loadConversation(1)">
+                    <p class="font-semibold">Report: UR-001</p>
+                    <p class="text-xs text-gray-400">Theft at Dhanmondi</p>
+                </div>
+                
+                <!-- Conversation Item (Inactive) -->
+                <div id="conv-2" class="conversation-item p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition duration-150" onclick="loadConversation(2)">
+                    <p class="font-semibold">Report: UR-002</p>
+                    <p class="text-xs text-gray-400">Mugging incident</p>
+                </div>
+
+                <!-- Conversation Item (Inactive) -->
+                <div id="conv-3" class="conversation-item p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition duration-150" onclick="loadConversation(3)">
+                    <p class="font-semibold">Report: UR-003</p>
+                    <p class="text-xs text-gray-400">Cyber Crime Report</p>
+                </div>
+
+            </div>
+
+            <!-- RIGHT PANEL: Chat Message Window -->
+            <div class="flex-1 flex flex-col">
+                
+                <!-- Message Display Area -->
+                <div id="messages-container" class="flex-1 p-6 space-y-4 overflow-y-auto">
+                    <!-- Messages will be populated here by JavaScript -->
+                    <div class="text-center text-gray-400 pt-10" id="chat-placeholder">
+                        Select a report on the left to view the conversation.
+                    </div>
+                </div>
+
+                <!-- Message Input Footer -->
+                <div id="message-input-area" class="p-4 border-t border-gray-700 flex space-x-3 bg-gray-800/50">
+                    <input type="text" id="message-input" placeholder="Type your message..." class="flex-1 rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                    <button id="send-button" onclick="sendMessage()" class="bg-accent-blue hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-opacity-50">
+                        Send
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Dummy Data (Replace with Firestore/DBMS Integration) ---
+
+        const conversationData = {
+            1: {
+                title: "Theft at Dhanmondi",
+                messages: [
+                    { sender: 'user', text: "I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?", time: "2 hours ago" },
+                    { sender: 'admin', text: "Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?", time: "1 hour ago" },
+                    { sender: 'user', text: "Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a phone.", time: "30 minutes ago" },
+                    { sender: 'admin', text: "Understood. We'll update the case file with this information. We appreciate your cooperation.", time: "5 minutes ago" }
+                ]
+            },
+            2: {
+                title: "Mugging incident",
+                messages: [
+                    { sender: 'admin', text: "We noticed your report on the mugging. Are you able to identify the suspect if shown a picture?", time: "Yesterday" }
+                ]
+            },
+            3: {
+                title: "Cyber Crime Report",
+                messages: [
+                    { sender: 'user', text: "I suspect my bank details were compromised after a phishing attempt.", time: "2 days ago" }
+                ]
+            }
+        };
+
+        let activeConversationId = 1; // Default to the first conversation
+
+        // --- Utility Functions ---
+
+        /**
+         * Renders a single message bubble into the chat window.
+         * @param {Object} message - { sender: 'user'|'admin', text: string, time: string }
+         */
+        function renderMessage(message) {
+            const container = document.getElementById('messages-container');
+            const isUser = message.sender === 'user';
+            
+            // Choose colors based on sender
+            const bgColor = isUser ? 'bg-accent-blue' : 'bg-admin-bubble';
+            const alignment = isUser ? 'self-end' : 'self-start';
+            const borderRadius = isUser ? 'rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl' : 'rounded-tr-xl rounded-bl-xl rounded-tl-sm rounded-br-xl';
+
+            const messageHtml = `
+                <div class="flex flex-col ${alignment} max-w-xs sm:max-w-md">
+                    <div class="p-3 text-sm ${bgColor} text-white ${borderRadius} shadow-md">
+                        ${message.text}
+                    </div>
+                    <span class="text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}">${message.time}</span>
+                </div>
+            `;
+            container.innerHTML += messageHtml;
+            container.scrollTop = container.scrollHeight; // Scroll to bottom
+        }
+
+        /**
+         * Loads and displays the messages for a selected conversation ID.
+         * @param {number} id - The ID of the conversation to load.
+         */
+        function loadConversation(id) {
+            activeConversationId = id;
+            const container = document.getElementById('messages-container');
+            const chatPlaceholder = document.getElementById('chat-placeholder');
+            const data = conversationData[id];
+
+            // Update conversation list visual state
+            document.querySelectorAll('.conversation-item').forEach(el => {
+                el.classList.remove('bg-gray-700/50');
+            });
+            document.getElementById(`conv-${id}`).classList.add('bg-gray-700/50');
+
+            // Clear chat window
+            container.innerHTML = '';
+            
+            if (data && data.messages.length > 0) {
+                // Render all messages in the selected conversation
+                data.messages.forEach(renderMessage);
+            } else {
+                // Show initial message if conversation is empty
+                container.innerHTML = `
+                    <div class="text-center text-gray-400 pt-10">
+                        Start a new conversation for Report UR-00${id} by sending the first message!
+                    </div>
+                `;
+            }
+        }
+
+        /**
+         * Simulates sending a message from the user.
+         */
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+
+            if (text === "" || activeConversationId === null) {
+                return;
+            }
+
+            // Create new message object
+            const newMessage = {
+                sender: 'user',
+                text: text,
+                time: 'Just now' // Use a library like moment.js for real time formatting
+            };
+
+            // 1. Render the message
+            renderMessage(newMessage);
+
+            // 2. Add to dummy data (in a real app, this goes to Firestore/DBMS)
+            if (!conversationData[activeConversationId]) {
+                conversationData[activeConversationId] = { title: `Report UR-00${activeConversationId}`, messages: [] };
+            }
+            conversationData[activeConversationId].messages.push(newMessage);
+
+            // 3. Clear input
+            input.value = '';
+            input.focus();
+
+            // 4. Simulate Admin response (for demonstration only)
+            setTimeout(simulateAdminResponse, 1500, activeConversationId);
+        }
+
+        /**
+         * Simulates an admin response after a brief delay.
+         */
+        function simulateAdminResponse(id) {
+            const adminMessage = {
+                sender: 'admin',
+                text: "Received. We will verify the details and respond shortly. Thank you for your patience.",
+                time: 'A moment ago'
+            };
+             if (activeConversationId === id) {
+                renderMessage(adminMessage);
+                conversationData[id].messages.push(adminMessage);
+            }
+        }
+
+        // Initialize the view on load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load the first conversation by default
+            loadConversation(activeConversationId); 
+
+            // Enable sending message on Enter key press
+            document.getElementById('message-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

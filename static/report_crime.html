@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Crime - My Safety</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-dark': '#111827',
+                        'card-dark': '#1F2937',
+                        'input-dark': '#374151',
+                        'accent-blue': '#3B82F6',
+                        'disabled-gray': '#6B7280',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .shadow-button {
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            background-color: #fff;
+            color: #4c1d95;
+            font-weight: 600;
+            box-shadow:
+                -4px -4px 8px rgb(255, 255, 255),
+                4px 4px 8px rgba(255, 255, 255, 0.5);
+            transition: all 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .shadow-button:hover {
+            box-shadow:
+                -2px -2px 4px rgba(255, 255, 255, 0.1),
+                2px 2px 4px rgba(0, 0, 0, 0.6);
+            transform: scale(0.98);
+            background-color: #f3f4f6;
+        }
+        .tab-content {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .tab-disabled {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body class="bg-primary-dark text-white min-h-screen font-sans p-4 sm:p-8">
+
+<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
+  <div class="flex items-center space-x-3">
+    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
+      <i data-lucide="shield" class="w-8 h-8"></i>
+    </div>
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
+  </div>
+  <nav class="hidden lg:flex items-center space-x-4">
+    <a href="#" class="shadow-button text-sm"><i data-lucide="route" class="w-4 h-4 mr-2"></i> Safe Area</a>
+    <a href="#" class="shadow-button text-sm"><i data-lucide="siren" class="w-4 h-4 mr-2"></i> Report to Police</a>
+    <a href="#" class="shadow-button text-sm"><i data-lucide="users" class="w-4 h-4 mr-2"></i> Wanted Criminals</a>
+    <a href="#" class="shadow-button text-sm"><i data-lucide="search" class="w-4 h-4 mr-2"></i> Missing Persons & Items</a>
+  </nav>
+  <div class="flex items-center space-x-4 relative">
+    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
+      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+    </button>
+    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+    </button>
+    <div class="relative">
+      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
+        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
+        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
+      </button>
+      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+          <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
+        </div>
+        <a href="#" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
+          Chat with Admin
+        </a>
+        <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Main Container -->
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-extrabold mb-2 text-white">Report Crime</h1>
+    <p class="text-gray-400 mb-8">Securely submit details about a new crime or provide information on known suspects.</p>
+
+    <!-- Tab Navigation/Toggle -->
+    <div class="flex border-b border-gray-700 mb-10">
+        <button id="tab-new-crime" onclick="showTab('new-crime')" class="tab-button py-3 px-6 text-sm sm:text-base font-semibold border-b-2 border-accent-blue text-accent-blue transition duration-200 hover:text-white focus:outline-none">
+            Add New Crime
+        </button>
+        <button id="tab-suspect-info" onclick="showTab('suspect-info')" class="tab-button tab-disabled py-3 px-6 text-sm sm:text-base font-semibold border-b-2 border-transparent text-gray-400 transition duration-200 hover:text-white focus:outline-none ml-4">
+            Suspect Information
+        </button>
+    </div>
+
+    <!-- Forms Container (using one form for the entire process) -->
+    <form id="crime-report-form" class="space-y-12">
+
+        <!-- 1. ADD NEW CRIME SECTION (Default View) -->
+        <section id="new-crime-content" class="tab-content">
+            <div class="bg-card-dark p-6 sm:p-8 rounded-xl shadow-2xl space-y-8">
+                <h2 class="text-2xl font-bold border-b border-gray-700 pb-4">Add New Crime</h2>
+                <p class="text-sm text-gray-400">Enter all necessary information to add a new crime to the database.</p>
+
+                <!-- Location Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Location Information</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- District (Populated by JS with 64 districts) -->
+                        <div>
+                            <label for="district" class="block text-sm font-medium text-gray-300">District</label>
+                            <select id="district" name="district" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option value="">Select District</option>
+                                <!-- Options will be dynamically populated here -->
+                            </select>
+                        </div>
+                        <!-- Area Name -->
+                        <div class="col-span-1">
+                            <label for="area-name" class="block text-sm font-medium text-gray-300">Area Name</label>
+                            <input type="text" id="area-name" name="area-name" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Enter Area Name">
+                        </div>
+                        <!-- City (Keeping City separate for flexibility, although District is usually enough) -->
+                        <div class="col-span-1">
+                            <label for="city" class="block text-sm font-medium text-gray-300">City</label>
+                            <input type="text" id="city" name="city" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Enter City/Upazila">
+                        </div>
+
+                        <!-- Location Button/Status (Replaces Lat/Lon inputs) -->
+                        <div class="col-span-full md:col-span-2 lg:col-span-1">
+                            <label class="block text-sm font-medium text-gray-300">Location Coordinates</label>
+                            <button type="button" id="get-location-btn" onclick="getCurrentLocation()" class="mt-1 w-full bg-yellow-500 hover:bg-yellow-600 text-primary-dark font-bold py-3 px-4 rounded-lg transition duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50">
+                                Get My Current Location
+                            </button>
+                            <p id="location-status" class="mt-2 text-sm text-gray-400 h-5">Click the button above to set coordinates.</p>
+                            <!-- Hidden inputs for submission -->
+                            <input type="hidden" id="latitude" name="latitude" value="">
+                            <input type="hidden" id="longitude" name="longitude" value="">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Crime Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Crime Information</legend>
+                    <!-- Grid is now 2 columns since Status was removed -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Crime Type (Populated by JS with BD-specific crimes) -->
+                        <div>
+                            <label for="crime-type" class="block text-sm font-medium text-gray-300">Crime Type</label>
+                            <select id="crime-type" name="crime-type" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option value="">Select Crime Type</option>
+                                <!-- Options will be dynamically populated here -->
+                            </select>
+                        </div>
+                        <!-- Date & Time -->
+                        <div class="col-span-1">
+                            <label for="date-time" class="block text-sm font-medium text-gray-300">Date & Time</label>
+                            <!-- Using a datetime-local type for combined date and time input -->
+                            <input type="datetime-local" id="date-time" name="date-time" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Status field REMOVED as requested -->
+                    </div>
+                    <!-- Crime Description -->
+                    <div class="mt-6">
+                        <label for="crime-description" class="block text-sm font-medium text-gray-300">Crime Description</label>
+                        <textarea id="crime-description" name="crime-description" rows="4" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Enter detailed description of the crime..."></textarea>
+                    </div>
+                </fieldset>
+
+                <!-- Victim Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Victim Information</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- Victim Full Name -->
+                        <div>
+                            <label for="victim-name" class="block text-sm font-medium text-gray-300">Victim Full Name</label>
+                            <input type="text" id="victim-name" name="victim-name" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Victim Date of Birth -->
+                        <div>
+                            <label for="victim-dob" class="block text-sm font-medium text-gray-300">Victim Date of Birth</label>
+                            <input type="date" id="victim-dob" name="victim-dob" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Victim Gender -->
+                        <div>
+                            <label for="victim-gender" class="block text-sm font-medium text-gray-300">Victim Gender</label>
+                            <select id="victim-gender" name="victim-gender" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option>Select Gender</option>
+                                <option>Male</option>
+                                <option>Female</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <!-- Victim Address -->
+                        <div>
+                            <label for="victim-address" class="block text-sm font-medium text-gray-300">Victim Address</label>
+                            <input type="text" id="victim-address" name="victim-address" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Victim Phone Number -->
+                        <div>
+                            <label for="victim-phone" class="block text-sm font-medium text-gray-300">Victim Phone Number</label>
+                            <input type="tel" id="victim-phone" name="victim-phone" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Victim Email -->
+                        <div>
+                            <label for="victim-email" class="block text-sm font-medium text-gray-300">Victim Email</label>
+                            <input type="email" id="victim-email" name="victim-email" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                    </div>
+                    <!-- Injury Details -->
+                    <div class="mt-6">
+                        <label for="injury-details" class="block text-sm font-medium text-gray-300">Injury Details</label>
+                        <textarea id="injury-details" name="injury-details" rows="3" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Describe any injuries sustained..."></textarea>
+                    </div>
+                </fieldset>
+
+            </div>
+            <!-- Action Button for NEW CRIME SECTION -->
+            <div class="flex justify-end pt-6">
+                <button type="button" onclick="enableSuspectTab()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl transition duration-300 shadow-lg shadow-green-500/50">
+                    Save Crime Details and Continue
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. SUSPECT INFORMATION SECTION (Hidden by Default) -->
+        <section id="suspect-info-content" class="tab-content hidden opacity-0">
+            <div class="bg-card-dark p-6 sm:p-8 rounded-xl shadow-2xl space-y-8">
+                <h2 class="text-2xl font-bold border-b border-gray-700 pb-4">Suspect Information</h2>
+                <p class="text-sm text-gray-400">Provide any known details about the **suspect**, weapons, or witnesses.</p>
+
+                <!-- Suspect Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Suspect Information</legend>
+                    <!-- Grid is adjusted to remove Alias Name field -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- Suspect Full Name -->
+                        <div>
+                            <label for="suspect-name" class="block text-sm font-medium text-gray-300">Suspect Full Name</label>
+                            <input type="text" id="suspect-name" name="suspect-name" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Suspect Age (Replaced Date of Birth) -->
+                        <div>
+                            <label for="suspect-age" class="block text-sm font-medium text-gray-300">Suspect Age</label>
+                            <input type="number" id="suspect-age" name="suspect-age" min="1" max="120" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Enter Age">
+                        </div>
+                        <!-- Suspect Gender -->
+                        <div>
+                            <label for="suspect-gender" class="block text-sm font-medium text-gray-300">Suspect Gender</label>
+                            <select id="suspect-gender" name="suspect-gender" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option>Select Gender</option>
+                                <option>Male</option>
+                                <option>Female</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <!-- Suspect Address -->
+                        <div>
+                            <label for="suspect-address" class="block text-sm font-medium text-gray-300">Suspect Address</label>
+                            <input type="text" id="suspect-address" name="suspect-address" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Marital Status (Added 'Don't Know') -->
+                        <div>
+                            <label for="marital-status" class="block text-sm font-medium text-gray-300">Marital Status</label>
+                            <select id="marital-status" name="marital-status" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option>Select Status</option>
+                                <option>Single</option>
+                                <option>Married</option>
+                                <option>Divorced</option>
+                                <option>Don't Know</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Previous Crimes -->
+                    <div class="mt-6">
+                        <label for="previous-crimes" class="block text-sm font-medium text-gray-300">Previous Crimes (if known)</label>
+                        <textarea id="previous-crimes" name="previous-crimes" rows="3" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="List any previous criminal activities of the suspect..."></textarea>
+                    </div>
+                </fieldset>
+
+                <!-- Weapon Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Weapon Information</legend>
+                    <!-- Updated grid to 2 columns and removed Serial Number -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6"> 
+                        <!-- Weapon Name -->
+                        <div>
+                            <label for="weapon-name" class="block text-sm font-medium text-gray-300">Weapon Name</label>
+                            <input type="text" id="weapon-name" name="weapon-name" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Weapon Type (Now dynamically populated with BD-specific options) -->
+                        <div>
+                            <label for="weapon-type" class="block text-sm font-medium text-gray-300">Weapon Type</label>
+                            <select id="weapon-type" name="weapon-type" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option value="">Select Weapon Type</option>
+                                <!-- Options populated by JS -->
+                            </select>
+                        </div>
+                        <!-- Weapon Description -->
+                        <div class="mt-6">
+                            <label for="weapon-description" class="block text-sm font-medium text-gray-300">Weapon Description</label>
+                            <textarea id="weapon-description" name="weapon-description" rows="3" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Describe the weapon used..."></textarea>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Witness Information -->
+                <fieldset>
+                    <legend class="text-xl font-semibold mb-4 text-gray-200">Witness Information</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Witness Full Name -->
+                        <div>
+                            <label for="witness-name" class="block text-sm font-medium text-gray-300">Witness Full Name</label>
+                            <input type="text" id="witness-name" name="witness-name" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Witness Phone Number -->
+                        <div>
+                            <label for="witness-phone" class="block text-sm font-medium text-gray-300">Witness Phone Number</label>
+                            <input type="tel" id="witness-phone" name="witness-phone" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                        </div>
+                        <!-- Protection Required -->
+                        <div>
+                            <label for="protection-required" class="block text-sm font-medium text-gray-300">Protection Required</label>
+                            <select id="protection-required" name="protection-required" class="mt-1 block w-full rounded-lg border border-gray-600 bg-input-dark p-3 text-white focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50">
+                                <option>Select Protection Status</option>
+                                <option>Yes</option>
+                                <option>No</option>
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+            <!-- Action Button for SUSPECT INFORMATION SECTION -->
+            <div class="flex justify-end pt-6">
+                <button type="submit" class="bg-accent-blue hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition duration-300 shadow-lg shadow-blue-500/50">
+                    Submit Final Report
+                </button>
+            </div>
+        </section>
+        
+    </form>
+</div>
+
+<script>
+  // Lucide icons
+  lucide.createIcons();
+
+  // User menu toggle
+  const userMenuButton = document.getElementById("user-menu-button");
+  const userMenu = document.getElementById("user-menu");
+  userMenuButton.addEventListener("click", () => {
+    userMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
+      userMenu.classList.add("hidden");
+    }
+  });
+
+  // Theme toggle
+  const themeToggle = document.getElementById("theme-toggle");
+  themeToggle.addEventListener("click", () => {
+    document.documentElement.classList.toggle("dark");
+    if (document.documentElement.classList.contains("dark")) {
+      localStorage.theme = "dark";
+    } else {
+      localStorage.theme = "light";
+    }
+    lucide.createIcons();
+  });
+
+  // Data for Bangladesh Districts and Crime Types
+  const bangladeshDistricts = [
+      "Bagerhat", "Bandarban", "Barguna", "Barishal", "Bhola", "Bogura", "Brahmanbaria", 
+      "Chandpur", "Chattogram", "Chuadanga", "Cox's Bazar", "Cumilla", "Dhaka", 
+      "Dinajpur", "Faridpur", "Feni", "Gaibandha", "Gazipur", "Gopalganj", "Habiganj", 
+      "Jamalpur", "Jashore", "Jhalokati", "Jhenaidah", "Joypurhat", "Khagrachhari", 
+      "Khulna", "Kishoreganj", "Kurigram", "Kushtia", "Lakshmipur", "Lalmonirhat", 
+      "Madaripur", "Magura", "Manikganj", "Meherpur", "Moulvibazar", "Munshiganj", 
+      "Mymensingh", "Naogaon", "Narail", "Narayanganj", "Narsingdi", "Natore", 
+      "Nawabganj", "Netrokona", "Nilphamari", "Noakhali", "Pabna", "Panchagarh", 
+      "Patuakhali", "Pirojpur", "Rajbari", "Rajshahi", "Rangamati", "Rangpur", 
+      "Satkhira", "Shariatpur", "Sherpur", "Sirajganj", "Sunamganj", "Sylhet", 
+      "Tangail", "Thakurgaon"
+  ];
+  
+  // Added BD-specific crime types, including Bengali names
+  const crimeTypes = [
+      "Theft (চুরি)", "Robbery (ডাকাতি)", "Mugging (ছিনতাই)", "Assault (আক্রমণ)", 
+      "Sexual Harassment/Molestation (যৌন হয়রানি)", "Kidnapping (অপহরণ)", 
+      "Burglary (গৃহস্থালী চুরি)", "Cyber Crime (সাইবার অপরাধ)", 
+      "Vandalism (ভাংচুর)", "Domestic Violence (পারিবারিক সহিংসতা)",
+      "Extortion (চাঁদাবাজি)", "Fraud/Scam (প্রতারণা)", "Homicide (খুন)"
+  ];
+
+  // Added more Bangladeshi-relevant Weapon Types
+  const weaponTypes = [
+      "Firearm (আগ্নেয়াস্ত্র)", "Knife/Blade (ছুরি/ধারালো অস্ত্র)", "Blunt Object (ভারী বস্তু)",
+      "Lathi/Stick (লাঠি)", "Axe/Machete (কুড়াল/দা)", "Explosives/Bomb (বিস্ফোরক/বোমা)",
+      "Chemical/Acid (কেমিক্যাল/এসিড)", "Bicycle Chain (সাইকেলের চেইন)", "Other", "Unknown (অজানা)"
+  ];
+
+  // Track whether the suspect tab has been enabled
+  let suspectTabEnabled = false;
+
+  /**
+   * Dynamically populates the District, Crime Type, and Weapon Type dropdowns.
+   */
+  function populateDropdowns() {
+      const districtSelect = document.getElementById('district');
+      const crimeTypeSelect = document.getElementById('crime-type');
+      const weaponTypeSelect = document.getElementById('weapon-type');
+
+      // Populate Districts
+      bangladeshDistricts.forEach(district => {
+          const option = document.createElement('option');
+          option.value = district;
+          option.textContent = district;
+          districtSelect.appendChild(option);
+      });
+
+      // Populate Crime Types
+      crimeTypes.forEach(type => {
+          const option = document.createElement('option');
+          // Use the English name as the value (first word before parenthesis)
+          const value = type.split(' ')[0].replace('(', '');
+          option.value = value;
+          option.textContent = type;
+          crimeTypeSelect.appendChild(option);
+      });
+
+      // Populate Weapon Types
+      weaponTypes.forEach(type => {
+          const option = document.createElement('option');
+          // Use the English name as the value
+          const value = type.split(' ')[0].replace('(', '');
+          option.value = value;
+          option.textContent = type;
+          weaponTypeSelect.appendChild(option);
+      });
+  }
+  
+  /**
+   * Uses Geolocation API to get the user's current coordinates.
+   */
+  function getCurrentLocation() {
+      const status = document.getElementById('location-status');
+      const latInput = document.getElementById('latitude');
+      const lonInput = document.getElementById('longitude');
+      const locationBtn = document.getElementById('get-location-btn');
+
+      status.textContent = "Fetching location...";
+      locationBtn.disabled = true;
+
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (position) => {
+                  latInput.value = position.coords.latitude;
+                  lonInput.value = position.coords.longitude;
+                  status.textContent = `Location set: Lat ${position.coords.latitude.toFixed(4)}, Lon ${position.coords.longitude.toFixed(4)}`;
+                  locationBtn.textContent = "Location Updated (Click to Re-fetch)";
+                  locationBtn.disabled = false;
+                  locationBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                  locationBtn.classList.add('bg-green-600', 'hover:bg-green-700', 'text-white');
+
+              },
+              (error) => {
+                  latInput.value = '';
+                  lonInput.value = '';
+                  let errorMessage = 'Error retrieving location.';
+                  if (error.code === error.PERMISSION_DENIED) {
+                      errorMessage = 'Location access denied by user.';
+                  } else if (error.code === error.POSITION_UNAVAILABLE) {
+                      errorMessage = 'Location information is unavailable.';
+                  } else if (error.code === error.TIMEOUT) {
+                      errorMessage = 'The request to get user location timed out.';
+                  }
+                  status.textContent = `${errorMessage} You may need to enable location services.`;
+                  locationBtn.textContent = "Try Again to Get Location";
+                  locationBtn.disabled = false;
+                  locationBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                  locationBtn.classList.remove('bg-green-600', 'hover:bg-green-700', 'text-white');
+                  console.error("Geolocation Error:", error.message);
+              },
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+      } else {
+          status.textContent = "Geolocation is not supported by this browser.";
+          locationBtn.disabled = false;
+      }
+  }
+
+  /**
+   * Function to switch between the 'Add New Crime' and 'Suspect Information' tabs.
+   * @param {string} tabName - The ID suffix of the content to show ('new-crime' or 'suspect-info').
+   */
+  function showTab(tabName) {
+      // Check if the suspect tab is being accessed prematurely
+      if (tabName === 'suspect-info' && !suspectTabEnabled) {
+          console.log("Suspect Information tab is currently disabled. Please fill out the Add New Crime form first.");
+          return; // Prevent switching if disabled
+      }
+
+      // Get content sections and tab buttons
+      const newCrimeContent = document.getElementById('new-crime-content');
+      const suspectInfoContent = document.getElementById('suspect-info-content');
+      const newCrimeButton = document.getElementById('tab-new-crime');
+      const suspectInfoButton = document.getElementById('tab-suspect-info');
+
+      // 1. Handle Content Display (Show/Hide)
+      if (tabName === 'new-crime') {
+          // Show New Crime, Hide Suspect Info
+          newCrimeContent.classList.remove('hidden', 'opacity-0');
+          suspectInfoContent.classList.add('hidden', 'opacity-0');
+
+          // 2. Handle Button Styling (Active/Inactive)
+          newCrimeButton.classList.add('border-accent-blue', 'text-accent-blue');
+          newCrimeButton.classList.remove('border-transparent', 'text-gray-400');
+          
+          // Suspect button styling based on whether it is enabled
+          if(suspectTabEnabled) {
+              suspectInfoButton.classList.remove('border-accent-blue', 'text-accent-blue');
+              suspectInfoButton.classList.add('border-transparent', 'text-gray-400');
+          }
+
+      } else if (tabName === 'suspect-info') {
+          // Show Suspect Info, Hide New Crime
+          suspectInfoContent.classList.remove('hidden', 'opacity-0');
+          newCrimeContent.classList.add('hidden', 'opacity-0');
+
+          // 2. Handle Button Styling (Active/Inactive)
+          suspectInfoButton.classList.add('border-accent-blue', 'text-accent-blue');
+          suspectInfoButton.classList.remove('border-transparent', 'text-gray-400');
+          
+          newCrimeButton.classList.remove('border-accent-blue', 'text-accent-blue');
+          newCrimeButton.classList.add('border-transparent', 'text-gray-400');
+      }
+  }
+  
+  /**
+   * Enables the Suspect Information tab and automatically switches the view.
+   * This function is called by the "Save Crime Details and Continue" button.
+   */
+  function enableSuspectTab() {
+      // In a real application, you would first validate the "Add New Crime" form fields here.
+
+      suspectTabEnabled = true;
+      const suspectInfoButton = document.getElementById('tab-suspect-info');
+
+      // 1. Enable the tab button visually and functionally
+      suspectInfoButton.classList.remove('tab-disabled', 'opacity-50');
+      suspectInfoButton.classList.add('hover:text-white');
+
+      // 2. Automatically switch to the newly enabled tab
+      showTab('suspect-info');
+
+      console.log("Crime Details Saved (conceptually)! Moving to Suspect Information.");
+  }
+
+
+  // Add a simple error handler for final form submission
+  document.getElementById('crime-report-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      // NOTE: Only runs if the user is on the Suspect Information tab and clicks the final submit button.
+      if (document.getElementById('suspect-info-content').classList.contains('hidden')) {
+          console.log("Attempted submission from the wrong tab state.");
+          return;
+      }
+
+      // In a real app, collect all form data and send it to your DBMS here.
+      
+      console.log("Final Report Submitted! All data (Crime + Suspect) ready for database insertion.");
+      
+      // Confirmation message simulation (no alert/confirm)
+      const submitButton = event.target.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.textContent = "Final Report Submitted Successfully!";
+      submitButton.classList.remove('bg-accent-blue', 'hover:bg-blue-700');
+      submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
+      
+      // Optional: reset form after success
+      // event.target.reset(); 
+
+      setTimeout(() => {
+          submitButton.textContent = originalText;
+          submitButton.classList.add('bg-accent-blue', 'hover:bg-blue-700');
+          submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+      }, 3000);
+  });
+
+  // Initialize the view and populate dropdowns on load
+  document.addEventListener('DOMContentLoaded', () => {
+      populateDropdowns();
+      showTab('new-crime');
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>My Safety – Report Missing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+
+  <style>
+    body {font-family: 'Inter', sans-serif;}
+
+    /* Shadow button style */
+    .shadow-button {
+      border-radius: 9999px;
+      padding: 0.75rem 1.5rem;
+      background-color: rgba(147, 51, 234, 0.2);
+      color: #d8b4fe;
+      font-weight: 600;
+      box-shadow: -4px -4px 8px rgb(255, 255, 255),
+                  4px 4px 8px rgba(255, 255, 255, 0.765);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: all 0.2s ease-in-out;
+    }
+    .light .shadow-button {
+      background-color: #f3f4f6;
+      color: #4c1d95;
+      box-shadow: -4px -4px 8px rgba(255,255,255,1),
+                  4px 4px 8px rgba(0,0,0,0.1);
+    }
+    .shadow-button:hover {
+      box-shadow: -2px -2px 4px rgba(255,255,255,0.1),
+                  2px 2px 4px rgba(0,0,0,0.6);
+      transform: scale(0.98);
+    }
+    .light .shadow-button:hover {
+      box-shadow: -2px -2px 4px rgba(255,255,255,0.8),
+                  2px 2px 4px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white">
+
+  <!-- Replaced Header -->
+  <header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
+        <i data-lucide="shield" class="w-8 h-8"></i>
+      </div>
+      <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">Safe Route Dashboard</h1>
+    </div>
+
+    <nav class="hidden lg:flex items-center space-x-4">
+      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="route" class="w-4 h-4 mr-2"></i> Safe Area</a>
+      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="siren" class="w-4 h-4 mr-2"></i> Report to Police</a>
+      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="users" class="w-4 h-4 mr-2"></i> Wanted Criminals</a>
+      <a href="#" class="shadow-button text-sm bg-white text-purple-700"><i data-lucide="search" class="w-4 h-4 mr-2"></i> Missing Persons & Items</a>
+    </nav>
+
+    <div class="flex items-center space-x-4 relative">
+      <!-- Panic Button: no white background, just red -->
+      <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Theme Toggle: no white background -->
+      <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+        <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+        <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+      </button>
+
+      <div class="relative">
+        <!-- User Menu Button: no white background -->
+        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
+          <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
+          <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
+        </button>
+
+        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
+          <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
+          </div>
+          <a href="#" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i> Chat with Admin
+          </a>
+          <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+            <i data-lucide="log-out" class="w-5 h-5 mr-3"></i> Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Original Report Missing Form -->
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-6">Report Missing to Police</h1>
+
+    <form id="reportForm" class="bg-slate-800 p-6 rounded-xl space-y-6">
+      <!-- Person Details -->
+      <div>
+        <h2 class="text-xl font-semibold mb-3">Person Details</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1">Full Name</label>
+            <input name="full_name" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Nickname</label>
+            <input name="nickname" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Hometown</label>
+            <input name="hometown" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Age</label>
+            <input type="number" name="age" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Weight (kg)</label>
+            <input type="number" name="weight" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Hair Color</label>
+            <input name="hair_color" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="block mb-1">Photo Upload</label>
+          <input type="file" name="photo_file" accept="image/*" class="w-full text-sm text-gray-300">
+        </div>
+      </div>
+
+      <!-- Last Seen -->
+      <div>
+        <h2 class="text-xl font-semibold mb-3">Last Seen</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1">Time & Date</label>
+            <input type="datetime-local" name="last_seen_time" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Location</label>
+            <div class="flex gap-2">
+              <input id="location" name="last_seen_location" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+              <button type="button" onclick="useMyLocation()" class="px-3 bg-slate-700 rounded">Use my location</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="block mb-1">Clothing / Appearance</label>
+          <textarea name="description" rows="3" placeholder="Clothes, marks, height, accessories, etc." class="w-full px-3 py-2 bg-slate-900 rounded text-white"></textarea>
+        </div>
+      </div>
+
+      <!-- Medical Needs -->
+      <div>
+        <h2 class="text-xl font-semibold mb-3">Medical Needs</h2>
+        <textarea name="medical_needs" rows="3" placeholder="e.g. Diabetes – requires insulin, epilepsy, heart condition, daily medicines" class="w-full px-3 py-2 bg-slate-900 rounded text-white"></textarea>
+      </div>
+
+      <!-- Reporter Contact -->
+      <div>
+        <h2 class="text-xl font-semibold mb-3">Reporter Contact</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block mb-1">Your Name</label>
+            <input name="reporter_name" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Phone</label>
+            <input name="reporter_phone" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Email</label>
+            <input name="reporter_email" type="email" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+          <div>
+            <label class="block mb-1">Relation</label>
+            <input name="reporter_relation" placeholder="Parent / sibling / neighbor / other" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
+          </div>
+        </div>
+      </div>
+
+      <p class="text-sm text-gray-400">By submitting, you consent to share these details with law enforcement.</p>
+      
+      <button class="w-full py-3 bg-green-500 hover:bg-green-600 rounded text-black font-semibold">Submit Report</button>
+    </form>
+  </div>
+
+<script>
+  lucide.createIcons();
+  const userMenuButton = document.getElementById("user-menu-button");
+  const userMenu = document.getElementById("user-menu");
+  userMenuButton.addEventListener("click", ()=>{userMenu.classList.toggle("hidden");});
+  document.addEventListener("click",(e)=>{if(!userMenuButton.contains(e.target)&&!userMenu.contains(e.target)){userMenu.classList.add("hidden");}});
+  const themeToggle = document.getElementById("theme-toggle");
+  themeToggle.addEventListener("click",()=>{document.documentElement.classList.toggle("dark"); lucide.createIcons();});
+
+  function useMyLocation(){
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        document.getElementById("location").value = pos.coords.latitude.toFixed(6)+", "+pos.coords.longitude.toFixed(6);
+      },err=> alert("Location access denied or unavailable."));
+    } else { alert("Geolocation not supported."); }
+  }
+
+  document.getElementById("reportForm").addEventListener("submit", e=>{
+    e.preventDefault();
+    alert("✅ Report submitted successfully!");
+    e.target.reset();
+  });
+</script>
+</body>
+</html>

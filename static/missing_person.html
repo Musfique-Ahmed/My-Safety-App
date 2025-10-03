@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="utf-8">
+  <title>My Safety – Missing Persons</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Tailwind + Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    /* Shadow button style */
+    .shadow-button {
+      border-radius: 9999px;
+      padding: 0.5rem 1rem;
+      background-color: rgba(147, 51, 234, 0.2);
+      color: #d8b4fe;
+      font-weight: 600;
+      box-shadow: 
+        -4px -4px 8px rgba(255, 255, 255, 0.05),
+        4px 4px 8px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s ease-in-out;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+    .light .shadow-button {
+      background-color: #f3f4f6;
+      color: #4c1d95;
+      box-shadow: 
+        -4px -4px 8px rgba(255, 255, 255, 1),
+        4px 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .shadow-button:hover {
+      box-shadow: 
+        -2px -2px 4px rgba(255, 255, 255, 0.1), 
+        2px 2px 4px rgba(0, 0, 0, 0.6);
+      transform: scale(0.98);
+    }
+    .light .shadow-button:hover {
+      box-shadow: 
+        -2px -2px 4px rgba(255, 255, 255, 0.8), 
+        2px 2px 4px rgba(0, 0, 0, 0.15);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+<!-- ===== HEADER ===== -->
+<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
+  <div class="flex items-center space-x-3">
+    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
+      <i data-lucide="shield" class="w-8 h-8"></i>
+    </div>
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
+  </div>
+
+  <nav class="hidden lg:flex items-center space-x-4">
+    <a href="index.html" class="shadow-button text-sm">
+      <i data-lucide="route" class="w-4 h-4 mr-2"></i> Safe Area
+    </a>
+    <a href="#" class="shadow-button text-sm">
+      <i data-lucide="siren" class="w-4 h-4 mr-2"></i> Report to Police
+    </a>
+    <a href="wanted_criminal.html" class="shadow-button text-sm">
+      <i data-lucide="users" class="w-4 h-4 mr-2"></i> Wanted Criminals
+    </a>
+    
+    <a href="missing_person.html" class="shadow-button text-sm bg-purple-600 text-white">
+      <i data-lucide="search" class="w-4 h-4 mr-2"></i> Missing Persons
+    </a>
+  </nav>
+
+  <div class="flex items-center space-x-4 relative">
+    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
+      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+    </button>
+    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
+      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
+    </button>
+    <div class="relative">
+      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
+        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">F</div>
+        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
+      </button>
+      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+          <p class="font-semibold text-gray-900 dark:text-white">Hi, Farhan!</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">farhan@example.com</p>
+        </div>
+        <a href="#" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
+          Chat with Admin
+        </a>
+        <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== CONTENT ===== -->
+<div class="container max-w-5xl mx-auto p-6">
+  <h1 class="text-2xl font-bold mb-4">Missing Persons</h1>
+  <div id="missingGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+</div>
+
+<!-- Modal -->
+<div id="backdrop" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50">
+  <div class="modal bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl max-w-2xl w-11/12">
+    <header class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 p-4">
+      <h2 id="modalTitle" class="text-lg font-bold">Details</h2>
+      <button id="closeModal" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-800">Close</button>
+    </header>
+    <div id="modalBody" class="p-4"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+lucide.createIcons();
+
+const missingData = [
+  {id:11,name:"Shahin Alam",nickname:"Shuvo",photo_url:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop",hometown:"Gazipur",age:16,weight_kg:52,hair_color:"Black",last_seen_time:"2025-09-30T19:00:00",last_seen_location:"Jatrabari, Dhaka",description:"Wearing blue t-shirt, white sneakers.",still_with_finder:false},
+  {id:12,name:"Nusrat Jahan",nickname:"Nusa",photo_url:"https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=800&auto=format&fit=crop",hometown:"Narayanganj",age:8,weight_kg:24,hair_color:"Brown",last_seen_time:"2025-09-29T17:30:00",last_seen_location:"Motijheel, Dhaka",description:"Pink frock, cartoon backpack.",still_with_finder:true}
+];
+
+const $=sel=>document.querySelector(sel);
+const fmt=dt=>dt?new Date(dt).toLocaleString():"";
+
+function card(item){
+  const el=document.createElement("div");
+  el.className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
+  el.innerHTML=`
+    <img src="${item.photo_url}" alt="${item.name}" class="w-full h-40 object-cover">
+    <div class="p-4">
+      <div class="flex justify-between items-center mb-2">
+        <div class="font-semibold">${item.name} <span class="text-sm text-gray-500">(${item.nickname||"—"})</span></div>
+        <span class="px-2 py-0.5 text-xs ${item.still_with_finder?"bg-green-100 text-green-700":"bg-yellow-100 text-yellow-700"} rounded-full">
+          ${item.still_with_finder?"With finder":"Unknown"}
+        </span>
+      </div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Hometown: ${item.hometown||"—"}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${item.last_seen_location} · ${fmt(item.last_seen_time)}</div>
+      <div class="mt-2">
+        <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
+      </div>
+    </div>`;
+  el.querySelector(".show").addEventListener("click",()=>openModal(item));
+  return el;
+}
+
+function render(){
+  const grid=$("#missingGrid");
+  grid.innerHTML="";
+  missingData.forEach(p=>grid.appendChild(card(p)));
+}
+
+function openModal(item){
+  $("#modalTitle").textContent=item.name+" — Details";
+  $("#modalBody").innerHTML=`
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <img src="${item.photo_url}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${item.name}">
+      <div class="md:col-span-2 text-sm space-y-1">
+        <p><b>Nickname:</b> ${item.nickname||"—"}</p>
+        <p><b>Age:</b> ${item.age||"—"} yrs | <b>Weight:</b> ${item.weight_kg||"—"} kg | <b>Hair:</b> ${item.hair_color||"—"}</p>
+        <p><b>Hometown:</b> ${item.hometown||"—"}</p>
+        <p><b>Last seen:</b> ${item.last_seen_location} at ${fmt(item.last_seen_time)}</p>
+        <p class="text-gray-500 dark:text-gray-400">${item.description||""}</p>
+        <div>
+          <button id="foundBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Found</button>
+        </div>
+        <div id="foundForm" class="hidden mt-3 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <div class="text-sm text-gray-500 mb-2">Tip: Location works only on https:// or http://localhost</div>
+          <label class="block text-sm">Where did you find this person?</label>
+          <input id="foundLocation" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Type location or use GPS">
+          <label class="flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" id="useGps" class="w-4 h-4"> Use my current location
+          </label>
+          <div id="geoMsg" class="text-xs text-gray-500 mb-2"></div>
+          <label class="block text-sm">Your Name</label>
+          <input id="finderName" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Your full name">
+          <label class="block text-sm">Your Phone</label>
+          <input id="finderPhone" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Phone number">
+          <label class="block text-sm">Your Email (optional)</label>
+          <input id="finderEmail" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Email">
+
+          <!-- Question + Still with finder -->
+          <div id="stillWrap" class="mt-4">
+            <div id="stillQuestion" class="mb-2 text-sm text-yellow-600 dark:text-yellow-300">
+              Is this person still with you? If yes then click <b>“Still with the finder”</b>.
+            </div>
+            <button id="toggleFinderBtn" class="px-3 py-1 bg-gray-500 text-white rounded">Still with the finder</button>
+          </div>
+
+          <!-- Submit button always last -->
+          <button id="submitFound" class="mt-4 px-3 py-1 bg-purple-600 text-white rounded w-full">Submit Report</button>
+        </div>
+      </div>
+    </div>`;
+  $("#backdrop").classList.remove("hidden");
+  $("#backdrop").classList.add("flex");
+
+  $("#foundBtn").onclick=()=>{
+    document.getElementById("foundForm").classList.toggle("hidden");
+  };
+
+  // FIX: no closeModal here
+  $("#toggleFinderBtn").onclick=()=>{
+    const ok=confirm("Is this person still with you?");
+    if(!ok)return;
+    item.still_with_finder=!item.still_with_finder;
+    render();
+    alert("✔ Status updated: Still with finder");
+  };
+
+  $("#useGps").addEventListener("change",async(e)=>{
+    const msg=$("#geoMsg");const loc=$("#foundLocation");
+    if(e.target.checked){
+      msg.textContent="Getting your location…";
+      try{const coords=await getCurrentCoords();loc.value=coords;msg.textContent="Location filled from GPS.";}
+      catch(err){msg.textContent="Couldn’t get location: "+err.message;e.target.checked=false;}
+    }else{msg.textContent="";}
+  });
+
+  $("#submitFound").onclick=()=>{
+    const location=$("#foundLocation").value.trim(),name=$("#finderName").value.trim(),phone=$("#finderPhone").value.trim(),email=$("#finderEmail").value.trim();
+    if(!location){alert("Please add a location or enable GPS.");return;}
+    if(!name||!phone){alert("Please add your name and phone number.");return;}
+    const payload={person_id:item.id,found_location:location,finder_name:name,finder_phone:phone,finder_email:email||null,found_time:new Date().toISOString()};
+    alert("📣 Report submitted:\n\n"+JSON.stringify(payload,null,2));
+    closeModal();
+  };
+}
+
+function getCurrentCoords(){
+  return new Promise((resolve,reject)=>{
+    if(!("geolocation"in navigator))return reject(new Error("Geolocation not supported."));
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`),
+      err=>reject(err),
+      {enableHighAccuracy:true,timeout:10000}
+    );
+  });
+}
+
+function closeModal(){$("#backdrop").classList.add("hidden");}
+document.getElementById("closeModal").addEventListener("click",closeModal);
+document.getElementById("backdrop").addEventListener("click",e=>{if(e.target.id==="backdrop")closeModal();});
+
+render();
+</script>
+</body>
+</html>
