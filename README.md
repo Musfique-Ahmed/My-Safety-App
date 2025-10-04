@@ -39,7 +39,7 @@ We appreciate the contributions from our amazing team members:
 | Contributor | Role | GitHub Profile |
 |-------------|------|----------------|
 | [Musfique Ahmed](https://github.com/Musfique-Ahmed) | Lead Developer | [@Musfique-Ahmed](https://github.com/Musfique-Ahmed) |
-| [Tasfiya Binte Karim](https://github.com/collaborator1) | Frontend Developer | [@collaborator1](https://github.com/collaborator1) |
+| [Tasfiya Binte Karim](https://github.com/TasfiyaBintaKarim) | Frontend Developer | [@collaborator1](https://github.com/TasfiyaBintaKarim) |
 | [Farhan Tarek Jamee](https://github.com/collaborator2) | Backend Developer | [@collaborator2](https://github.com/collaborator2) |
 | [Sayma Talukdar](https://github.com/collaborator3) | UI/UX Designer | [@collaborator3](https://github.com/collaborator3) |
 
