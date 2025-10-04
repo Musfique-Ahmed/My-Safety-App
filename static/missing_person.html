@@ -115,7 +115,7 @@
                 <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
                 Chat with Admin
             </a>
-            <button onclick="alert('Logging out...')" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
+            <button onclick="window.location.href='login.html'" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
                 <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
                 Logout
             </button>
@@ -302,6 +302,36 @@ reportDropdownMenu.querySelectorAll('a').forEach(link => {
 });
 // Removed mouseover and mouseout handlers as requested.
 // --- END UPDATED DROPDOWN LOGIC ---
+
+// --- USER MENU DROPDOWN LOGIC ---
+const userMenuButton = document.getElementById('user-menu-button');
+const userMenu = document.getElementById('user-menu');
+
+// Toggle user menu when clicking the button
+userMenuButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    userMenu.classList.toggle('hidden');
+});
+
+// Close user menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (!userMenu.classList.contains('hidden') && !userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
+        userMenu.classList.add('hidden');
+    }
+});
+
+// Theme toggle functionality
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    document.documentElement.classList.toggle('light');
+});
+
+// Panic button functionality
+document.getElementById('panic-btn').addEventListener('click', () => {
+    alert('🚨 PANIC ALERT SENT! Emergency services have been notified.');
+});
+// --- END USER MENU DROPDOWN LOGIC ---
 
 </script>
 </body>
