@@ -5,3 +5,8 @@ httpx
 sqlalchemy
 pymysql
 mysqlclient
+flask
+mysql-connector-python
+flask-cors
+bcrypt
+python-multipart
