@@ -145,10 +145,20 @@
 
 lucide.createIcons();
 
-const missingData = [
-  {id:11,name:"Shahin Alam",nickname:"Shuvo",photo_url:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop",hometown:"Gazipur",age:16,weight_kg:52,hair_color:"Black",last_seen_time:"2025-09-30T19:00:00",last_seen_location:"Jatrabari, Dhaka",description:"Wearing blue t-shirt, white sneakers.",still_with_finder:false},
-  {id:12,name:"Nusrat Jahan",nickname:"Nusa",photo_url:"https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=800&auto=format&fit=crop",hometown:"Narayanganj",age:8,weight_kg:24,hair_color:"Brown",last_seen_time:"2025-09-29T17:30:00",last_seen_location:"Motijheel, Dhaka",description:"Pink frock, cartoon backpack.",still_with_finder:true}
-];
+let missingData = [];
+
+async function loadMissingPersons() {
+    try {
+        const response = await fetch('/api/missing-persons');
+        const data = await response.json();
+        missingData = data.missing_persons;
+        render();
+    } catch (error) {
+        console.error('Error loading missing persons:', error);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadMissingPersons);
 
 const $=sel=>document.querySelector(sel);
 const fmt=dt=>dt?new Date(dt).toLocaleString():"";

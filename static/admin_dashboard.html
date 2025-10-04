@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - My Safety</title>
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --dark-bg: #0f0f0f;
+      --dark-surface: #1a1a1a;
+      --dark-card: #2a2a2a;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666666;
+      --accent-purple: #8b5cf6;
+      --accent-gray: #6b7280;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-blue: #3b82f6;
+      --border-color: #333333;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: var(--dark-bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* FIX: Add padding at the bottom equal to the footer height (4rem is enough for 1rem padding top/bottom + margin) */
+      padding-bottom: 4rem; 
+    }
+    .header {
+      background: var(--dark-surface);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      position: relative; /* Needed for absolute positioning of the dropdown */
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-purple);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    /* Profile Menu Styles */
+    .user-profile-menu {
+        position: relative;
+        z-index: 100;
+    }
+    .user-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--accent-purple);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: box-shadow 0.2s;
+        border: 2px solid var(--accent-purple);
+    }
+    .user-icon:hover {
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+    }
+    .dropdown-menu {
+        position: absolute;
+        top: 50px; /* Position below the icon */
+        right: 0;
+        width: 250px;
+        background: var(--dark-surface);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+        padding: 1rem;
+    }
+    .dropdown-menu.active {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    .profile-info {
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .profile-info p {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+    }
+    .profile-info strong {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+    .dropdown-menu .logout-btn {
+        width: 100%;
+        justify-content: center;
+        margin: 0;
+        padding: 0.75rem;
+    }
+    /* End Profile Menu Styles */
+
+
+    .nav-links {
+      display: none; 
+      gap: 2rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+    .logout-btn { 
+      background: var(--accent-red);
+      color: white;
+      border: 1px solid var(--accent-red);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover { 
+      background: #dc2626;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
+    .main-content {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      flex-grow: 1; 
+      width: 100%; 
+    }
+    .dashboard-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+    .dashboard-subtitle {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+    .admin-tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .tab-btn {
+      background: transparent;
+      color: var(--text-secondary);
+      border: none;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--accent-purple);
+    }
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .section-card {
+      background: var(--dark-card);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+    .section-description {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-label {
+      color: var(--text-primary);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    .form-input, .form-select, .form-textarea {
+      background: var(--dark-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent-purple);
+    }
+    .form-textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-primary {
+      background: var(--accent-purple);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #7c3aed;
+    }
+    .btn-success {
+      background: var(--accent-green);
+      color: white;
+    }
+    .btn-success:hover {
+      background: #059669;
+    }
+    .btn-danger {
+      background: var(--accent-red);
+      color: white;
+    }
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    .btn-secondary {
+      background: var(--accent-gray);
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+    }
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    td {
+      color: var(--text-primary);
+    }
+    .status-badge {
+      /* FIX: Improved padding and border-radius for better visual appeal */
+      padding: 0.35rem 1rem; 
+      border-radius: 6px; 
+      font-size: 0.75rem;
+      font-weight: 600; /* Increased weight for visibility */
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: inline-block; /* Ensures padding works consistently */
+      min-width: 80px; /* Ensures all badges have a minimum width */
+      text-align: center;
+    }
+    .status-pending {
+      background: var(--accent-gray);
+      color: white;
+    }
+    .status-verified {
+      background: var(--accent-green);
+      color: white;
+    }
+    .status-in-progress {
+      background: var(--accent-purple);
+      color: white;
+    }
+    .status-resolved {
+      background: var(--accent-blue);
+      color: white;
+    }
+    .status-reported {
+      background: var(--accent-gray);
+      color: white;
+    }
+    .status-under-investigation {
+      background: var(--accent-purple);
+      color: white;
+    }
+    .status-case-closed {
+      background: var(--accent-green);
+      color: white;
+    }
+    .action-btn {
+      background: transparent;
+      color: var(--text-secondary);
+      border: none;
+      padding: 0.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      transition: color 0.2s;
+    }
+    .action-btn:hover {
+      color: var(--text-primary);
+    }
+    .chat-container {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+      height: 500px; /* Locked height for the whole chat interface */
+    }
+    .chat-sidebar {
+      background: var(--dark-surface);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .chat-user {
+      padding: 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 0.5rem;
+    }
+    .chat-user:hover, .chat-user.active {
+      background: var(--dark-card);
+    }
+    .chat-main {
+      background: var(--dark-surface);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); 
+      /* FIX: Add overflow hidden to clip content to the border radius */
+      overflow: hidden; 
+    }
+    .chat-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .chat-messages {
+      flex: 1; 
+      padding: 1rem;
+      overflow-y: auto; /* Re-enabled scrolling for message history */
+      display: flex; 
+      flex-direction: column;
+      gap: 0.5rem; 
+    }
+    .chat-input-container {
+      padding: 1rem;
+      border-top: 1px solid var(--border-color);
+      display: flex; 
+      gap: 0.5rem;
+      align-items: center;
+      /* FIX: Ensure the background color covers the entire area right up to the bottom edge */
+      background: var(--dark-surface);
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--dark-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px; 
+      padding: 0.75rem 1rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .chat-input:focus {
+      border-color: var(--accent-purple);
+    }
+    .message {
+      margin-bottom: 0.5rem; 
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      max-width: 75%; 
+      line-height: 1.4;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+    }
+    .message.admin {
+      background: var(--accent-purple);
+      color: white;
+      margin-left: auto;
+      /* Adjusted borders for a cleaner bubble look */
+      border-bottom-right-radius: 4px; 
+      border-top-right-radius: 12px;
+      border-top-left-radius: 12px;
+      border-bottom-left-radius: 12px;
+    }
+    .message.user {
+      background: var(--dark-card);
+      border: 1px solid var(--border-color);
+      margin-right: auto;
+      /* Adjusted borders for a cleaner bubble look */
+      border-bottom-left-radius: 4px; 
+      border-top-right-radius: 12px;
+      border-top-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+    .message-sender {
+      font-weight: 600; 
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+    }
+    .message.user .message-sender {
+      color: var(--accent-purple); 
+    }
+    .message-time {
+      font-size: 0.7rem; 
+      color: var(--text-muted); 
+      margin-top: 0.3rem; 
+      display: block;
+      text-align: right;
+      opacity: 0.8;
+    }
+    .message.admin .message-time {
+      color: rgba(255, 255, 255, 0.6); 
+    }
+    /* Send button change for cleaner integration */
+    .chat-input-container .btn {
+      padding: 0.75rem 1rem;
+    }
+    .footer {
+      /* CRITICAL FIX: Ensures footer is always at the bottom of the viewport */
+      position: fixed; 
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      z-index: 999; 
+
+      background: var(--dark-surface);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border-color); 
+    }
+    .footer-icon {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-purple);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    /* Custom Modal Styles (for non-blocking UI) */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: none; 
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+        opacity: 1;
+    }
+    
+    .modal-content {
+        background: var(--dark-card);
+        border-radius: 12px;
+        padding: 1.5rem;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        transform: translateY(-20px);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .modal-overlay.show .modal-content {
+        transform: translateY(0);
+    }
+
+    .modal-message {
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-primary);
+    }
+
+    .modal-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    /* Adjust button styles for modal */
+    .modal-buttons .btn {
+        padding: 0.6rem 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    .modal-buttons .btn-secondary {
+        background: var(--dark-surface);
+        color: var(--text-primary);
+    }
+    .modal-buttons .btn-secondary:hover {
+        background: var(--border-color);
+    }
+    /* End Custom Modal Styles */
+  </style>
+</head>
+<body>
+  <!-- Custom Modal HTML Structure -->
+  <div id="custom-modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content">
+      <div id="modal-message" class="modal-message"></div>
+      <div id="modal-buttons" class="modal-buttons">
+        <!-- Buttons injected by JS -->
+      </div>
+    </div>
+  </div>
+  <!-- End Custom Modal HTML Structure -->
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">My Safety</div>
+    </div>
+    
+    <!-- Admin Profile Dropdown Menu -->
+    <div class="user-profile-menu">
+        <div class="user-icon" onclick="toggleMenu()">AD</div>
+        <div id="dropdown-menu" class="dropdown-menu">
+            <div class="profile-info">
+                <!-- ADDED Admin Name -->
+                <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Inspector John Doe</div>
+                <p>Role: <strong>Super Admin</strong></p>
+                <p>ID: <strong>ADM-90210</strong></p>
+                <p>Email: <strong>admin@mysafety.com</strong></p>
+                <p>Status: <strong style="color: var(--accent-green);">Active</strong></p>
+            </div>
+            <!-- Logout button inside the dropdown -->
+            <a href="/static/login.html" class="logout-btn" onclick="handleLogout(event)">
+                <span>←</span>
+                Logout
+            </a>
+        </div>
+    </div>
+    <!-- End Admin Profile Dropdown Menu -->
+  </div>
+
+  <div class="main-content">
+    <h1 class="dashboard-title">Admin Dashboard</h1>
+    <p class="dashboard-subtitle">Manage crimes, verify reports, update cases, and communicate with reporters.</p>
+
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="showTab('overview', event)">Overview</button>
+      <button class="tab-btn" onclick="showTab('add-crime', event)">Add Crime</button>
+      <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
+      <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
+      <button class="tab-btn" onclick="showTab('chat', event)">Chat</button>
+    </div>
+
+    <!-- Overview Tab -->
+    <div id="overview" class="tab-content active">
+      <div class="section-card">
+        <h2 class="section-title">Crime Reports</h2>
+        <p class="section-description">A list of all submitted crime reports. Select a report to view details and generate an AI summary.</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="crimes-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Crime Tab -->
+    <div id="add-crime" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Add New Crime</h2>
+        <p class="section-description">Enter all necessary information to add a new crime to the database.</p>
+        
+        <form id="add-crime-form">
+          <!-- Location Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Location Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">District</label>
+              <select class="form-select" name="district_id" required>
+                <option value="">Select District</option>
+                <option value="1">Dhaka</option>
+                <option value="2">Chittagong</option>
+                <option value="3">Sylhet</option>
+                <option value="4">Rajshahi</option>
+                <option value="5">Khulna</option>
+                <option value="6">Barisal</option>
+                <option value="7">Rangpur</option>
+                <option value="8">Mymensingh</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Area Name</label>
+              <input type="text" class="form-input" name="area_name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">City</label>
+              <input type="text" class="form-input" name="city" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Latitude</label>
+              <input type="number" step="any" class="form-input" name="latitude" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Longitude</label>
+              <input type="number" step="any" class="form-input" name="longitude" required>
+            </div>
+          </div>
+
+          <!-- Crime Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Crime Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Crime Type</label>
+              <select class="form-select" name="crime_type" required>
+                <option value="">Select Crime Type</option>
+                <option value="theft">Theft</option>
+                <option value="robbery">Robbery</option>
+                <option value="assault">Assault</option>
+                <option value="burglary">Burglary</option>
+                <option value="vandalism">Vandalism</option>
+                <option value="fraud">Fraud</option>
+                <option value="murder">Murder</option>
+                <option value="kidnapping">Kidnapping</option>
+                <option value="drug_trafficking">Drug Trafficking</option>
+                <option value="cyber_crime">Cyber Crime</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date & Time</label>
+              <input type="datetime-local" class="form-input" name="date_time" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <select class="form-select" name="status" required>
+                <option value="">Select Status</option>
+                <option value="reported">Reported</option>
+                <option value="under_investigation">Under Investigation</option>
+                <option value="case_closed">Case Closed</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Crime Description</label>
+            <textarea class="form-textarea" name="description" placeholder="Enter detailed description of the crime..." required></textarea>
+          </div>
+
+          <!-- Victim Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Victim Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Victim Full Name</label>
+              <input type="text" class="form-input" name="victim_full_name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Date of Birth</label>
+              <input type="date" class="form-input" name="victim_dob">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Gender</label>
+              <select class="form-select" name="victim_gender">
+                <option value="">Select Gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Address</label>
+              <input type="text" class="form-input" name="victim_address">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Phone Number</label>
+              <input type="tel" class="form-input" name="victim_phone">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Injury Details</label>
+            <textarea class="form-textarea" name="injury_details" placeholder="Describe any injuries sustained..."></textarea>
+          </div>
+
+          <!-- Criminal Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Criminal Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Criminal Full Name</label>
+              <input type="text" class="form-input" name="criminal_full_name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alias Name</label>
+              <input type="text" class="form-input" name="alias_name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Criminal Date of Birth</label>
+              <input type="date" class="form-input" name="criminal_dob">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Criminal Gender</label>
+              <select class="form-select" name="criminal_gender">
+                <option value="">Select Gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Criminal Address</label>
+              <input type="text" class="form-input" name="criminal_address">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Marital Status</label>
+              <select class="form-select" name="marital_status">
+                <option value="">Select Status</option>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="divorced">Divorced</option>
+                <option value="widowed">Widowed</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Previous Crimes</label>
+            <textarea class="form-textarea" name="previous_crimes" placeholder="List any previous criminal activities..."></textarea>
+          </div>
+
+          <!-- Weapon Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Weapon Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Weapon Name</label>
+              <input type="text" class="form-input" name="weapon_name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Weapon Type</label>
+              <select class="form-select" name="weapon_type">
+                <option value="">Select Weapon Type</option>
+                <option value="firearm">Firearm</option>
+                <option value="knife">Knife</option>
+                <option value="blunt_object">Blunt Object</option>
+                <option value="explosive">Explosive</option>
+                <option value="chemical">Chemical</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Serial Number</label>
+              <input type="text" class="form-input" name="serial_number">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Weapon Description</label>
+            <textarea class="form-textarea" name="weapon_description" placeholder="Describe the weapon used..."></textarea>
+          </div>
+
+          <!-- Witness Information -->
+          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Witness Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Witness Full Name</label>
+              <input type="text" class="form-input" name="witness_full_name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Witness Phone Number</label>
+              <input type="tel" class="form-input" name="witness_phone">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Protection Required</label>
+              <select class="form-select" name="protection_flag">
+                <option value="">Select Protection Status</option>
+                <option value="true">Yes - Protection Required</option>
+                <option value="false">No - Protection Not Required</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary">
+              <span>➕</span>
+              Add Crime
+            </button>
+            <button type="reset" class="btn btn-secondary" style="margin-left: 1rem;">
+              <span>🔄</span>
+              Reset Form
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Verify Reports Tab -->
+    <div id="verify-reports" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Verify User Complaints</h2>
+        <p class="section-description">Review and verify complaints submitted by users. Update verification status and escalate to crime reports.</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Complaint ID</th>
+              <th>Reporter Contact</th>
+              <th>Reported At</th>
+              <th>Channel</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="complaints-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Case Management Tab -->
+    <div id="case-management" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Case Management</h2>
+        <p class="section-description">Manage case assignments and track status history for all crimes.</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Assignment ID</th>
+              <th>Crime ID</th>
+              <th>Assigned Officer</th>
+              <th>Duty Role</th>
+              <th>Assigned At</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assignments-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Chat Tab -->
+    <div id="chat" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Chat with Reporters</h2>
+        <p class="section-description">Communicate with users who have submitted reports.</p>
+        
+        <div class="chat-container">
+          <div class="chat-sidebar">
+            <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Active Conversations</h3>
+            <div class="chat-user active" data-user-id="john-doe" onclick="selectUser('john-doe', event)">
+              <div style="font-weight: 500;">John Doe</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-001</div>
+            </div>
+            <div class="chat-user" data-user-id="jane-smith" onclick="selectUser('jane-smith', event)">
+              <div style="font-weight: 500;">Jane Smith</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-002</div>
+            </div>
+            <div class="chat-user" data-user-id="mike-johnson" onclick="selectUser('mike-johnson', event)">
+              <div style="font-weight: 500;">Mike Johnson</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-003</div>
+            </div>
+          </div>
+          
+          <div class="chat-main">
+            <div class="chat-header">
+              <h3 id="chat-header-name" style="color: var(--text-primary);">John Doe</h3>
+              <p id="chat-header-report" style="color: var(--text-secondary); font-size: 0.875rem;">Report ID: UR-001</p>
+            </div>
+            
+            <div class="chat-messages" id="chat-messages">
+              <!-- Initial messages for John Doe -->
+              <div class="message user">
+                <div class="message-sender">John Doe</div>
+                <div>I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?</div>
+                <div class="message-time">2 hours ago</div>
+              </div>
+              <div class="message admin">
+                <div class="message-sender">Admin</div>
+                <div>Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?</div>
+                <div class="message-time">1 hour ago</div>
+              </div>
+              <div class="message user">
+                <div class="message-sender">John Doe</div>
+                <div>Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a woman's purse and ran away.</div>
+                <div class="message-time">30 minutes ago</div>
+              </div>
+            </div>
+            
+            <div class="chat-input-container">
+              <input type="text" class="chat-input" placeholder="Type your message..." id="chat-input">
+              <button class="btn btn-primary" onclick="sendMessage()">
+                <span>↑ Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-icon">N</div>
+    <span>©2025 My Safety. All rights reserved.</span>
+  </div>
+
+  <script>
+    // --- Custom Modal Functions (Replacing alert and confirm/prompt) ---
+    const modalOverlay = document.getElementById('custom-modal-overlay');
+    const modalMessage = document.getElementById('modal-message');
+    const modalButtons = document.getElementById('modal-buttons');
+
+    function closeModal(event) {
+        if (event && event.target !== modalOverlay) {
+            return;
+        }
+        modalOverlay.classList.remove('show');
+    }
+
+    /**
+     * Shows a custom alert modal.
+     * @param {string} message - The message to display.
+     */
+    function showAlert(message) {
+        modalMessage.textContent = message;
+        modalButtons.innerHTML = ''; // Clear previous buttons
+
+        const okButton = document.createElement('button');
+        okButton.className = 'btn btn-primary';
+        okButton.textContent = 'OK';
+        okButton.onclick = closeModal;
+        modalButtons.appendChild(okButton);
+
+        modalOverlay.classList.add('show');
+    }
+
+    /**
+     * Shows a custom confirmation modal.
+     * @param {string} message - The message to confirm.
+     * @param {function(boolean): void} callback - The function to call with the result (true for yes, false for no).
+     */
+    function showConfirm(message, callback) {
+        modalMessage.textContent = message;
+        modalButtons.innerHTML = '';
+
+        const noButton = document.createElement('button');
+        noButton.className = 'btn btn-secondary';
+        noButton.textContent = 'No';
+        noButton.onclick = () => {
+            closeModal();
+            callback(false);
+        };
+        
+        const yesButton = document.createElement('button');
+        yesButton.className = 'btn btn-danger';
+        yesButton.textContent = 'Yes';
+        yesButton.onclick = () => {
+            closeModal();
+            callback(true);
+        };
+
+        modalButtons.appendChild(noButton);
+        modalButtons.appendChild(yesButton);
+        modalOverlay.classList.add('show');
+    }
+    // --- End Custom Modal Functions ---
+
+    // --- Logout Functionality ---
+    function handleLogout(event) {
+        event.preventDefault(); // Prevent immediate link navigation
+        showConfirm("Are you sure you want to log out of the Admin Dashboard?", (confirmed) => {
+            if (confirmed) {
+                // In a real application, this is where you'd call a sign-out API.
+                // For this mock, we redirect back to the login page.
+                window.location.href = event.currentTarget.href; 
+            }
+        });
+    }
+
+    // --- Profile Dropdown Toggle ---
+    function toggleMenu() {
+        document.getElementById('dropdown-menu').classList.toggle('active');
+        // Close menu if clicking outside of it (added listener to document body)
+        if (document.getElementById('dropdown-menu').classList.contains('active')) {
+            document.addEventListener('click', closeMenuOutside, true);
+        } else {
+            document.removeEventListener('click', closeMenuOutside, true);
+        }
+    }
+
+    function closeMenuOutside(event) {
+        const menuContainer = document.querySelector('.user-profile-menu');
+        if (!menuContainer.contains(event.target)) {
+            document.getElementById('dropdown-menu').classList.remove('active');
+            document.removeEventListener('click', closeMenuOutside, true);
+        }
+    }
+    
+    // --- Mock Data (Kept locally to ensure the dashboard loads, as API calls would fail here) ---
+    const crimesData = [
+        { crime_id: 1, area_name: 'Dhanmondi', city: 'Dhaka', status: 'under_investigation' },
+        { crime_id: 2, area_name: 'Khilkhet', city: 'Dhaka', status: 'reported' },
+        { crime_id: 3, area_name: 'Agrabad', city: 'Chittagong', status: 'case_closed' },
+        { crime_id: 4, area_name: 'Shamshernagar', city: 'Sylhet', status: 'pending' },
+    ];
+
+    const complaintsData = [
+        { complaint_id: 101, reporter_contact: 'john.doe@email.com', reported_at: new Date().toISOString(), channel: 'Web Form', status: 'verified' },
+        { complaint_id: 102, reporter_contact: '+88017xxxxxxxx', reported_at: new Date(Date.now() - 3600000).toISOString(), channel: 'Phone Call', status: 'pending' },
+        { complaint_id: 103, reporter_contact: 'jane.smith@email.com', reported_at: new Date(Date.now() - 7200000).toISOString(), channel: 'Mobile App', status: 'pending' },
+    ];
+
+    const assignmentsData = [
+        { assignment_id: 501, crime_id: 1, full_name: 'Officer Rahman', duty_role: 'Lead Investigator', assigned_at: new Date().toISOString(), status: 'in_progress' },
+        { assignment_id: 502, crime_id: 2, full_name: 'Inspector Ali', duty_role: 'Initial Assessment', assigned_at: new Date(Date.now() - 86400000).toISOString(), status: 'reported' },
+        { assignment_id: 503, crime_id: 3, full_name: 'Sergeant Khan', duty_role: 'Archive', assigned_at: new Date(Date.now() - 604800000).toISOString(), status: 'resolved' },
+    ];
+    
+    // --- Mock Chat Messages ---
+    const mockChatMessages = {
+        'john-doe': [
+            { sender: 'user', name: 'John Doe', text: 'I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?', time: '2 hours ago' },
+            { sender: 'admin', name: 'Admin', text: 'Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?', time: '1 hour ago' },
+            { sender: 'user', name: 'John Doe', text: 'Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a woman\'s purse and ran away.', time: '30 minutes ago' },
+        ],
+        'jane-smith': [
+            { sender: 'user', name: 'Jane Smith', text: 'I reported a suspicious vehicle near my apartment (UR-002) but haven\'t heard back. Is there any update?', time: '1 day ago' },
+            { sender: 'admin', name: 'Admin', text: 'Hello Jane, sorry for the delay. We are reviewing the report now. Can you confirm the license plate number?', time: '10 hours ago' },
+            { sender: 'user', name: 'Jane Smith', text: 'I wrote it down in the report, but it was a black sedan, plate starting with "DHK-".', time: '8 hours ago' },
+        ],
+        'mike-johnson': [
+            { sender: 'user', name: 'Mike Johnson', text: 'I saw a case of property damage (UR-003) earlier this morning. Is there a way to upload video evidence?', time: '5 hours ago' },
+            { sender: 'admin', name: 'Admin', text: 'Yes, Mike. We can send you a secure link via email for upload. Please check your inbox shortly.', time: '4 hours ago' },
+        ]
+    };
+    // --- End Mock Chat Messages ---
+    
+    // --- End Mock Data ---
+
+
+    // Tab switching functionality
+    function showTab(tabName, event) {
+      // Hide all tab contents
+      const tabContents = document.querySelectorAll('.tab-content');
+      tabContents.forEach(content => content.classList.remove('active'));
+      
+      // Remove active class from all tab buttons
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      
+      // Show selected tab content
+      document.getElementById(tabName).classList.add('active');
+      
+      // Add active class to clicked button
+      if (event && event.target) {
+         event.target.closest('.tab-btn').classList.add('active');
+      } else {
+        // Fallback for programmatic calls
+        document.querySelector(`.tab-btn[onclick*="'${tabName}'"]`).classList.add('active');
+      }
+      
+      // Load data for specific tabs (uses local mock data)
+      if (tabName === 'overview') {
+        loadCrimesOverview();
+      } else if (tabName === 'verify-reports') {
+        loadComplaints();
+      } else if (tabName === 'case-management') {
+        loadCaseAssignments();
+      }
+      // Auto-scroll chat when opening chat tab
+      if (tabName === 'chat') {
+        // Ensure the initial chat (John Doe) is selected and loaded
+        selectUser('john-doe'); 
+      }
+    }
+
+    // Add crime form submission
+    document.getElementById('add-crime-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const crimeData = Object.fromEntries(formData);
+      
+      // Process the form data to match database schema (omitted for brevity, assume valid)
+      
+      try {
+        // Show loading state
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span>⏳</span> Adding Crime...';
+        submitBtn.disabled = true;
+        
+        // --- MOCK DATA SIMULATION START ---
+        await new Promise(resolve => setTimeout(resolve, 1500)); 
+        const newCrimeId = crimesData.length + 1;
+
+        // Add to mock data
+        crimesData.push({
+            crime_id: newCrimeId,
+            area_name: crimeData.area_name,
+            city: crimeData.city,
+            status: crimeData.status,
+        });
+
+        showAlert(`Crime added successfully!\nCrime ID: CR-${newCrimeId.toString().padStart(3, '0')}`);
+        this.reset();
+        
+        // Refresh the overview table if we're on that tab
+        if (document.getElementById('overview').classList.contains('active')) {
+          loadCrimesOverview();
+        }
+        // --- MOCK DATA SIMULATION END ---
+        
+      } catch (error) {
+        console.error('Error:', error);
+        showAlert(`Error adding crime: ${error.message}`);
+      } finally {
+        // Reset button state
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Load crimes for overview tab
+    async function loadCrimesOverview() {
+      const tbody = document.getElementById('crimes-table');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading crime reports...</td></tr>';
+      try {
+        // --- MOCK DATA SIMULATION ---
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        const result = { success: true, crimes: crimesData };
+        // --- END MOCK DATA SIMULATION ---
+        
+        if (result.success) {
+          tbody.innerHTML = ''; // Clear existing rows
+          
+          result.crimes.forEach(crime => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>CR-${crime.crime_id.toString().padStart(3, '0')}</td>
+              <td>${crime.area_name || 'N/A'}, ${crime.city || 'N/A'}</td>
+              <td><span class="status-badge status-${(crime.status || 'pending').replace('_', '-')}">${(crime.status || 'pending').replace('_', ' ')}</span></td>
+              <td>
+                <button class="action-btn" onclick="viewCrimeDetails(${crime.crime_id})">
+                  <span>📄</span>
+                  Summarize
+                </button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Failed to load crimes.</td></tr>';
+            console.error('Data Error loading crimes:', result.message || 'Unknown error');
+        }
+      } catch (error) {
+        console.error('Process Error loading crimes:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">An error occurred while processing crime data.</td></tr>';
+      }
+    }
+
+    // Load complaints for verify reports tab
+    async function loadComplaints() {
+      const tbody = document.getElementById('complaints-table');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading user complaints...</td></tr>';
+      try {
+        // --- MOCK DATA SIMULATION ---
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        const result = { success: true, complaints: complaintsData };
+        // --- END MOCK DATA SIMULATION ---
+        
+        if (result.success) {
+          tbody.innerHTML = ''; // Clear existing rows
+          
+          result.complaints.forEach(complaint => {
+            const row = document.createElement('tr');
+            const statusClass = complaint.status === 'verified' ? 'verified' : 'pending';
+            const statusText = complaint.status.charAt(0).toUpperCase() + complaint.status.slice(1);
+            
+            row.innerHTML = `
+              <td>COMP-${complaint.complaint_id.toString().padStart(3, '0')}</td>
+              <td>${complaint.reporter_contact}</td>
+              <td>${new Date(complaint.reported_at).toLocaleString()}</td>
+              <td>${complaint.channel}</td>
+              <td><span class="status-badge status-${statusClass}">${statusText}</span></td>
+              <td>
+                ${complaint.status === 'pending' ? `
+                  <button class="btn btn-success" onclick="verifyComplaint(${complaint.complaint_id})">
+                    <span>✓</span>
+                    Verify
+                  </button>
+                  <button class="btn btn-danger" onclick="rejectComplaint(${complaint.complaint_id})">
+                    <span>✗</span>
+                    Reject
+                  </button>
+                ` : `
+                  <button class="btn btn-primary" onclick="escalateToCrime(${complaint.complaint_id})">
+                    <span>📋</span>
+                    Escalate to Crime
+                  </button>
+                `}
+                <button class="action-btn" onclick="viewComplaintDetails(${complaint.complaint_id})">
+                  <span>👁️</span>
+                  View Details
+                </button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } else {
+             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-red);">Failed to load complaints.</td></tr>';
+        }
+      } catch (error) {
+        console.error('Process Error loading complaints:', error);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-red);">An error occurred while processing complaint data.</td></tr>';
+      }
+    }
+
+    // Load case assignments
+    async function loadCaseAssignments() {
+      const tbody = document.getElementById('assignments-table');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading case assignments...</td></tr>';
+      try {
+        // --- MOCK DATA SIMULATION ---
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        const result = { success: true, assignments: assignmentsData };
+        // --- END MOCK DATA SIMULATION ---
+        
+        if (result.success) {
+          tbody.innerHTML = ''; // Clear existing rows
+          
+          result.assignments.forEach(assignment => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>ASSIGN-${assignment.assignment_id.toString().padStart(3, '0')}</td>
+              <td>CRIME-${assignment.crime_id.toString().padStart(3, '0')}</td>
+              <td>${assignment.full_name || assignment.username || 'Unassigned'}</td>
+              <td>${assignment.duty_role}</td>
+              <td>${new Date(assignment.assigned_at).toLocaleString()}</td>
+              <td><span class="status-badge status-${assignment.status.replace('_', '-')}">${assignment.status.replace('_', ' ')}</span></td>
+              <td>
+                <button class="btn btn-primary" onclick="updateCaseStatus(${assignment.assignment_id})">
+                  <span>📝</span>
+                  Update Status
+                </button>
+                <button class="btn btn-secondary" onclick="viewStatusHistory(${assignment.crime_id})">
+                  <span>📊</span>
+                  View History
+                </button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } else {
+             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Failed to load assignments.</td></tr>';
+        }
+      } catch (error) {
+        console.error('Process Error loading case assignments:', error);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">An error occurred while processing assignment data.</td></tr>';
+      }
+    }
+
+    // Complaint verification functions
+    async function verifyComplaint(complaintId) {
+      showConfirm(`Are you sure you want to verify complaint COMP-${complaintId.toString().padStart(3, '0')}? This will flag it for escalation.`, async (confirmed) => {
+        if (confirmed) {
+          try {
+            // Simulated verification and update of mock data
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
+            if(index !== -1) complaintsData[index].status = 'verified';
+
+            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **VERIFIED**!`);
+            loadComplaints(); // Refresh the table
+          } catch (error) {
+            console.error('Error:', error);
+            showAlert(`Error verifying complaint: ${error.message}`);
+          }
+        }
+      });
+    }
+
+    async function rejectComplaint(complaintId) {
+      showConfirm(`Are you sure you want to **REJECT** complaint COMP-${complaintId.toString().padStart(3, '0')}? This action cannot be undone.`, async (confirmed) => {
+        if (confirmed) {
+          try {
+            // Simulated rejection and removal from mock data
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
+            if(index !== -1) complaintsData.splice(index, 1);
+            
+            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **REJECTED** and archived.`);
+            loadComplaints(); // Refresh the table
+          } catch (error) {
+            console.error('Error:', error);
+            showAlert(`Error rejecting complaint: ${error.message}`);
+          }
+        }
+      });
+    }
+
+    function escalateToCrime(complaintId) {
+      showConfirm(`Are you sure you want to escalate verified complaint COMP-${complaintId.toString().padStart(3, '0')} to a formal crime report?`, (confirmed) => {
+        if (confirmed) {
+          console.log(`Escalating complaint ${complaintId} to crime report`);
+          showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been **ESCALATED** to a crime report! (New CRIME ID TBD)`);
+        }
+      });
+    }
+
+    function viewComplaintDetails(complaintId) {
+      console.log(`Viewing details for complaint: ${complaintId}`);
+      showAlert(`Loading detailed information for complaint COMP-${complaintId.toString().padStart(3, '0')}... (This is where the full report contents would display)`);
+    }
+
+    // Case management functions
+    function updateCaseStatus(assignmentId) {
+      console.log(`Attempting to update status for assignment ${assignmentId}`);
+      // NOTE: Replacing prompt() with an informative modal.
+      showAlert(`To update the case status for ASSIGN-${assignmentId.toString().padStart(3, '0')}, a full modal form with status selection and notes field would appear here for data entry.`);
+    }
+
+    function viewStatusHistory(crimeId) {
+      console.log(`Viewing status history for crime: ${crimeId}`);
+      showAlert(`Loading status history and timeline for CRIME-${crimeId.toString().padStart(3, '0')}...`);
+    }
+
+    function viewCrimeDetails(crimeId) {
+      console.log(`Viewing crime details: ${crimeId}`);
+      showAlert(`Loading crime details and AI-generated summary for CRIME-${crimeId.toString().padStart(3, '0')}...`);
+    }
+
+    /**
+     * Updates the chat interface to show the selected user's conversation.
+     * @param {string} userId - The ID of the user (e.g., 'jane-smith').
+     * @param {Event} [event] - The click event object.
+     */
+    function selectUser(userId, event) {
+      // 1. Update active class in sidebar
+      const users = document.querySelectorAll('.chat-user');
+      users.forEach(user => user.classList.remove('active'));
+      
+      let selectedUserElement;
+      if (event && event.target) {
+        selectedUserElement = event.target.closest('.chat-user');
+      } else {
+        // Fallback for programmatic call (like when opening the chat tab)
+        selectedUserElement = document.querySelector(`.chat-user[data-user-id="${userId}"]`);
+      }
+      
+      if (selectedUserElement) {
+        selectedUserElement.classList.add('active');
+      }
+
+      // 2. Load the mock data for the selected user
+      const messages = mockChatMessages[userId] || [];
+      const userName = selectedUserElement ? selectedUserElement.querySelector('div:first-child').textContent : 'Unknown User';
+      const reportId = selectedUserElement ? selectedUserElement.querySelector('div:last-child').textContent.split(': ')[1] : 'UR-000';
+
+      // 3. Update the chat header
+      document.getElementById('chat-header-name').textContent = userName;
+      document.getElementById('chat-header-report').textContent = `Report ID: ${reportId}`;
+
+      // 4. Populate the chat messages container
+      const messagesContainer = document.getElementById('chat-messages');
+      messagesContainer.innerHTML = ''; // Clear existing messages
+
+      messages.forEach(msg => {
+          const messageElement = document.createElement('div');
+          messageElement.className = `message ${msg.sender}`;
+          messageElement.innerHTML = `
+              <div class="message-sender">${msg.name}</div>
+              <div>${msg.text}</div>
+              <div class="message-time">${msg.time}</div>
+          `;
+          messagesContainer.appendChild(messageElement);
+      });
+      
+      // 5. Auto-scroll chat to the bottom
+      if (messagesContainer) {
+          setTimeout(() => {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }, 0);
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      
+      if (message) {
+        // Add message to chat
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message admin';
+        messageElement.innerHTML = `
+          <div class="message-sender">Admin</div>
+          <div>${message}</div>
+          <div class="message-time">Just now</div>
+        `;
+        messagesContainer.appendChild(messageElement);
+        
+        // Clear input
+        input.value = '';
+        
+        // CRITICAL FIX: Scroll to bottom after a tiny delay (0ms) to ensure
+        // the new message element's height is calculated by the DOM before scrolling.
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 0);
+        
+        console.log('Sending message:', message);
+      }
+    }
+
+    // Allow sending message with Enter key
+    document.getElementById('chat-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      loadCrimesOverview();
+      loadComplaints();
+      loadCaseAssignments();
+      
+      // Initial state: Select John Doe's chat upon loading the chat module
+      // Note: This relies on showTab('chat') being called when the user navigates there, 
+      // but we ensure the content exists on load.
+      selectUser('john-doe'); 
+      
+      // Close the menu if clicked outside on initial load (although usually triggered by toggleMenu)
+      document.addEventListener('click', closeMenuOutside, true);
+    });
+  </script>
+</body>
+</html>

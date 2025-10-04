@@ -187,47 +187,20 @@
 <script>
 "use strict";
 // Data (with age, height_cm, complexion)
-const wantedData = [
-  {
-    id:1,
-    name:"Rahim Uddin",
-    photo_url:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=800&auto=format&fit=crop",
-    crimes:["Robbery","Extortion"],
-    last_seen_location:"Mirpur, Dhaka",
-    last_seen_time:"2025-09-25T18:30:00",
-    reward:50000,
-    note:"Considered dangerous.",
-    age:32,
-    height_cm:175,
-    complexion:"Wheatish"
-  },
-  {
-    id:2,
-    name:"Tariq Hasan",
-    photo_url:"https://images.unsplash.com/photo-1542202229-7d93c33f5d07?q=80&w=800&auto=format&fit=crop",
-    crimes:["Fraud"],
-    last_seen_location:"Agrabad, Chattogram",
-    last_seen_time:"2025-09-20T14:10:00",
-    reward:20000,
-    note:"Drives a black sedan.",
-    age:40,
-    height_cm:168,
-    complexion:"Fair"
-  },
-  {
-    id:3,
-    name:"Unknown Alias 'Blue'",
-    photo_url:"https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?q=80&w=800&auto=format&fit=crop",
-    crimes:["Burglary"],
-    last_seen_location:"Uttara, Dhaka",
-    last_seen_time:"2025-09-28T05:45:00",
-    reward:0,
-    note:"Seen near construction sites.",
-    age:29,
-    height_cm:180,
-    complexion:"Dark"
-  }
-];
+let wantedData = [];
+
+async function loadWantedCriminals() {
+    try {
+        const response = await fetch('/api/wanted-criminals');
+        const data = await response.json();
+        wantedData = data.wanted_criminals;
+        render(wantedData);
+    } catch (error) {
+        console.error('Error loading wanted criminals:', error);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadWantedCriminals);
 
 // Helpers
 const $ = sel => document.querySelector(sel);

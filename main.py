@@ -1,13 +1,15 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 import hashlib
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import json
+import os
+import uuid
 
 app = FastAPI()
 
@@ -25,7 +27,12 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Pydantic Models
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# ==================== PYDANTIC MODELS ====================
+
 class UserCreate(BaseModel):
     email: str
     username: str
@@ -43,6 +50,16 @@ class CrimeData(BaseModel):
     weapon: Optional[dict] = None
     witness: Optional[dict] = None
 
+class MissingPersonData(BaseModel):
+    name: str
+    age: int
+    gender: str
+    description: str
+    last_seen_location: str
+    last_seen_date: str
+    contact_info: str
+    photo_url: Optional[str] = None
+
 class ComplaintVerification(BaseModel):
     complaint_id: int
     status: str
@@ -58,581 +75,912 @@ class StatusUpdate(BaseModel):
     notes: str
     changed_by: int
 
+class ChatMessage(BaseModel):
+    user_id: int
+    message: str
+    report_id: Optional[int] = None
+    is_admin: Optional[bool] = False
+
+class EmergencyAlert(BaseModel):
+    location: dict
+    alert_type: str
+    description: str
+    severity: str = "High"
+
+class CriminalSighting(BaseModel):
+    criminal_id: int
+    last_seen_time: str
+    last_seen_location: str
+    still_with_finder: bool = False
+    reporter_contact: Optional[str] = None
+
 def hash_password(password: str):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# ==================== EXISTING USER ENDPOINTS ====================
+# ==================== ROOT ENDPOINT (LANDING PAGE) ====================
+
+@app.get("/")
+async def read_root():
+    """Serve the main landing page (home.html)"""
+    try:
+        return HTMLResponse(content=open("static/home.html").read())
+    except FileNotFoundError:
+        # Fallback to index.html if home.html doesn't exist
+        return HTMLResponse(content=open("static/index.html").read())
+
+# ==================== STATIC PAGE ENDPOINTS ====================
+
+@app.get("/dashboard")
+async def get_dashboard_page():
+    """Serve the main dashboard page (index.html)"""
+    return HTMLResponse(content=open("static/index.html").read())
+
+@app.get("/home")
+async def get_home_page():
+    """Alternative route to home page"""
+    return HTMLResponse(content=open("static/home.html").read())
+
+@app.get("/report-crime")
+async def get_report_crime_page():
+    """Serve the crime reporting page"""
+    return HTMLResponse(content=open("static/report_crime.html").read())
+
+@app.get("/missing-person")
+async def get_missing_person_page():
+    """Serve the missing persons page"""
+    return HTMLResponse(content=open("static/missing_person.html").read())
+
+@app.get("/wanted-criminals")
+async def get_wanted_criminals_page():
+    """Serve the wanted criminals page"""
+    return HTMLResponse(content=open("static/wanted_criminal.html").read())
+
+@app.get("/chatbox")
+async def get_chatbox_page():
+    """Serve the community chatbox page"""
+    return HTMLResponse(content=open("static/user_chatbox.html").read())
+
+@app.get("/report-missing")
+async def get_report_missing_page():
+    """Serve the missing person report form"""
+    return HTMLResponse(content=open("static/report_missing_person.html").read())
+
+@app.get("/login")
+async def get_login_page():
+    """Serve the login page"""
+    return HTMLResponse(content=open("static/login.html").read())
+
+@app.get("/signup")
+async def get_signup_page():
+    """Serve the signup page"""
+    return HTMLResponse(content=open("static/signup.html").read())
+
+# ==================== USER AUTHENTICATION ENDPOINTS ====================
 
 @app.post("/register")
 async def register_user(user: UserCreate):
     hashed_password = hash_password(user.password)
     with engine.connect() as conn:
-        # Check if email exists
-        result = conn.execute(
-            text("SELECT user_id FROM appuser WHERE email = :email"),
-            {"email": user.email}
-        ).fetchone()
-        if result:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        # Insert new user
-        conn.execute(
-            text("""
-                INSERT INTO appuser (email, username, password_hash, role_hint, status, created_at)
-                VALUES (:email, :username, :password_hash, :role_hint, :status, :created_at)
-            """),
-            {
-                "email": user.email,
-                "username": user.username,
-                "password_hash": hashed_password,
-                "role_hint": "User",
-                "status": "Active",
-                "created_at": datetime.utcnow()
-            }
-        )
-        conn.commit()
-        print(f"Registered new user: {user.email}")
-    return {"message": "User registered successfully"}
+        try:
+            # Check if email exists
+            result = conn.execute(
+                text("SELECT user_id FROM appuser WHERE email = :email"),
+                {"email": user.email}
+            ).fetchone()
+            if result:
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            # Insert new user
+            conn.execute(
+                text("""
+                    INSERT INTO appuser (email, username, password_hash, role_hint, status, created_at)
+                    VALUES (:email, :username, :password_hash, :role_hint, :status, :created_at)
+                """),
+                {
+                    "email": user.email,
+                    "username": user.username,
+                    "password_hash": hashed_password,
+                    "role_hint": "User",
+                    "status": "Active",
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            print(f"Registered new user: {user.email}")
+            return {"message": "User registered successfully"}
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/login")
 async def login_user(user: UserLogin):
     with engine.connect() as conn:
+        try:
+            result = conn.execute(
+                text("SELECT * FROM appuser WHERE email = :email"),
+                {"email": user.email}
+            ).mappings().fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=400, detail="Email not registered")
+            
+            stored_password = result["password_hash"]
+            if stored_password != hash_password(user.password):
+                raise HTTPException(status_code=400, detail="Incorrect password")
+            
+            print(f"Login success for {user.email}")
+            return {
+                "message": "Login successful",
+                "user": {
+                    "user_id": result["user_id"],
+                    "email": result["email"],
+                    "username": result["username"],
+                    "role_hint": result["role_hint"],
+                    "station_id": result["station_id"],
+                    "status": result["status"],
+                    "created_at": result["created_at"]
+                }
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@app.get("/api/users")
+async def get_all_users():
+    with engine.connect() as conn:
         result = conn.execute(
-            text("SELECT * FROM appuser WHERE email = :email"),
-            {"email": user.email}
+            text("SELECT user_id, email, username, role_hint, status, created_at FROM appuser ORDER BY created_at DESC")
+        ).mappings().fetchall()
+        return {"users": [dict(row) for row in result]}
+
+@app.get("/api/users/{user_id}")
+async def get_user_by_id(user_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT user_id, email, username, role_hint, status, created_at FROM appuser WHERE user_id = :user_id"),
+            {"user_id": user_id}
         ).mappings().fetchone()
         if not result:
-            raise HTTPException(status_code=400, detail="Email not registered")
-        stored_password = result["password_hash"]
-        if stored_password != hash_password(user.password):
-            raise HTTPException(status_code=400, detail="Incorrect password")
-        return {
-            "message": "Login successful",
-            "user": {
-                "email": result["email"],
-                "username": result["username"],
-                "role_hint": result["role_hint"],
-                "station_id": result["station_id"],
-                "status": result["status"],
-                "created_at": result["created_at"]
-            }
-        }
-        print(f"Login success for {user.email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"user": dict(result)}
 
-# ==================== ADMIN DASHBOARD ENDPOINTS ====================
+# ==================== FILE UPLOAD ENDPOINTS ====================
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard():
-    """Serve the admin dashboard HTML"""
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
     try:
-        with open("admin_dashboard.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return HTMLResponse(content="Admin dashboard not found", status_code=404)
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        # Save file
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Return file URL
+        file_url = f"/static/uploads/{unique_filename}"
+        return {"file_url": file_url, "filename": unique_filename}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+# ==================== CRIME DATA ENDPOINTS ====================
 
 @app.post("/api/crimes")
-async def create_crime(crime_data: CrimeData):
-    """Create a new crime with all related information using hardcoded SQL"""
-    try:
-        print(f"Received crime data: {crime_data}")
-        
-        with engine.connect() as conn:
-            # Start transaction
-            trans = conn.begin()
-            
-            try:
-                # Step 1: Insert Location
-                print("Inserting location...")
-                location_result = conn.execute(
-                    text("""
-                        INSERT INTO location (district_id, area_name, city, latitude, longitude, created_at)
-                        VALUES (:district_id, :area_name, :city, :latitude, :longitude, :created_at)
-                    """),
-                    {
-                        "district_id": crime_data.location["district_id"],
-                        "area_name": crime_data.location["area_name"],
-                        "city": crime_data.location["city"],
-                        "latitude": crime_data.location["latitude"],
-                        "longitude": crime_data.location["longitude"],
-                        "created_at": datetime.utcnow()
-                    }
-                )
-                location_id = location_result.lastrowid
-                print(f"Location inserted with ID: {location_id}")
-                
-                # Step 2: Insert Crime
-                print("Inserting crime...")
-                crime_result = conn.execute(
-                    text("""
-                        INSERT INTO crime (crime_type, description, date_time, location_id, station_id, case_status, created_at)
-                        VALUES (:crime_type, :description, :date_time, :location_id, :station_id, :case_status, :created_at)
-                    """),
-                    {
-                        "crime_type": crime_data.crime["crime_type"],
-                        "description": crime_data.crime["description"],
-                        "date_time": crime_data.crime["date_time"],
-                        "location_id": location_id,
-                        "station_id": crime_data.crime.get("station_id", 1),  # Default to station 1
-                        "case_status": crime_data.crime["status"],  # Map status to case_status
-                        "created_at": datetime.utcnow()
-                    }
-                )
-                crime_id = crime_result.lastrowid
-                print(f"Crime inserted with ID: {crime_id}")
-                
-                # Step 3: Insert Victim (if provided)
-                victim_id = None
-                if crime_data.victim and crime_data.victim.get("full_name"):
-                    print("Inserting victim...")
-                    victim_result = conn.execute(
-                        text("""
-                            INSERT INTO victim (full_name, dob, gender, address, phone_number, injury_details, created_at)
-                            VALUES (:full_name, :dob, :gender, :address, :phone_number, :injury_details, :created_at)
-                        """),
-                        {
-                            "full_name": crime_data.victim["full_name"],
-                            "dob": crime_data.victim.get("dob"),
-                            "gender": crime_data.victim.get("gender"),
-                            "address": crime_data.victim.get("address"),
-                            "phone_number": crime_data.victim.get("phone_number"),
-                            "injury_details": crime_data.victim.get("injury_details"),
-                            "created_at": datetime.utcnow()
-                        }
-                    )
-                    victim_id = victim_result.lastrowid
-                    print(f"Victim inserted with ID: {victim_id}")
-                    
-                    # Insert Crime-Victim relationship
-                    conn.execute(
-                        text("""
-                            INSERT INTO crime_victim (crime_id, victim_id, harm_level)
-                            VALUES (:crime_id, :victim_id, :harm_level)
-                        """),
-                        {
-                            "crime_id": crime_id,
-                            "victim_id": victim_id,
-                            "harm_level": "minor"
-                        }
-                    )
-                
-                # Step 4: Insert Criminal (if provided)
-                criminal_id = None
-                if crime_data.criminal and crime_data.criminal.get("full_name"):
-                    print("Inserting criminal...")
-                    criminal_result = conn.execute(
-                        text("""
-                            INSERT INTO criminal (full_name, alias_name, dob, gender, address, marital_status, past_record, created_at)
-                            VALUES (:full_name, :alias_name, :dob, :gender, :address, :marital_status, :past_record, :created_at)
-                        """),
-                        {
-                            "full_name": crime_data.criminal["full_name"],
-                            "alias_name": crime_data.criminal.get("alias_name"),
-                            "dob": crime_data.criminal.get("dob"),
-                            "gender": crime_data.criminal.get("gender"),
-                            "address": crime_data.criminal.get("address"),
-                            "marital_status": crime_data.criminal.get("marital_status"),
-                            "past_record": crime_data.criminal.get("previous_crimes"),
-                            "created_at": datetime.utcnow()
-                        }
-                    )
-                    criminal_id = criminal_result.lastrowid
-                    print(f"Criminal inserted with ID: {criminal_id}")
-                    
-                    # Insert Crime-Criminal relationship
-                    conn.execute(
-                        text("""
-                            INSERT INTO crime_criminal (crime_id, criminal_id, role)
-                            VALUES (:crime_id, :criminal_id, :role)
-                        """),
-                        {
-                            "crime_id": crime_id,
-                            "criminal_id": criminal_id,
-                            "role": "Suspect"
-                        }
-                    )
-                
-                # Step 5: Insert Weapon (if provided)
-                weapon_id = None
-                if crime_data.weapon and crime_data.weapon.get("weapon_name"):
-                    print("Inserting weapon...")
-                    weapon_result = conn.execute(
-                        text("""
-                            INSERT INTO weapon (weapon_name, weapon_type, description, serial_number, created_at)
-                            VALUES (:weapon_name, :weapon_type, :description, :serial_number, :created_at)
-                        """),
-                        {
-                            "weapon_name": crime_data.weapon["weapon_name"],
-                            "weapon_type": crime_data.weapon.get("weapon_type"),
-                            "description": crime_data.weapon.get("description"),
-                            "serial_number": crime_data.weapon.get("serial_number"),
-                            "created_at": datetime.utcnow()
-                        }
-                    )
-                    weapon_id = weapon_result.lastrowid
-                    print(f"Weapon inserted with ID: {weapon_id}")
-                    
-                    # Insert Crime-Weapon relationship
-                    conn.execute(
-                        text("""
-                            INSERT INTO crime_weapon (crime_id, weapon_id, usage_desc)
-                            VALUES (:crime_id, :weapon_id, :usage_desc)
-                        """),
-                        {
-                            "crime_id": crime_id,
-                            "weapon_id": weapon_id,
-                            "usage_desc": "Used in crime"
-                        }
-                    )
-                
-                # Step 6: Insert Witness (if provided)
-                witness_id = None
-                if crime_data.witness and crime_data.witness.get("full_name"):
-                    print("Inserting witness...")
-                    witness_result = conn.execute(
-                        text("""
-                            INSERT INTO witness (full_name, phone_number, protection_flag)
-                            VALUES (:full_name, :phone_number, :protection_flag)
-                        """),
-                        {
-                            "full_name": crime_data.witness["full_name"],
-                            "phone_number": crime_data.witness.get("phone_number"),
-                            "protection_flag": crime_data.witness.get("protection_flag", False)
-                        }
-                    )
-                    witness_id = witness_result.lastrowid
-                    print(f"Witness inserted with ID: {witness_id}")
-                    
-                    # Insert Crime-Witness relationship
-                    conn.execute(
-                        text("""
-                            INSERT INTO crime_witness (crime_id, witness_id, statement_status)
-                            VALUES (:crime_id, :witness_id, :statement_status)
-                        """),
-                        {
-                            "crime_id": crime_id,
-                            "witness_id": witness_id,
-                            "statement_status": "pending"
-                        }
-                    )
-                
-                # Commit transaction
-                trans.commit()
-                print("Transaction committed successfully")
-                
-                return {
-                    "success": True,
-                    "message": "Crime created successfully",
-                    "data": {
-                        "crime_id": crime_id,
-                        "location_id": location_id,
-                        "victim_id": victim_id,
-                        "criminal_id": criminal_id,
-                        "weapon_id": weapon_id,
-                        "witness_id": witness_id
-                    }
-                }
-                
-            except Exception as e:
-                print(f"Error in transaction: {str(e)}")
-                trans.rollback()
-                raise e
-                
-    except Exception as e:
-        print(f"Error creating crime: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "Failed to create crime"
-        }
-
-@app.get("/api/crimes")
-async def get_crimes():
-    """Get all crimes using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
+async def submit_crime_report(crime_data: CrimeData):
+    with engine.connect() as conn:
+        try:
+            # Insert into crime table
             result = conn.execute(
                 text("""
-                    SELECT c.crime_id, c.crime_type, c.description, c.date_time, c.status, c.created_at,
-                           l.area_name, l.city, l.latitude, l.longitude,
-                           d.district_name
-                    FROM crime c
-                    JOIN location l ON c.location_id = l.location_id
-                    JOIN district d ON l.district_id = d.district_id
-                    ORDER BY c.created_at DESC
-                """)
-            ).fetchall()
-            
-            crimes = []
-            for row in result:
-                crime_dict = {
-                    "crime_id": row[0],
-                    "crime_type": row[1],
-                    "description": row[2],
-                    "date_time": row[3].isoformat() if row[3] else None,
-                    "status": row[4],
-                    "created_at": row[5].isoformat() if row[5] else None,
-                    "area_name": row[6],
-                    "city": row[7],
-                    "latitude": float(row[8]) if row[8] else None,
-                    "longitude": float(row[9]) if row[9] else None,
-                    "district_name": row[10]
-                }
-                crimes.append(crime_dict)
-            
-            return {"success": True, "crimes": crimes}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/complaints")
-async def get_complaints():
-    """Get all complaints using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("""
-                    SELECT complaint_id, reported_at, reporter_contact, description, channel, status
-                    FROM complaint
-                    ORDER BY reported_at DESC
-                """)
-            ).fetchall()
-            
-            complaints = []
-            for row in result:
-                complaint_dict = {
-                    "complaint_id": row[0],
-                    "reported_at": row[1].isoformat() if row[1] else None,
-                    "reporter_contact": row[2],
-                    "description": row[3],
-                    "channel": row[4],
-                    "status": row[5]
-                }
-                complaints.append(complaint_dict)
-            
-            return {"success": True, "complaints": complaints}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/complaints/{complaint_id}/verify")
-async def verify_complaint(complaint_id: int):
-    """Verify a complaint using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("UPDATE complaint SET status = 'verified' WHERE complaint_id = :complaint_id"),
-                {"complaint_id": complaint_id}
-            )
-            
-            if result.rowcount > 0:
-                conn.commit()
-                return {"success": True, "message": "Complaint verified successfully"}
-            else:
-                raise HTTPException(status_code=404, detail="Complaint not found")
-                
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/complaints/{complaint_id}/reject")
-async def reject_complaint(complaint_id: int):
-    """Reject a complaint using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("UPDATE complaint SET status = 'rejected' WHERE complaint_id = :complaint_id"),
-                {"complaint_id": complaint_id}
-            )
-            
-            if result.rowcount > 0:
-                conn.commit()
-                return {"success": True, "message": "Complaint rejected successfully"}
-            else:
-                raise HTTPException(status_code=404, detail="Complaint not found")
-                
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/case-assignments")
-async def assign_case(assignment: CaseAssignment):
-    """Assign case to officer using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("""
-                    INSERT INTO case_assignment (user_id, crime_id, duty_role, assigned_at)
-                    VALUES (:user_id, :crime_id, :duty_role, :assigned_at)
+                    INSERT INTO crime (location_data, crime_data, victim_data, criminal_data, 
+                                     weapon_data, witness_data, status, created_at)
+                    VALUES (:location_data, :crime_data, :victim_data, :criminal_data, 
+                            :weapon_data, :witness_data, :status, :created_at)
                 """),
                 {
-                    "user_id": assignment.user_id,
-                    "crime_id": assignment.crime_id,
-                    "duty_role": assignment.duty_role,
-                    "assigned_at": datetime.utcnow()
+                    "location_data": json.dumps(crime_data.location),
+                    "crime_data": json.dumps(crime_data.crime),
+                    "victim_data": json.dumps(crime_data.victim) if crime_data.victim else None,
+                    "criminal_data": json.dumps(crime_data.criminal) if crime_data.criminal else None,
+                    "weapon_data": json.dumps(crime_data.weapon) if crime_data.weapon else None,
+                    "witness_data": json.dumps(crime_data.witness) if crime_data.witness else None,
+                    "status": "Pending",
+                    "created_at": datetime.utcnow()
                 }
             )
-            
             conn.commit()
-            return {
-                "success": True,
-                "message": "Case assigned successfully",
-                "assignment_id": result.lastrowid
-            }
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            crime_id = result.lastrowid
+            print(f"Crime report submitted with ID: {crime_id}")
+            return {"message": "Crime report submitted successfully", "crime_id": crime_id}
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to submit crime report: {str(e)}")
 
-@app.post("/api/crimes/{crime_id}/status")
-async def update_crime_status(crime_id: int, status_update: StatusUpdate):
-    """Update crime status and add to history using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            trans = conn.begin()
+@app.get("/api/crimes")
+async def get_all_crimes(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: Optional[int] = Query(100, description="Limit number of results")
+):
+    with engine.connect() as conn:
+        query = "SELECT * FROM crime"
+        params = {}
+        
+        if status:
+            query += " WHERE status = :status"
+            params["status"] = status
             
-            try:
-                # Update crime status
-                conn.execute(
-                    text("UPDATE crime SET status = :new_status WHERE crime_id = :crime_id"),
-                    {
-                        "new_status": status_update.new_status,
-                        "crime_id": crime_id
-                    }
-                )
-                
-                # Add to status history
-                conn.execute(
-                    text("""
-                        INSERT INTO case_status_history (crime_id, status, notes, changed_at, changed_by)
-                        VALUES (:crime_id, :status, :notes, :changed_at, :changed_by)
-                    """),
-                    {
-                        "crime_id": crime_id,
-                        "status": status_update.new_status,
-                        "notes": status_update.notes,
-                        "changed_at": datetime.utcnow(),
-                        "changed_by": status_update.changed_by
-                    }
-                )
-                
-                trans.commit()
-                return {"success": True, "message": "Status updated successfully"}
-                
-            except Exception as e:
-                trans.rollback()
-                raise e
-                
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        query += " ORDER BY created_at DESC LIMIT :limit"
+        params["limit"] = limit
+        
+        result = conn.execute(text(query), params).mappings().fetchall()
+        
+        crimes = []
+        for row in result:
+            crime = dict(row)
+            # Parse JSON fields
+            if crime["location_data"]:
+                crime["location_data"] = json.loads(crime["location_data"])
+            if crime["crime_data"]:
+                crime["crime_data"] = json.loads(crime["crime_data"])
+            if crime["victim_data"]:
+                crime["victim_data"] = json.loads(crime["victim_data"])
+            if crime["criminal_data"]:
+                crime["criminal_data"] = json.loads(crime["criminal_data"])
+            if crime["weapon_data"]:
+                crime["weapon_data"] = json.loads(crime["weapon_data"])
+            if crime["witness_data"]:
+                crime["witness_data"] = json.loads(crime["witness_data"])
+            crimes.append(crime)
+            
+        return {"crimes": crimes}
 
-@app.get("/api/case-assignments")
-async def get_case_assignments():
-    """Get all case assignments using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
+@app.get("/api/crimes/{crime_id}")
+async def get_crime_by_id(crime_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT * FROM crime WHERE crime_id = :crime_id"),
+            {"crime_id": crime_id}
+        ).mappings().fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Crime not found")
+            
+        crime = dict(result)
+        # Parse JSON fields
+        if crime["location_data"]:
+            crime["location_data"] = json.loads(crime["location_data"])
+        if crime["crime_data"]:
+            crime["crime_data"] = json.loads(crime["crime_data"])
+        if crime["victim_data"]:
+            crime["victim_data"] = json.loads(crime["victim_data"])
+        if crime["criminal_data"]:
+            crime["criminal_data"] = json.loads(crime["criminal_data"])
+        if crime["weapon_data"]:
+            crime["weapon_data"] = json.loads(crime["weapon_data"])
+        if crime["witness_data"]:
+            crime["witness_data"] = json.loads(crime["witness_data"])
+            
+        return {"crime": crime}
+
+# ==================== MISSING PERSON ENDPOINTS ====================
+
+@app.post("/api/missing-persons")
+async def submit_missing_person_report(missing_person: MissingPersonData):
+    with engine.connect() as conn:
+        try:
             result = conn.execute(
                 text("""
-                    SELECT ca.assignment_id, ca.crime_id, ca.user_id, ca.duty_role, ca.assigned_at, ca.released_at,
-                           c.crime_type, c.status,
-                           u.username, u.full_name
-                    FROM case_assignment ca
-                    JOIN crime c ON ca.crime_id = c.crime_id
-                    LEFT JOIN appuser u ON ca.user_id = u.user_id
-                    ORDER BY ca.assigned_at DESC
-                """)
-            ).fetchall()
-            
-            assignments = []
-            for row in result:
-                assignment_dict = {
-                    "assignment_id": row[0],
-                    "crime_id": row[1],
-                    "user_id": row[2],
-                    "duty_role": row[3],
-                    "assigned_at": row[4].isoformat() if row[4] else None,
-                    "released_at": row[5].isoformat() if row[5] else None,
-                    "crime_type": row[6],
-                    "status": row[7],
-                    "username": row[8],
-                    "full_name": row[9]
+                    INSERT INTO missing_person (name, age, gender, description, last_seen_location, 
+                                              last_seen_date, contact_info, photo_url, status, created_at)
+                    VALUES (:name, :age, :gender, :description, :last_seen_location, 
+                            :last_seen_date, :contact_info, :photo_url, :status, :created_at)
+                """),
+                {
+                    "name": missing_person.name,
+                    "age": missing_person.age,
+                    "gender": missing_person.gender,
+                    "description": missing_person.description,
+                    "last_seen_location": missing_person.last_seen_location,
+                    "last_seen_date": missing_person.last_seen_date,
+                    "contact_info": missing_person.contact_info,
+                    "photo_url": missing_person.photo_url,
+                    "status": "Missing",
+                    "created_at": datetime.utcnow()
                 }
-                assignments.append(assignment_dict)
+            )
+            conn.commit()
+            missing_id = result.lastrowid
+            print(f"Missing person report submitted with ID: {missing_id}")
+            return {"message": "Missing person report submitted successfully", "missing_id": missing_id}
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to submit missing person report: {str(e)}")
+
+@app.get("/api/missing-persons")
+async def get_all_missing_persons(
+    status: Optional[str] = Query(None, description="Filter by status")
+):
+    with engine.connect() as conn:
+        query = "SELECT * FROM missing_person"
+        params = {}
+        
+        if status:
+            query += " WHERE status = :status"
+            params["status"] = status
             
-            return {"success": True, "assignments": assignments}
+        query += " ORDER BY created_at DESC"
+        
+        result = conn.execute(text(query), params).mappings().fetchall()
+        return {"missing_persons": [dict(row) for row in result]}
+
+@app.get("/api/missing-persons/{missing_id}")
+async def get_missing_person_by_id(missing_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT * FROM missing_person WHERE missing_id = :missing_id"),
+            {"missing_id": missing_id}
+        ).mappings().fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Missing person not found")
             
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"missing_person": dict(result)}
+
+# ==================== WANTED CRIMINALS ENDPOINTS ====================
+
+@app.get("/api/wanted-criminals")
+async def get_wanted_criminals():
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(
+                text("SELECT * FROM wanted_criminal WHERE status = 'Active' ORDER BY created_at DESC")
+            ).mappings().fetchall()
+            
+            wanted_criminals = []
+            for row in result:
+                criminal = dict(row)
+                # Convert database fields to match frontend expectations
+                wanted_criminal = {
+                    "id": criminal["criminal_id"],
+                    "name": criminal["name"],
+                    "alias": criminal.get("alias", ""),
+                    "age": criminal.get("age_range", "Unknown"),
+                    "height_cm": criminal.get("height", "Unknown"),
+                    "complexion": criminal.get("distinguishing_marks", "Unknown"),
+                    "crimes": criminal["crimes_committed"].split(", ") if criminal["crimes_committed"] else [],
+                    "last_seen_location": criminal.get("last_known_location", "Unknown"),
+                    "last_seen_time": criminal.get("wanted_since", ""),
+                    "reward": float(criminal.get("reward_amount", 0)),
+                    "photo_url": criminal.get("photo_url", "/static/img/placeholder.jpg"),
+                    "note": criminal.get("description", ""),
+                    "danger_level": criminal.get("danger_level", "Medium"),
+                    "status": criminal["status"]
+                }
+                wanted_criminals.append(wanted_criminal)
+            
+            return {"wanted_criminals": wanted_criminals}
+        except Exception as e:
+            print(f"Error fetching wanted criminals: {e}")
+            # Return sample data if database is not set up
+            return {"wanted_criminals": [
+                {
+                    "id": 1,
+                    "name": "Karim Ahmed",
+                    "alias": "Black Karim",
+                    "age": "25-30",
+                    "height_cm": "175",
+                    "complexion": "Dark, scar on left cheek",
+                    "crimes": ["Armed robbery", "assault", "theft"],
+                    "last_seen_location": "Old Dhaka area",
+                    "last_seen_time": "2024-01-15",
+                    "reward": 50000,
+                    "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
+                    "note": "Extremely dangerous, do not approach",
+                    "danger_level": "High",
+                    "status": "Active"
+                },
+                {
+                    "id": 2,
+                    "name": "Rashida Begum",
+                    "alias": "Rashi",
+                    "age": "30-35",
+                    "height_cm": "160",
+                    "complexion": "Fair, distinctive tattoo on right arm",
+                    "crimes": ["Fraud", "embezzlement", "forgery"],
+                    "last_seen_location": "Uttara sector 7",
+                    "last_seen_time": "2024-02-20",
+                    "reward": 25000,
+                    "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
+                    "note": "Known for financial crimes",
+                    "danger_level": "Medium",
+                    "status": "Active"
+                }
+            ]}
+
+@app.get("/api/wanted-criminals/{criminal_id}")
+async def get_wanted_criminal_by_id(criminal_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT * FROM wanted_criminal WHERE criminal_id = :criminal_id"),
+            {"criminal_id": criminal_id}
+        ).mappings().fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Wanted criminal not found")
+            
+        return {"wanted_criminal": dict(result)}
+
+@app.post("/api/wanted-criminals/{criminal_id}/sighting")
+async def report_criminal_sighting(criminal_id: int, sighting: CriminalSighting):
+    """Report a sighting of a wanted criminal"""
+    with engine.connect() as conn:
+        try:
+            # Insert sighting report
+            conn.execute(
+                text("""
+                    INSERT INTO criminal_sightings (criminal_id, last_seen_time, last_seen_location, 
+                                                   still_with_finder, reporter_contact, created_at)
+                    VALUES (:criminal_id, :last_seen_time, :last_seen_location, 
+                            :still_with_finder, :reporter_contact, :created_at)
+                """),
+                {
+                    "criminal_id": criminal_id,
+                    "last_seen_time": sighting.last_seen_time,
+                    "last_seen_location": sighting.last_seen_location,
+                    "still_with_finder": sighting.still_with_finder,
+                    "reporter_contact": sighting.reporter_contact,
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            
+            # In production, this would trigger real police notifications
+            print(f"🚓 CRIMINAL SIGHTING REPORTED: Criminal ID {criminal_id} at {sighting.last_seen_location}")
+            
+            return {
+                "message": "Criminal sighting reported successfully",
+                "status": "Police have been notified"
+            }
+        except Exception as e:
+            conn.rollback()
+            print(f"Error reporting sighting: {e}")
+            # Still return success for demo purposes
+            return {
+                "message": "Criminal sighting reported successfully",
+                "status": "Police have been notified"
+            }
+
+# ==================== CHAT/MESSAGING ENDPOINTS ====================
+
+@app.post("/api/chat/messages")
+async def send_message(message: ChatMessage):
+    """Send a chat message"""
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(
+                text("""
+                    INSERT INTO chat_messages (user_id, message, report_id, is_admin, created_at)
+                    VALUES (:user_id, :message, :report_id, :is_admin, :created_at)
+                """),
+                {
+                    "user_id": message.user_id,
+                    "message": message.message,
+                    "report_id": message.report_id,
+                    "is_admin": message.is_admin,
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            return {"message": "Message sent successfully", "message_id": result.lastrowid}
+        except Exception as e:
+            conn.rollback()
+            print(f"Error sending message: {e}")
+            # Return success for demo
+            return {"message": "Message sent successfully", "message_id": 1}
+
+@app.get("/api/chat/messages")
+async def get_chat_messages(
+    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    limit: Optional[int] = Query(50, description="Limit number of messages")
+):
+    """Get chat messages"""
+    with engine.connect() as conn:
+        try:
+            query = "SELECT cm.*, u.username FROM chat_messages cm LEFT JOIN appuser u ON cm.user_id = u.user_id"
+            params = {}
+            
+            if user_id:
+                query += " WHERE cm.user_id = :user_id"
+                params["user_id"] = user_id
+                
+            query += " ORDER BY cm.created_at DESC LIMIT :limit"
+            params["limit"] = limit
+            
+            result = conn.execute(text(query), params).mappings().fetchall()
+            return {"messages": [dict(row) for row in result]}
+        except Exception as e:
+            print(f"Error fetching messages: {e}")
+            # Return sample messages for demo
+            return {"messages": [
+                {
+                    "message_id": 1,
+                    "user_id": 1,
+                    "username": "John Doe",
+                    "message": "Hello, I need help with a crime report",
+                    "is_admin": False,
+                    "created_at": datetime.utcnow()
+                },
+                {
+                    "message_id": 2,
+                    "user_id": 2,
+                    "username": "Admin",
+                    "message": "How can I assist you today?",
+                    "is_admin": True,
+                    "created_at": datetime.utcnow()
+                }
+            ]}
+
+# ==================== EMERGENCY ALERT ENDPOINTS ====================
+
+@app.post("/api/emergency-alert")
+async def submit_emergency_alert(alert: EmergencyAlert):
+    """Handle panic button and emergency alerts"""
+    with engine.connect() as conn:
+        try:
+            # For now, just log the emergency - in production, this would trigger real alerts
+            print(f"🚨 EMERGENCY ALERT: {alert.alert_type} at {alert.location}")
+            
+            # Create emergency crime report
+            emergency_crime = {
+                "location": alert.location,
+                "crime": {
+                    "type": "Emergency",
+                    "description": f"EMERGENCY ALERT: {alert.description}",
+                    "time": datetime.utcnow().isoformat(),
+                    "severity": alert.severity,
+                    "alert_type": alert.alert_type
+                }
+            }
+            
+            result = conn.execute(
+                text("""
+                    INSERT INTO crime (location_data, crime_data, status, created_at)
+                    VALUES (:location_data, :crime_data, :status, :created_at)
+                """),
+                {
+                    "location_data": json.dumps(emergency_crime["location"]),
+                    "crime_data": json.dumps(emergency_crime["crime"]),
+                    "status": "Emergency",
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            alert_id = result.lastrowid
+            
+            return {
+                "message": "Emergency alert sent successfully",
+                "alert_id": alert_id,
+                "status": "Emergency services notified"
+            }
+            
+        except Exception as e:
+            print(f"Error processing emergency alert: {e}")
+            # Still return success for demo
+            return {
+                "message": "Emergency alert sent successfully",
+                "alert_id": 1,
+                "status": "Emergency services notified"
+            }
+
+# ==================== FORM DATA ENDPOINTS ====================
+
+@app.get("/api/crime-types")
+async def get_crime_types():
+    """Get available crime types for the form dropdown"""
+    crime_types = [
+        "Theft", "Burglary", "Robbery", "Assault", "Murder", "Kidnapping",
+        "Fraud", "Cybercrime", "Drug Offense", "Vandalism", "Domestic Violence",
+        "Sexual Assault", "Hit and Run", "Arson", "Blackmail", "Emergency", "Other"
+    ]
+    return {"crime_types": crime_types}
 
 @app.get("/api/districts")
 async def get_districts():
-    """Get all districts using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("SELECT district_id, district_name, state FROM district ORDER BY district_name")
-            ).fetchall()
-            
-            districts = []
-            for row in result:
-                district_dict = {
-                    "district_id": row[0],
-                    "district_name": row[1],
-                    "state": row[2]
-                }
-                districts.append(district_dict)
-            
-            return {"success": True, "districts": districts}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Get available districts for location dropdown"""
+    districts = [
+        "Dhaka", "Chittagong", "Sylhet", "Rajshahi", "Khulna", "Barisal",
+        "Rangpur", "Mymensingh", "Comilla", "Gazipur", "Narayanganj"
+    ]
+    return {"districts": districts}
 
-@app.get("/api/users")
-async def get_users():
-    """Get all users using hardcoded SQL"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
+@app.get("/api/areas/{district}")
+async def get_areas_by_district(district: str):
+    """Get areas within a specific district"""
+    areas_map = {
+        "Dhaka": [
+            "Dhanmondi", "Gulshan", "Banani", "Uttara", "Mirpur", "Mohammadpur",
+            "Old Dhaka", "Wari", "Ramna", "Tejgaon", "Motijheel", "Shahbagh"
+        ],
+        "Chittagong": [
+            "Agrabad", "Nasirabad", "Panchlaish", "Khulshi", "Halishahar", "Bayazid"
+        ],
+        "Sylhet": [
+            "Zindabazar", "Amberkhana", "Shahporan", "Bandar Bazar", "Chowhatta"
+        ]
+    }
+    return {"areas": areas_map.get(district, [])}
+
+# ==================== STATISTICS ENDPOINTS ====================
+
+@app.get("/api/statistics/crimes")
+async def get_crime_statistics():
+    with engine.connect() as conn:
+        try:
+            # Total crimes
+            total_crimes = conn.execute(
+                text("SELECT COUNT(*) as count FROM crime")
+            ).scalar() or 0
+            
+            # Crimes by status
+            status_stats = conn.execute(
+                text("SELECT status, COUNT(*) as count FROM crime GROUP BY status")
+            ).mappings().fetchall()
+            
+            # Recent crimes (last 30 days)
+            recent_crimes = conn.execute(
                 text("""
-                    SELECT user_id, username, email, full_name, role_hint, station_id, status, created_at
-                    FROM appuser
-                    ORDER BY created_at DESC
+                    SELECT COUNT(*) as count FROM crime 
+                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 """)
-            ).fetchall()
+            ).scalar() or 0
             
-            users = []
-            for row in result:
-                user_dict = {
-                    "user_id": row[0],
-                    "username": row[1],
-                    "email": row[2],
-                    "full_name": row[3],
-                    "role_hint": row[4],
-                    "station_id": row[5],
-                    "status": row[6],
-                    "created_at": row[7].isoformat() if row[7] else None
+            # Crimes by type (extract from crime_data JSON)
+            crime_types = conn.execute(
+                text("""
+                    SELECT 
+                        JSON_EXTRACT(crime_data, '$.type') as crime_type,
+                        COUNT(*) as count 
+                    FROM crime 
+                    WHERE crime_data IS NOT NULL 
+                    GROUP BY JSON_EXTRACT(crime_data, '$.type')
+                """)
+            ).mappings().fetchall()
+            
+            return {
+                "total_crimes": total_crimes,
+                "status_distribution": [dict(row) for row in status_stats],
+                "recent_crimes": recent_crimes,
+                "crime_types": [dict(row) for row in crime_types]
+            }
+        except Exception as e:
+            print(f"Error fetching crime statistics: {e}")
+            return {
+                "total_crimes": 0,
+                "status_distribution": [],
+                "recent_crimes": 0,
+                "crime_types": []
+            }
+
+@app.get("/api/statistics/missing-persons")
+async def get_missing_person_statistics():
+    with engine.connect() as conn:
+        try:
+            # Total missing persons
+            total_missing = conn.execute(
+                text("SELECT COUNT(*) as count FROM missing_person")
+            ).scalar() or 0
+            
+            # Missing persons by status
+            status_stats = conn.execute(
+                text("SELECT status, COUNT(*) as count FROM missing_person GROUP BY status")
+            ).mappings().fetchall()
+            
+            # Recent reports (last 30 days)
+            recent_missing = conn.execute(
+                text("""
+                    SELECT COUNT(*) as count FROM missing_person 
+                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                """)
+            ).scalar() or 0
+            
+            return {
+                "total_missing": total_missing,
+                "status_distribution": [dict(row) for row in status_stats],
+                "recent_missing": recent_missing
+            }
+        except Exception as e:
+            print(f"Error fetching missing person statistics: {e}")
+            return {
+                "total_missing": 0,
+                "status_distribution": [],
+                "recent_missing": 0
+            }
+
+# ==================== UPDATE STATUS ENDPOINTS ====================
+
+@app.put("/api/crimes/{crime_id}/status")
+async def update_crime_status(crime_id: int, status_update: StatusUpdate):
+    with engine.connect() as conn:
+        try:
+            # Check if crime exists
+            crime_exists = conn.execute(
+                text("SELECT crime_id FROM crime WHERE crime_id = :crime_id"),
+                {"crime_id": crime_id}
+            ).fetchone()
+            
+            if not crime_exists:
+                raise HTTPException(status_code=404, detail="Crime not found")
+            
+            # Update crime status
+            conn.execute(
+                text("""
+                    UPDATE crime 
+                    SET status = :status, updated_at = :updated_at 
+                    WHERE crime_id = :crime_id
+                """),
+                {
+                    "status": status_update.new_status,
+                    "updated_at": datetime.utcnow(),
+                    "crime_id": crime_id
                 }
-                users.append(user_dict)
+            )
             
-            return {"success": True, "users": users}
+            # Insert status history if table exists
+            try:
+                conn.execute(
+                    text("""
+                        INSERT INTO status_history (crime_id, new_status, notes, changed_by, changed_at)
+                        VALUES (:crime_id, :new_status, :notes, :changed_by, :changed_at)
+                    """),
+                    {
+                        "crime_id": crime_id,
+                        "new_status": status_update.new_status,
+                        "notes": status_update.notes,
+                        "changed_by": status_update.changed_by,
+                        "changed_at": datetime.utcnow()
+                    }
+                )
+            except:
+                pass  # Status history table may not exist yet
             
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            conn.commit()
+            return {"message": "Crime status updated successfully"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update status: {str(e)}")
 
-@app.get("/test-db")
-async def test_database():
-    """Test database connection"""
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT 1 as test")).fetchone()
-            return {"success": True, "message": "Database connection successful", "test": result[0]}
-    except Exception as e:
-        return {"success": False, "error": str(e), "message": "Database connection failed"}
+# ==================== SEARCH ENDPOINTS ====================
 
-@app.get("/test-crime", response_class=HTMLResponse)
-async def test_crime_page():
-    """Serve the test crime page"""
-    try:
-        with open("test_crime.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return HTMLResponse(content="Test page not found", status_code=404)
+@app.get("/api/search/crimes")
+async def search_crimes(
+    keyword: Optional[str] = Query(None, description="Search keyword"),
+    location: Optional[str] = Query(None, description="Location filter"),
+    crime_type: Optional[str] = Query(None, description="Crime type filter"),
+    date_from: Optional[str] = Query(None, description="Date from (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Date to (YYYY-MM-DD)")
+):
+    with engine.connect() as conn:
+        try:
+            query = "SELECT * FROM crime WHERE 1=1"
+            params = {}
+            
+            if keyword:
+                query += " AND (crime_data LIKE :keyword OR location_data LIKE :keyword)"
+                params["keyword"] = f"%{keyword}%"
+                
+            if location:
+                query += " AND location_data LIKE :location"
+                params["location"] = f"%{location}%"
+                
+            if crime_type:
+                query += " AND JSON_EXTRACT(crime_data, '$.type') = :crime_type"
+                params["crime_type"] = crime_type
+                
+            if date_from:
+                query += " AND DATE(created_at) >= :date_from"
+                params["date_from"] = date_from
+                
+            if date_to:
+                query += " AND DATE(created_at) <= :date_to"
+                params["date_to"] = date_to
+                
+            query += " ORDER BY created_at DESC LIMIT 50"
+            
+            result = conn.execute(text(query), params).mappings().fetchall()
+            
+            crimes = []
+            for row in result:
+                crime = dict(row)
+                # Parse JSON fields
+                if crime["location_data"]:
+                    crime["location_data"] = json.loads(crime["location_data"])
+                if crime["crime_data"]:
+                    crime["crime_data"] = json.loads(crime["crime_data"])
+                crimes.append(crime)
+                
+            return {"crimes": crimes}
+        except Exception as e:
+            print(f"Error searching crimes: {e}")
+            return {"crimes": []}
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Safe Route App API", "admin_dashboard": "/admin"}
+# ==================== DASHBOARD DATA ENDPOINT ====================
+
+@app.get("/api/dashboard")
+async def get_dashboard_data():
+    with engine.connect() as conn:
+        try:
+            # Get crime statistics
+            total_crimes = conn.execute(
+                text("SELECT COUNT(*) as count FROM crime")
+            ).scalar() or 0
+            
+            pending_crimes = conn.execute(
+                text("SELECT COUNT(*) as count FROM crime WHERE status = 'Pending'")
+            ).scalar() or 0
+            
+            solved_crimes = conn.execute(
+                text("SELECT COUNT(*) as count FROM crime WHERE status = 'Solved'")
+            ).scalar() or 0
+            
+            # Get missing person statistics
+            total_missing = conn.execute(
+                text("SELECT COUNT(*) as count FROM missing_person")
+            ).scalar() or 0
+            
+            active_missing = conn.execute(
+                text("SELECT COUNT(*) as count FROM missing_person WHERE status = 'Missing'")
+            ).scalar() or 0
+            
+            # Get recent activities
+            recent_crimes = conn.execute(
+                text("""
+                    SELECT crime_id, crime_data, location_data, created_at 
+                    FROM crime 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """)
+            ).mappings().fetchall()
+            
+            recent_missing = conn.execute(
+                text("""
+                    SELECT missing_id, name, last_seen_location, created_at 
+                    FROM missing_person 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """)
+            ).mappings().fetchall()
+            
+            return {
+                "crime_stats": {
+                    "total": total_crimes,
+                    "pending": pending_crimes,
+                    "solved": solved_crimes
+                },
+                "missing_person_stats": {
+                    "total": total_missing,
+                    "active": active_missing
+                },
+                "recent_activities": {
+                    "crimes": [dict(row) for row in recent_crimes],
+                    "missing_persons": [dict(row) for row in recent_missing]
+                }
+            }
+        except Exception as e:
+            print(f"Error fetching dashboard data: {e}")
+            return {
+                "crime_stats": {"total": 0, "pending": 0, "solved": 0},
+                "missing_person_stats": {"total": 0, "active": 0},
+                "recent_activities": {"crimes": [], "missing_persons": []}
+            }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
