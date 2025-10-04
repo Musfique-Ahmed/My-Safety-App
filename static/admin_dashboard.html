@@ -626,10 +626,15 @@
 
     <div class="admin-tabs">
       <button class="tab-btn active" onclick="showTab('overview', event)">Overview</button>
+      <button class="tab-btn" onclick="showTab('users', event)">Users</button>
+      <button class="tab-btn" onclick="showTab('wanted-criminals', event)">Wanted Criminals</button>
+      <button class="tab-btn" onclick="showTab('police-stations', event)">Police Stations</button>
+      <button class="tab-btn" onclick="showTab('missing-persons', event)">Missing Persons</button>
       <button class="tab-btn" onclick="showTab('add-crime', event)">Add Crime</button>
       <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
       <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
       <button class="tab-btn" onclick="showTab('chat', event)">Chat</button>
+      <button class="tab-btn" onclick="showTab('analytics', event)">Analytics</button>
     </div>
 
     <!-- Overview Tab -->
@@ -654,226 +659,363 @@
       </div>
     </div>
 
-    <!-- Add Crime Tab -->
-    <div id="add-crime" class="tab-content">
+    <!-- Users Management Tab -->
+    <div id="users" class="tab-content">
       <div class="section-card">
-        <h2 class="section-title">Add New Crime</h2>
-        <p class="section-description">Enter all necessary information to add a new crime to the database.</p>
+        <h2 class="section-title">User Management</h2>
+        <p class="section-description">Manage user accounts, roles, and permissions.</p>
         
-        <form id="add-crime-form">
-          <!-- Location Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Location Information</h3>
+        <div style="margin-bottom: 1rem;">
+          <button class="btn btn-primary" onclick="showUserStats()">
+            <span>📊</span>
+            View User Statistics
+          </button>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Wanted Criminals Management Tab -->
+    <div id="wanted-criminals" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Wanted Criminals Management</h2>
+        <p class="section-description">Add, edit, and manage wanted criminals database.</p>
+        
+        <div style="margin-bottom: 1rem;">
+          <button class="btn btn-primary" onclick="showAddCriminalForm()">
+            <span>➕</span>
+            Add Wanted Criminal
+          </button>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Criminal ID</th>
+              <th>Name</th>
+              <th>Alias</th>
+              <th>Crimes</th>
+              <th>Danger Level</th>
+              <th>Reward</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="wanted-criminals-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add Criminal Form (Hidden by default) -->
+      <div id="add-criminal-form" class="section-card" style="display: none;">
+        <h2 class="section-title">Add New Wanted Criminal</h2>
+        <form id="criminal-form">
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label">District</label>
-              <select class="form-select" name="district_id" required>
-                <option value="">Select District</option>
-                <option value="1">Dhaka</option>
-                <option value="2">Chittagong</option>
-                <option value="3">Sylhet</option>
-                <option value="4">Rajshahi</option>
-                <option value="5">Khulna</option>
-                <option value="6">Barisal</option>
-                <option value="7">Rangpur</option>
-                <option value="8">Mymensingh</option>
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-input" name="name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alias</label>
+              <input type="text" class="form-input" name="alias">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Age Range</label>
+              <input type="text" class="form-input" name="age_range" placeholder="e.g., 25-30" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gender</label>
+              <select class="form-select" name="gender" required>
+                <option value="">Select Gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">Area Name</label>
-              <input type="text" class="form-input" name="area_name" required>
+              <label class="form-label">Height</label>
+              <input type="text" class="form-input" name="height" placeholder="e.g., 175 cm">
             </div>
             <div class="form-group">
-              <label class="form-label">City</label>
-              <input type="text" class="form-input" name="city" required>
+              <label class="form-label">Weight</label>
+              <input type="text" class="form-input" name="weight" placeholder="e.g., 70 kg">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hair Color</label>
+              <input type="text" class="form-input" name="hair_color">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Eye Color</label>
+              <input type="text" class="form-input" name="eye_color">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Danger Level</label>
+              <select class="form-select" name="danger_level" required>
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+                <option value="Extreme">Extreme</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reward Amount (BDT)</label>
+              <input type="number" class="form-input" name="reward_amount" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Last Known Location</label>
+              <input type="text" class="form-input" name="last_known_location">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Photo URL</label>
+              <input type="url" class="form-input" name="photo_url">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" name="description" required></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Distinguishing Marks</label>
+            <textarea class="form-textarea" name="distinguishing_marks"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Crimes Committed</label>
+            <textarea class="form-textarea" name="crimes_committed" placeholder="List crimes separated by commas" required></textarea>
+          </div>
+          
+          <div style="margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary">
+              <span>➕</span>
+              Add Criminal
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="hideAddCriminalForm()">
+              <span>❌</span>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Police Stations Management Tab -->
+    <div id="police-stations" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Police Stations Management</h2>
+        <p class="section-description">Manage police station information and jurisdictions.</p>
+        
+        <div style="margin-bottom: 1rem;">
+          <button class="btn btn-primary" onclick="showAddStationForm()">
+            <span>➕</span>
+            Add Police Station
+          </button>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Station ID</th>
+              <th>Station Name</th>
+              <th>Station Code</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>Jurisdiction</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="stations-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add Station Form (Hidden by default) -->
+      <div id="add-station-form" class="section-card" style="display: none;">
+        <h2 class="section-title">Add New Police Station</h2>
+        <form id="station-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Station Name</label>
+              <input type="text" class="form-input" name="station_name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Station Code</label>
+              <input type="text" class="form-input" name="station_code" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="tel" class="form-input" name="phone">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" name="email">
             </div>
             <div class="form-group">
               <label class="form-label">Latitude</label>
-              <input type="number" step="any" class="form-input" name="latitude" required>
+              <input type="number" step="any" class="form-input" name="latitude">
             </div>
             <div class="form-group">
               <label class="form-label">Longitude</label>
-              <input type="number" step="any" class="form-input" name="longitude" required>
+              <input type="number" step="any" class="form-input" name="longitude">
             </div>
           </div>
+          
+          <div class="form-group">
+            <label class="form-label">Address</label>
+            <textarea class="form-textarea" name="address"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Jurisdiction Area</label>
+            <textarea class="form-textarea" name="jurisdiction_area"></textarea>
+          </div>
+          
+          <div style="margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary">
+              <span>➕</span>
+              Add Station
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="hideAddStationForm()">
+              <span>❌</span>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
-          <!-- Crime Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Crime Information</h3>
+    <!-- Missing Persons Management Tab -->
+    <div id="missing-persons" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Missing Persons Management</h2>
+        <p class="section-description">View and manage missing person reports.</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Missing ID</th>
+              <th>Name</th>
+              <th>Age</th>
+              <th>Gender</th>
+              <th>Last Seen Location</th>
+              <th>Last Seen Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="missing-persons-table">
+            <!-- Data will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Crime Tab -->
+    <div id="add-crime" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Add New Crime Report</h2>
+        <p class="section-description">Manually add a crime report to the system.</p>
+        
+        <form id="add-crime-form">
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">Crime Type</label>
               <select class="form-select" name="crime_type" required>
                 <option value="">Select Crime Type</option>
                 <option value="theft">Theft</option>
+                <option value="burglary">Burglary</option>
                 <option value="robbery">Robbery</option>
                 <option value="assault">Assault</option>
-                <option value="burglary">Burglary</option>
-                <option value="vandalism">Vandalism</option>
-                <option value="fraud">Fraud</option>
                 <option value="murder">Murder</option>
                 <option value="kidnapping">Kidnapping</option>
-                <option value="drug_trafficking">Drug Trafficking</option>
-                <option value="cyber_crime">Cyber Crime</option>
+                <option value="fraud">Fraud</option>
+                <option value="cybercrime">Cybercrime</option>
+                <option value="drug_offense">Drug Offense</option>
+                <option value="vandalism">Vandalism</option>
+                <option value="domestic_violence">Domestic Violence</option>
                 <option value="other">Other</option>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">Date & Time</label>
-              <input type="datetime-local" class="form-input" name="date_time" required>
-            </div>
+            
             <div class="form-group">
               <label class="form-label">Status</label>
               <select class="form-select" name="status" required>
-                <option value="">Select Status</option>
                 <option value="reported">Reported</option>
                 <option value="under_investigation">Under Investigation</option>
-                <option value="case_closed">Case Closed</option>
                 <option value="pending">Pending</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">City</label>
+              <select class="form-select" name="city" required>
+                <option value="">Select City</option>
+                <option value="Dhaka">Dhaka</option>
+                <option value="Chittagong">Chittagong</option>
+                <option value="Sylhet">Sylhet</option>
+                <option value="Rajshahi">Rajshahi</option>
+                <option value="Khulna">Khulna</option>
+                <option value="Barisal">Barisal</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Area Name</label>
+              <input type="text" class="form-input" name="area_name" required placeholder="e.g., Dhanmondi">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Date & Time</label>
+              <input type="datetime-local" class="form-input" name="incident_time" required>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Priority Level</label>
+              <select class="form-select" name="priority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
           </div>
           
           <div class="form-group">
             <label class="form-label">Crime Description</label>
-            <textarea class="form-textarea" name="description" placeholder="Enter detailed description of the crime..." required></textarea>
-          </div>
-
-          <!-- Victim Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Victim Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Victim Full Name</label>
-              <input type="text" class="form-input" name="victim_full_name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Victim Date of Birth</label>
-              <input type="date" class="form-input" name="victim_dob">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Victim Gender</label>
-              <select class="form-select" name="victim_gender">
-                <option value="">Select Gender</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-                <option value="O">Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Victim Address</label>
-              <input type="text" class="form-input" name="victim_address">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Victim Phone Number</label>
-              <input type="tel" class="form-input" name="victim_phone">
-            </div>
+            <textarea class="form-textarea" name="description" required placeholder="Detailed description of the crime..."></textarea>
           </div>
           
           <div class="form-group">
-            <label class="form-label">Injury Details</label>
-            <textarea class="form-textarea" name="injury_details" placeholder="Describe any injuries sustained..."></textarea>
-          </div>
-
-          <!-- Criminal Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Criminal Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Criminal Full Name</label>
-              <input type="text" class="form-input" name="criminal_full_name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Alias Name</label>
-              <input type="text" class="form-input" name="alias_name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Criminal Date of Birth</label>
-              <input type="date" class="form-input" name="criminal_dob">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Criminal Gender</label>
-              <select class="form-select" name="criminal_gender">
-                <option value="">Select Gender</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-                <option value="O">Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Criminal Address</label>
-              <input type="text" class="form-input" name="criminal_address">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Marital Status</label>
-              <select class="form-select" name="marital_status">
-                <option value="">Select Status</option>
-                <option value="single">Single</option>
-                <option value="married">Married</option>
-                <option value="divorced">Divorced</option>
-                <option value="widowed">Widowed</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Previous Crimes</label>
-            <textarea class="form-textarea" name="previous_crimes" placeholder="List any previous criminal activities..."></textarea>
-          </div>
-
-          <!-- Weapon Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Weapon Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Weapon Name</label>
-              <input type="text" class="form-input" name="weapon_name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Weapon Type</label>
-              <select class="form-select" name="weapon_type">
-                <option value="">Select Weapon Type</option>
-                <option value="firearm">Firearm</option>
-                <option value="knife">Knife</option>
-                <option value="blunt_object">Blunt Object</option>
-                <option value="explosive">Explosive</option>
-                <option value="chemical">Chemical</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Serial Number</label>
-              <input type="text" class="form-input" name="serial_number">
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Weapon Description</label>
-            <textarea class="form-textarea" name="weapon_description" placeholder="Describe the weapon used..."></textarea>
-          </div>
-
-          <!-- Witness Information -->
-          <h3 style="color: var(--text-primary); margin: 2rem 0 1rem 0;">Witness Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Witness Full Name</label>
-              <input type="text" class="form-input" name="witness_full_name">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Witness Phone Number</label>
-              <input type="tel" class="form-input" name="witness_phone">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Protection Required</label>
-              <select class="form-select" name="protection_flag">
-                <option value="">Select Protection Status</option>
-                <option value="true">Yes - Protection Required</option>
-                <option value="false">No - Protection Not Required</option>
-              </select>
-            </div>
+            <label class="form-label">Location Details</label>
+            <textarea class="form-textarea" name="location_details" placeholder="Specific location details, landmarks, etc."></textarea>
           </div>
           
           <div style="margin-top: 2rem;">
             <button type="submit" class="btn btn-primary">
               <span>➕</span>
-              Add Crime
+              Add Crime Report
             </button>
-            <button type="reset" class="btn btn-secondary" style="margin-left: 1rem;">
+            <button type="reset" class="btn btn-secondary">
               <span>🔄</span>
               Reset Form
             </button>
@@ -885,8 +1027,8 @@
     <!-- Verify Reports Tab -->
     <div id="verify-reports" class="tab-content">
       <div class="section-card">
-        <h2 class="section-title">Verify User Complaints</h2>
-        <p class="section-description">Review and verify complaints submitted by users. Update verification status and escalate to crime reports.</p>
+        <h2 class="section-title">Verify User Reports</h2>
+        <p class="section-description">Review and verify complaints submitted by users.</p>
         
         <table>
           <thead>
@@ -909,8 +1051,15 @@
     <!-- Case Management Tab -->
     <div id="case-management" class="tab-content">
       <div class="section-card">
-        <h2 class="section-title">Case Management</h2>
-        <p class="section-description">Manage case assignments and track status history for all crimes.</p>
+        <h2 class="section-title">Case Assignment & Management</h2>
+        <p class="section-description">Assign cases to officers and track progress.</p>
+        
+        <div style="margin-bottom: 1rem;">
+          <button class="btn btn-primary" onclick="showAssignCaseForm()">
+            <span>👮</span>
+            Assign New Case
+          </button>
+        </div>
         
         <table>
           <thead>
@@ -918,7 +1067,7 @@
               <th>Assignment ID</th>
               <th>Crime ID</th>
               <th>Assigned Officer</th>
-              <th>Duty Role</th>
+              <th>Role</th>
               <th>Assigned At</th>
               <th>Status</th>
               <th>Actions</th>
@@ -929,74 +1078,114 @@
           </tbody>
         </table>
       </div>
+      
+      <!-- Assign Case Form (Hidden by default) -->
+      <div id="assign-case-form" class="section-card" style="display: none;">
+        <h2 class="section-title">Assign Case to Officer</h2>
+        <form id="case-assignment-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Crime ID</label>
+              <input type="number" class="form-input" name="crime_id" required placeholder="Enter Crime ID">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Officer ID</label>
+              <input type="number" class="form-input" name="user_id" required placeholder="Enter Officer ID">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Duty Role</label>
+              <select class="form-select" name="duty_role" required>
+                <option value="">Select Role</option>
+                <option value="Lead Investigator">Lead Investigator</option>
+                <option value="Assistant Investigator">Assistant Investigator</option>
+                <option value="Evidence Collector">Evidence Collector</option>
+                <option value="Initial Assessment">Initial Assessment</option>
+                <option value="Follow-up">Follow-up</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary">
+              <span>✅</span>
+              Assign Case
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="hideAssignCaseForm()">
+              <span>❌</span>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Chat Tab -->
     <div id="chat" class="tab-content">
       <div class="section-card">
-        <h2 class="section-title">Chat with Reporters</h2>
-        <p class="section-description">Communicate with users who have submitted reports.</p>
+        <h2 class="section-title">User Communication</h2>
+        <p class="section-description">Chat with users who have submitted reports.</p>
         
         <div class="chat-container">
           <div class="chat-sidebar">
-            <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Active Conversations</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Active Conversations</h3>
             <div class="chat-user active" data-user-id="john-doe" onclick="selectUser('john-doe', event)">
-              <div style="font-weight: 500;">John Doe</div>
+              <div style="font-weight: 600;">John Doe</div>
               <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-001</div>
             </div>
             <div class="chat-user" data-user-id="jane-smith" onclick="selectUser('jane-smith', event)">
-              <div style="font-weight: 500;">Jane Smith</div>
+              <div style="font-weight: 600;">Jane Smith</div>
               <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-002</div>
             </div>
             <div class="chat-user" data-user-id="mike-johnson" onclick="selectUser('mike-johnson', event)">
-              <div style="font-weight: 500;">Mike Johnson</div>
+              <div style="font-weight: 600;">Mike Johnson</div>
               <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-003</div>
             </div>
           </div>
           
           <div class="chat-main">
             <div class="chat-header">
-              <h3 id="chat-header-name" style="color: var(--text-primary);">John Doe</h3>
-              <p id="chat-header-report" style="color: var(--text-secondary); font-size: 0.875rem;">Report ID: UR-001</p>
+              <div style="font-weight: 600;" id="chat-header-name">John Doe</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);" id="chat-header-report">Report ID: UR-001</div>
             </div>
             
             <div class="chat-messages" id="chat-messages">
-              <!-- Initial messages for John Doe -->
-              <div class="message user">
-                <div class="message-sender">John Doe</div>
-                <div>I witnessed a theft incident at Dhanmondi area yesterday. Can you please look into this?</div>
-                <div class="message-time">2 hours ago</div>
-              </div>
-              <div class="message admin">
-                <div class="message-sender">Admin</div>
-                <div>Thank you for reporting this. We have received your report and are investigating. Can you provide more details about the incident?</div>
-                <div class="message-time">1 hour ago</div>
-              </div>
-              <div class="message user">
-                <div class="message-sender">John Doe</div>
-                <div>Sure, it happened around 3 PM near the Dhanmondi Lake area. A man snatched a woman's purse and ran away.</div>
-                <div class="message-time">30 minutes ago</div>
-              </div>
+              <!-- Messages will be loaded dynamically -->
             </div>
             
             <div class="chat-input-container">
-              <input type="text" class="chat-input" placeholder="Type your message..." id="chat-input">
+              <input type="text" class="chat-input" id="chat-input" placeholder="Type your message...">
               <button class="btn btn-primary" onclick="sendMessage()">
-                <span>↑ Send</span>
+                <span>📤</span>
+                Send
               </button>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="footer">
-    <div class="footer-icon">N</div>
-    <span>©2025 My Safety. All rights reserved.</span>
-  </div>
+    <!-- Analytics Tab -->
+    <div id="analytics" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">System Analytics</h2>
+        <p class="section-description">View comprehensive system statistics and trends.</p>
+        
+        <div class="form-grid" id="analytics-overview">
+          <!-- Statistics cards will be loaded here -->
+        </div>
+        
+        <div style="margin-top: 2rem;">
+          <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Recent Activity Log</h3>
+          <div id="activity-log">
+            <!-- Activity log will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <script>
+    <!-- Add these JavaScript functions before the closing </script> tag -->
+
+    <script>
     // --- Custom Modal Functions (Replacing alert and confirm/prompt) ---
     const modalOverlay = document.getElementById('custom-modal-overlay');
     const modalMessage = document.getElementById('modal-message');
@@ -1422,110 +1611,293 @@
       showAlert(`Loading crime details and AI-generated summary for CRIME-${crimeId.toString().padStart(3, '0')}...`);
     }
 
-    /**
-     * Updates the chat interface to show the selected user's conversation.
-     * @param {string} userId - The ID of the user (e.g., 'jane-smith').
-     * @param {Event} [event] - The click event object.
-     */
-    function selectUser(userId, event) {
-      // 1. Update active class in sidebar
-      const users = document.querySelectorAll('.chat-user');
-      users.forEach(user => user.classList.remove('active'));
-      
-      let selectedUserElement;
-      if (event && event.target) {
-        selectedUserElement = event.target.closest('.chat-user');
-      } else {
-        // Fallback for programmatic call (like when opening the chat tab)
-        selectedUserElement = document.querySelector(`.chat-user[data-user-id="${userId}"]`);
-      }
-      
-      if (selectedUserElement) {
-        selectedUserElement.classList.add('active');
-      }
+    // Real-time chat functionality for admin (FIXED VERSION)
+let currentConversation = null;
+let chatPollingInterval = null;
 
-      // 2. Load the mock data for the selected user
-      const messages = mockChatMessages[userId] || [];
-      const userName = selectedUserElement ? selectedUserElement.querySelector('div:first-child').textContent : 'Unknown User';
-      const reportId = selectedUserElement ? selectedUserElement.querySelector('div:last-child').textContent.split(': ')[1] : 'UR-000';
+// Update the existing selectUser function
+function selectUser(userId, event) {
+  // Keep your existing selectUser logic but add real-time functionality
+  
+  // 1. Update active class in sidebar (your existing code)
+  const users = document.querySelectorAll('.chat-user');
+  users.forEach(user => user.classList.remove('active'));
+  
+  let selectedUserElement;
+  if (event && event.target) {
+    selectedUserElement = event.target.closest('.chat-user');
+  } else {
+    selectedUserElement = document.querySelector(`.chat-user[data-user-id="${userId}"]`);
+  }
+  
+  if (selectedUserElement) {
+    selectedUserElement.classList.add('active');
+  }
 
-      // 3. Update the chat header
-      document.getElementById('chat-header-name').textContent = userName;
-      document.getElementById('chat-header-report').textContent = `Report ID: ${reportId}`;
+  // 2. Set current conversation for real-time updates
+  const reportId = selectedUserElement ? 
+    selectedUserElement.querySelector('div:last-child').textContent.split(': ')[1] : 
+    'General';
+  
+  currentConversation = { 
+    user_id: getUserIdFromString(userId), 
+    report_id: reportId 
+  };
 
-      // 4. Populate the chat messages container
-      const messagesContainer = document.getElementById('chat-messages');
-      messagesContainer.innerHTML = ''; // Clear existing messages
+  // 3. Load messages (try real API first, fallback to mock)
+  loadConversationMessages(currentConversation.user_id, reportId);
+  
+  // 4. Update chat header (your existing code)
+  const userName = selectedUserElement ? 
+    selectedUserElement.querySelector('div:first-child').textContent : 
+    'Unknown User';
+  
+  document.getElementById('chat-header-name').textContent = userName;
+  document.getElementById('chat-header-report').textContent = `Report ID: ${reportId}`;
 
-      messages.forEach(msg => {
-          const messageElement = document.createElement('div');
-          messageElement.className = `message ${msg.sender}`;
-          messageElement.innerHTML = `
-              <div class="message-sender">${msg.name}</div>
-              <div>${msg.text}</div>
-              <div class="message-time">${msg.time}</div>
-          `;
-          messagesContainer.appendChild(messageElement);
-      });
-      
-      // 5. Auto-scroll chat to the bottom
-      if (messagesContainer) {
-          setTimeout(() => {
-              messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          }, 0);
-      }
+  // 5. Start polling for new messages
+  if (chatPollingInterval) {
+    clearInterval(chatPollingInterval);
+  }
+  chatPollingInterval = setInterval(() => 
+    loadConversationMessages(currentConversation.user_id, reportId, false), 5000
+  );
+}
+
+// Helper function to convert string userId to number
+function getUserIdFromString(userIdString) {
+  const userMap = {
+    'john-doe': 1,
+    'jane-smith': 2,
+    'mike-johnson': 3
+  };
+  return userMap[userIdString] || 1;
+}
+
+// Load conversation messages (real API with fallback to mock)
+async function loadConversationMessages(userId, reportId, showLoading = true) {
+  const messagesContainer = document.getElementById('chat-messages');
+  
+  try {
+    if (showLoading) {
+      messagesContainer.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading messages...</div>';
     }
-
-    function sendMessage() {
-      const input = document.getElementById('chat-input');
-      const message = input.value.trim();
-      
-      if (message) {
-        // Add message to chat
-        const messagesContainer = document.getElementById('chat-messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message admin';
-        messageElement.innerHTML = `
-          <div class="message-sender">Admin</div>
-          <div>${message}</div>
-          <div class="message-time">Just now</div>
-        `;
-        messagesContainer.appendChild(messageElement);
-        
-        // Clear input
-        input.value = '';
-        
-        // CRITICAL FIX: Scroll to bottom after a tiny delay (0ms) to ensure
-        // the new message element's height is calculated by the DOM before scrolling.
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 0);
-        
-        console.log('Sending message:', message);
-      }
+    
+    // Try real API first
+    const response = await fetch(`/api/chat/conversation/${userId}?report_id=${reportId}`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      displayMessages(data.messages);
+    } else {
+      throw new Error('API not available');
     }
+    
+  } catch (error) {
+    console.log('Using mock data for chat:', error.message);
+    
+    // Fallback to your existing mock data
+    const userIdString = Object.keys(mockChatMessages).find(key => 
+      getUserIdFromString(key) === userId
+    ) || 'john-doe';
+    
+    const messages = mockChatMessages[userIdString] || [];
+    
+    // Convert mock format to API format
+    const convertedMessages = messages.map((msg, index) => ({
+      message_id: index + 1,
+      user_id: msg.sender === 'admin' ? 999 : userId,
+      username: msg.name,
+      message: msg.text,
+      is_admin: msg.sender === 'admin',
+      created_at: new Date().toISOString(),
+      report_id: reportId
+    }));
+    
+    displayMessages(convertedMessages);
+  }
+}
 
-    // Allow sending message with Enter key
-    document.getElementById('chat-input').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
-    });
+// Display messages in the chat container
+function displayMessages(messages) {
+  const messagesContainer = document.getElementById('chat-messages');
+  
+  const messagesHtml = messages.map(msg => `
+    <div class="message ${msg.is_admin ? 'admin' : 'user'}">
+      <div class="message-sender">${msg.is_admin ? 'Admin' : msg.username}</div>
+      <div>${msg.message}</div>
+      <div class="message-time">${formatMessageTime(msg.created_at)}</div>
+    </div>
+  `).join('');
+  
+  messagesContainer.innerHTML = messagesHtml;
+  
+  // Auto-scroll to bottom
+  setTimeout(() => {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }, 0);
+}
 
-    // Load data when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      loadCrimesOverview();
-      loadComplaints();
-      loadCaseAssignments();
-      
-      // Initial state: Select John Doe's chat upon loading the chat module
-      // Note: This relies on showTab('chat') being called when the user navigates there, 
-      // but we ensure the content exists on load.
-      selectUser('john-doe'); 
-      
-      // Close the menu if clicked outside on initial load (although usually triggered by toggleMenu)
-      document.addEventListener('click', closeMenuOutside, true);
+// Update the existing sendMessage function
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+  
+  if (!message) {
+    return;
+  }
+  
+  // Try real API first
+  if (currentConversation) {
+    sendMessageToAPI(message);
+  } else {
+    // Fallback to your existing mock logic
+    sendMessageMock(message);
+  }
+  
+  input.value = '';
+}
+
+// Send message via API
+async function sendMessageToAPI(message) {
+  try {
+    const response = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: currentConversation.user_id,
+        message: message,
+        report_id: currentConversation.report_id,
+        is_admin: true
+      })
     });
-  </script>
-</body>
+    
+    if (response.ok) {
+      // Reload messages to show the new one
+      await loadConversationMessages(currentConversation.user_id, currentConversation.report_id, false);
+    } else {
+      throw new Error('API failed');
+    }
+  } catch (error) {
+    console.log('API failed, using mock:', error.message);
+    sendMessageMock(message);
+  }
+}
+
+// Your existing mock message logic
+function sendMessageMock(message) {
+  const messagesContainer = document.getElementById('chat-messages');
+  const messageElement = document.createElement('div');
+  messageElement.className = 'message admin';
+  messageElement.innerHTML = `
+    <div class="message-sender">Admin</div>
+    <div>${message}</div>
+    <div class="message-time">Just now</div>
+  `;
+  messagesContainer.appendChild(messageElement);
+  
+  setTimeout(() => {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }, 0);
+}
+
+// Load admin conversations (for real-time updates)
+async function loadAdminConversations() {
+  try {
+    const response = await fetch('/api/chat/conversations');
+    
+    if (response.ok) {
+      const data = await response.json();
+      updateConversationsSidebar(data.conversations);
+    } else {
+      throw new Error('API not available');
+    }
+  } catch (error) {
+    console.log('Using existing mock conversations');
+    // Keep your existing static conversations in the HTML
+  }
+}
+
+// Update conversations sidebar
+function updateConversationsSidebar(conversations) {
+  const sidebar = document.querySelector('.chat-sidebar');
+  
+  const conversationsHtml = conversations.map(conv => `
+    <div class="chat-user ${conv.user_id === currentConversation?.user_id ? 'active' : ''}" 
+         data-user-id="user-${conv.user_id}" 
+         onclick="selectUser('user-${conv.user_id}', event)">
+      <div style="font-weight: 600;">${conv.username}</div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);">
+        Report: ${conv.report_id}
+        ${conv.unread_count > 0 ? `<span style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px;">${conv.unread_count}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+  
+  sidebar.innerHTML = `
+    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Active Conversations</h3>
+    ${conversationsHtml}
+  `;
+}
+
+// Format message timestamp
+function formatMessageTime(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  return date.toLocaleDateString();
+}
+
+// Update your existing showTab function to include chat loading
+const originalShowTabFunc = showTab;
+showTab = function(tabName, event) {
+  originalShowTabFunc(tabName, event);
+  
+  if (tabName === 'chat') {
+    // Try to load real conversations, fallback to existing mock
+    loadAdminConversations();
+    // Initialize with first user if no conversation is active
+    if (!currentConversation) {
+      selectUser('john-doe');
+    }
+  } else if (tabName === 'users') {
+    loadUsers();
+  } else if (tabName === 'wanted-criminals') {
+    loadWantedCriminals();
+  } else if (tabName === 'police-stations') {
+    loadPoliceStations();
+  } else if (tabName === 'missing-persons') {
+    loadMissingPersons();
+  } else if (tabName === 'analytics') {
+    loadAnalytics();
+  }
+};
+
+// Cleanup polling when leaving chat or page
+window.addEventListener('beforeunload', () => {
+  if (chatPollingInterval) {
+    clearInterval(chatPollingInterval);
+  }
+});
+
+// Clean up polling when switching tabs
+document.addEventListener('click', (e) => {
+  if ( e.target.classList.contains('tab-btn') && !e.target.textContent.includes('Chat')) {
+    if (chatPollingInterval) {
+      clearInterval(chatPollingInterval);
+    }
+  }
+});
+    </script>
+  </body>
 </html>

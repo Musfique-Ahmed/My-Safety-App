@@ -49,6 +49,56 @@
             transform: scale(0.98);
             background-color: #f3f4f6;
         }
+
+        /* --- ADDED STYLES FOR CHAT MESSAGES --- */
+.message {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border-radius: 12px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.message.user {
+    background: #e3f2fd;
+    margin-left: auto;
+    margin-right: 0;
+    border-bottom-right-radius: 4px;
+}
+
+.message.admin {
+    background: #f3e5f5;
+    margin-left: 0;
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
+}
+
+.message-sender {
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    color: #555;
+}
+
+.message-text {
+    line-height: 1.4;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 0.25rem;
+    text-align: right;
+}
+
+.chat-messages {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
     </style>
 </head>
 <body class="bg-primary-dark text-white min-h-screen font-sans">
@@ -165,6 +215,167 @@
         </div>
     </div>
 </div>
+
+<!-- Add this script section to user_chatbox.html (replace existing chat functionality) -->
+<script>
+// Real-time chat functionality for users
+let currentUserConversation = 'General Support';
+let userChatPollingInterval = null;
+let currentUserId = 1; // This should come from login session
+
+// Initialize chat
+document.addEventListener('DOMContentLoaded', function() {
+    // Get user ID from session/localStorage (implement based on your auth system)
+    currentUserId = localStorage.getItem('currentUserId') || 1;
+    
+    loadUserConversations();
+    selectUserConversation('General Support');
+});
+
+// Load user conversations
+async function loadUserConversations() {
+    try {
+        const response = await fetch(`/api/chat/user-conversations/${currentUserId}`);
+        const data = await response.json();
+        
+        // Update conversation list if you have one in the UI
+        console.log('User conversations:', data.conversations);
+        
+        // For now, we'll just use the General Support conversation
+        // You can expand this to show multiple conversations if needed
+        
+    } catch (error) {
+        console.error('Error loading user conversations:', error);
+    }
+}
+
+// Select conversation
+function selectUserConversation(reportId) {
+    currentUserConversation = reportId;
+    loadUserMessages(reportId);
+    
+    // Start polling for new messages
+    if (userChatPollingInterval) {
+        clearInterval(userChatPollingInterval);
+    }
+    userChatPollingInterval = setInterval(() => loadUserMessages(reportId, false), 3000);
+}
+
+// Load messages for user
+async function loadUserMessages(reportId, showLoading = true) {
+    try {
+        const chatContainer = document.getElementById('chat-messages') || document.querySelector('.chat-messages');
+        
+        if (showLoading && chatContainer) {
+            chatContainer.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading messages...</div>';
+        }
+        
+        const response = await fetch(`/api/chat/conversation/${currentUserId}?report_id=${reportId}`);
+        const data = await response.json();
+        
+        if (chatContainer) {
+            const messagesHtml = data.messages.map(msg => `
+                <div class="message ${msg.is_admin ? 'admin' : 'user'}">
+                    <div class="message-sender">${msg.is_admin ? 'Support Team' : 'You'}</div>
+                    <div class="message-text">${msg.message}</div>
+                    <div class="message-time">${formatMessageTime(msg.created_at)}</div>
+                </div>
+            `).join('');
+            
+            chatContainer.innerHTML = messagesHtml;
+            
+            // Auto-scroll to bottom
+            setTimeout(() => {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 0);
+        }
+    } catch (error) {
+        console.error('Error loading user messages:', error);
+    }
+}
+
+// Send message as user
+async function sendUserMessage() {
+    const input = document.getElementById('message-input') || document.querySelector('.message-input');
+    const message = input ? input.value.trim() : '';
+    
+    if (!message) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/chat/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: currentUserId,
+                message: message,
+                report_id: currentUserConversation,
+                is_admin: false
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.message) {
+            input.value = '';
+            // Reload messages to show the new one
+            await loadUserMessages(currentUserConversation, false);
+        }
+    } catch (error) {
+        console.error('Error sending user message:', error);
+        alert('Failed to send message. Please try again.');
+    }
+}
+
+// Format message timestamp
+function formatMessageTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+}
+
+// Set up send button and enter key
+document.addEventListener('DOMContentLoaded', function() {
+    const sendButton = document.getElementById('send-button') || document.querySelector('.send-button');
+    const messageInput = document.getElementById('message-input') || document.querySelector('.message-input');
+    
+    if (sendButton) {
+        sendButton.addEventListener('click', sendUserMessage);
+    }
+    
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendUserMessage();
+            }
+        });
+    }
+});
+
+// Cleanup polling when leaving page
+window.addEventListener('beforeunload', () => {
+    if (userChatPollingInterval) {
+        clearInterval(userChatPollingInterval);
+    }
+});
+
+// Export functions for global access
+window.sendUserMessage = sendUserMessage;
+window.selectUserConversation = selectUserConversation;
+</script>
 
 <script>
     // --- Dummy Data (Replace with Firestore/DBMS Integration) ---
