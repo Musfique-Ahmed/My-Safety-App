@@ -304,6 +304,22 @@ function filterItem(it){
 $("#searchWanted").addEventListener("input", ()=> render(wantedData.filter(filterItem)));
 $("#refreshWanted").addEventListener("click", ()=> render(wantedData.filter(filterItem)));
 
+
+// Add to wanted_criminal.html
+async function loadWantedCriminalsList() {
+  try {
+    const response = await fetch('/api/admin/wanted-criminals');
+    const data = await response.json();
+    
+    if (data.success) {
+      displayCriminalsList(data.criminals);
+    }
+  } catch (error) {
+    console.error('Error loading criminals:', error);
+  }
+}
+
+
 // First render
 render(wantedData);
 

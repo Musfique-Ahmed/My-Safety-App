@@ -11,6 +11,8 @@ import json
 import os
 import uuid
 import asyncio
+import mysql.connector
+from mysql.connector import Error
 
 app = FastAPI()
 
@@ -24,6 +26,23 @@ app.add_middleware(
 
 SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/mysafetydb"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})
+
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'mysafetydb',
+    'port': 3306
+}
+
+def get_db_connection():
+    try:
+        connection = mysql.connector.connect(**DB_CONFIG)
+        return connection
+    except Error as e:
+        print(f"Error connecting to database: {e}")
+        return None
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -1611,293 +1611,210 @@
       showAlert(`Loading crime details and AI-generated summary for CRIME-${crimeId.toString().padStart(3, '0')}...`);
     }
 
-    // Real-time chat functionality for admin (FIXED VERSION)
-let currentConversation = null;
-let chatPollingInterval = null;
+    // Replace the existing load functions with these database-connected versions:
 
-// Update the existing selectUser function
-function selectUser(userId, event) {
-  // Keep your existing selectUser logic but add real-time functionality
-  
-  // 1. Update active class in sidebar (your existing code)
-  const users = document.querySelectorAll('.chat-user');
-  users.forEach(user => user.classList.remove('active'));
-  
-  let selectedUserElement;
-  if (event && event.target) {
-    selectedUserElement = event.target.closest('.chat-user');
-  } else {
-    selectedUserElement = document.querySelector(`.chat-user[data-user-id="${userId}"]`);
-  }
-  
-  if (selectedUserElement) {
-    selectedUserElement.classList.add('active');
-  }
-
-  // 2. Set current conversation for real-time updates
-  const reportId = selectedUserElement ? 
-    selectedUserElement.querySelector('div:last-child').textContent.split(': ')[1] : 
-    'General';
-  
-  currentConversation = { 
-    user_id: getUserIdFromString(userId), 
-    report_id: reportId 
-  };
-
-  // 3. Load messages (try real API first, fallback to mock)
-  loadConversationMessages(currentConversation.user_id, reportId);
-  
-  // 4. Update chat header (your existing code)
-  const userName = selectedUserElement ? 
-    selectedUserElement.querySelector('div:first-child').textContent : 
-    'Unknown User';
-  
-  document.getElementById('chat-header-name').textContent = userName;
-  document.getElementById('chat-header-report').textContent = `Report ID: ${reportId}`;
-
-  // 5. Start polling for new messages
-  if (chatPollingInterval) {
-    clearInterval(chatPollingInterval);
-  }
-  chatPollingInterval = setInterval(() => 
-    loadConversationMessages(currentConversation.user_id, reportId, false), 5000
-  );
-}
-
-// Helper function to convert string userId to number
-function getUserIdFromString(userIdString) {
-  const userMap = {
-    'john-doe': 1,
-    'jane-smith': 2,
-    'mike-johnson': 3
-  };
-  return userMap[userIdString] || 1;
-}
-
-// Load conversation messages (real API with fallback to mock)
-async function loadConversationMessages(userId, reportId, showLoading = true) {
-  const messagesContainer = document.getElementById('chat-messages');
-  
-  try {
-    if (showLoading) {
-      messagesContainer.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading messages...</div>';
+    // Load users from database
+    async function loadUsers() {
+      try {
+        const response = await fetch('/api/admin/users');
+        const data = await response.json();
+        
+        if (data.success) {
+          displayUsers(data.users);
+        } else {
+          console.error('Failed to load users:', data.error);
+          document.getElementById('users-container').innerHTML = '<p>Error loading users</p>';
+        }
+      } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('users-container').innerHTML = '<p>Error loading users</p>';
+      }
     }
-    
-    // Try real API first
-    const response = await fetch(`/api/chat/conversation/${userId}?report_id=${reportId}`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      displayMessages(data.messages);
-    } else {
-      throw new Error('API not available');
+
+    // Load wanted criminals from database
+    async function loadWantedCriminals() {
+      try {
+        const response = await fetch('/api/admin/wanted-criminals');
+        const data = await response.json();
+        
+        if (data.success) {
+          displayWantedCriminals(data.criminals);
+        } else {
+          console.error('Failed to load criminals:', data.error);
+          document.getElementById('wanted-criminals-container').innerHTML = '<p>Error loading criminals</p>';
+        }
+      } catch (error) {
+        console.error('Error loading criminals:', error);
+        document.getElementById('wanted-criminals-container').innerHTML = '<p>Error loading criminals</p>';
+      }
     }
-    
-  } catch (error) {
-    console.log('Using mock data for chat:', error.message);
-    
-    // Fallback to your existing mock data
-    const userIdString = Object.keys(mockChatMessages).find(key => 
-      getUserIdFromString(key) === userId
-    ) || 'john-doe';
-    
-    const messages = mockChatMessages[userIdString] || [];
-    
-    // Convert mock format to API format
-    const convertedMessages = messages.map((msg, index) => ({
-      message_id: index + 1,
-      user_id: msg.sender === 'admin' ? 999 : userId,
-      username: msg.name,
-      message: msg.text,
-      is_admin: msg.sender === 'admin',
-      created_at: new Date().toISOString(),
-      report_id: reportId
-    }));
-    
-    displayMessages(convertedMessages);
-  }
-}
 
-// Display messages in the chat container
-function displayMessages(messages) {
-  const messagesContainer = document.getElementById('chat-messages');
-  
-  const messagesHtml = messages.map(msg => `
-    <div class="message ${msg.is_admin ? 'admin' : 'user'}">
-      <div class="message-sender">${msg.is_admin ? 'Admin' : msg.username}</div>
-      <div>${msg.message}</div>
-      <div class="message-time">${formatMessageTime(msg.created_at)}</div>
-    </div>
-  `).join('');
-  
-  messagesContainer.innerHTML = messagesHtml;
-  
-  // Auto-scroll to bottom
-  setTimeout(() => {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }, 0);
-}
-
-// Update the existing sendMessage function
-function sendMessage() {
-  const input = document.getElementById('chat-input');
-  const message = input.value.trim();
-  
-  if (!message) {
-    return;
-  }
-  
-  // Try real API first
-  if (currentConversation) {
-    sendMessageToAPI(message);
-  } else {
-    // Fallback to your existing mock logic
-    sendMessageMock(message);
-  }
-  
-  input.value = '';
-}
-
-// Send message via API
-async function sendMessageToAPI(message) {
-  try {
-    const response = await fetch('/api/chat/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: currentConversation.user_id,
-        message: message,
-        report_id: currentConversation.report_id,
-        is_admin: true
-      })
-    });
-    
-    if (response.ok) {
-      // Reload messages to show the new one
-      await loadConversationMessages(currentConversation.user_id, currentConversation.report_id, false);
-    } else {
-      throw new Error('API failed');
+    // Load police stations from database
+    async function loadPoliceStations() {
+      try {
+        const response = await fetch('/api/admin/police-stations');
+        const data = await response.json();
+        
+        if (data.success) {
+          displayPoliceStations(data.stations);
+        } else {
+          console.error('Failed to load stations:', data.error);
+          document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
+        }
+      } catch (error) {
+        console.error('Error loading stations:', error);
+        document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
+      }
     }
-  } catch (error) {
-    console.log('API failed, using mock:', error.message);
-    sendMessageMock(message);
-  }
-}
 
-// Your existing mock message logic
-function sendMessageMock(message) {
-  const messagesContainer = document.getElementById('chat-messages');
-  const messageElement = document.createElement('div');
-  messageElement.className = 'message admin';
-  messageElement.innerHTML = `
-    <div class="message-sender">Admin</div>
-    <div>${message}</div>
-    <div class="message-time">Just now</div>
-  `;
-  messagesContainer.appendChild(messageElement);
-  
-  setTimeout(() => {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }, 0);
-}
-
-// Load admin conversations (for real-time updates)
-async function loadAdminConversations() {
-  try {
-    const response = await fetch('/api/chat/conversations');
-    
-    if (response.ok) {
-      const data = await response.json();
-      updateConversationsSidebar(data.conversations);
-    } else {
-      throw new Error('API not available');
+    // Load missing persons from database
+    async function loadMissingPersons() {
+      try {
+        const response = await fetch('/api/admin/missing-persons');
+        const data = await response.json();
+        
+        if (data.success) {
+          displayMissingPersons(data.missing_persons);
+        } else {
+          console.error('Failed to load missing persons:', data.error);
+          document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
+        }
+      } catch (error) {
+        console.error('Error loading missing persons:', error);
+        document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
+      }
     }
-  } catch (error) {
-    console.log('Using existing mock conversations');
-    // Keep your existing static conversations in the HTML
-  }
-}
 
-// Update conversations sidebar
-function updateConversationsSidebar(conversations) {
-  const sidebar = document.querySelector('.chat-sidebar');
-  
-  const conversationsHtml = conversations.map(conv => `
-    <div class="chat-user ${conv.user_id === currentConversation?.user_id ? 'active' : ''}" 
-         data-user-id="user-${conv.user_id}" 
-         onclick="selectUser('user-${conv.user_id}', event)">
-      <div style="font-weight: 600;">${conv.username}</div>
-      <div style="font-size: 0.875rem; color: var(--text-secondary);">
-        Report: ${conv.report_id}
-        ${conv.unread_count > 0 ? `<span style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px;">${conv.unread_count}</span>` : ''}
-      </div>
-    </div>
-  `).join('');
-  
-  sidebar.innerHTML = `
-    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Active Conversations</h3>
-    ${conversationsHtml}
-  `;
-}
-
-// Format message timestamp
-function formatMessageTime(timestamp) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-  
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  return date.toLocaleDateString();
-}
-
-// Update your existing showTab function to include chat loading
-const originalShowTabFunc = showTab;
-showTab = function(tabName, event) {
-  originalShowTabFunc(tabName, event);
-  
-  if (tabName === 'chat') {
-    // Try to load real conversations, fallback to existing mock
-    loadAdminConversations();
-    // Initialize with first user if no conversation is active
-    if (!currentConversation) {
-      selectUser('john-doe');
+    // Load analytics from database
+    async function loadAnalytics() {
+      try {
+        const response = await fetch('/api/admin/analytics');
+        const data = await response.json();
+        
+        if (data.success) {
+          displayAnalytics(data.analytics);
+        } else {
+          console.error('Failed to load analytics:', data.error);
+          document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
+        }
+      } catch (error) {
+        console.error('Error loading analytics:', error);
+        document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
+      }
     }
-  } else if (tabName === 'users') {
-    loadUsers();
-  } else if (tabName === 'wanted-criminals') {
-    loadWantedCriminals();
-  } else if (tabName === 'police-stations') {
-    loadPoliceStations();
-  } else if (tabName === 'missing-persons') {
-    loadMissingPersons();
-  } else if (tabName === 'analytics') {
-    loadAnalytics();
-  }
-};
 
-// Cleanup polling when leaving chat or page
-window.addEventListener('beforeunload', () => {
-  if (chatPollingInterval) {
-    clearInterval(chatPollingInterval);
-  }
-});
-
-// Clean up polling when switching tabs
-document.addEventListener('click', (e) => {
-  if ( e.target.classList.contains('tab-btn') && !e.target.textContent.includes('Chat')) {
-    if (chatPollingInterval) {
-      clearInterval(chatPollingInterval);
+    // Display functions (add these if they don't exist)
+    function displayUsers(users) {
+      const container = document.getElementById('users-container');
+      
+      const usersHtml = users.map(user => `
+        <div class="data-card">
+          <h4>${user.full_name || user.username}</h4>
+          <p><strong>Email:</strong> ${user.email}</p>
+          <p><strong>Role:</strong> ${user.role_hint}</p>
+          <p><strong>Status:</strong> <span class="status ${user.status.toLowerCase()}">${user.status}</span></p>
+          <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
+          <p><strong>Joined:</strong> ${new Date(user.created_at).toLocaleDateString()}</p>
+        </div>
+      `).join('');
+      
+      container.innerHTML = usersHtml;
     }
-  }
-});
+
+    function displayWantedCriminals(criminals) {
+      const container = document.getElementById('wanted-criminals-container');
+      
+      const criminalsHtml = criminals.map(criminal => `
+        <div class="data-card">
+          <h4>${criminal.name}</h4>
+          ${criminal.alias ? `<p><strong>Alias:</strong> ${criminal.alias}</p>` : ''}
+          <p><strong>Age Range:</strong> ${criminal.age_range}</p>
+          <p><strong>Danger Level:</strong> <span class="priority ${criminal.danger_level.toLowerCase()}">${criminal.danger_level}</span></p>
+          <p><strong>Crimes:</strong> ${criminal.crimes_committed}</p>
+          <p><strong>Reward:</strong> BDT ${criminal.reward_amount}</p>
+          <p><strong>Status:</strong> <span class="status ${criminal.status.toLowerCase()}">${criminal.status}</span></p>
+        </div>
+      `).join('');
+      
+      container.innerHTML = criminalsHtml;
+    }
+
+    function displayPoliceStations(stations) {
+      const container = document.getElementById('police-stations-container');
+      
+      const stationsHtml = stations.map(station => `
+        <div class="data-card">
+          <h4>${station.station_name}</h4>
+          <p><strong>Code:</strong> ${station.station_code}</p>
+          <p><strong>Address:</strong> ${station.address}</p>
+          <p><strong>Phone:</strong> ${station.phone}</p>
+          <p><strong>Email:</strong> ${station.email}</p>
+          <p><strong>Officer in Charge:</strong> ${station.officer_in_charge || 'N/A'}</p>
+          <p><strong>Jurisdiction:</strong> ${station.jurisdiction_area}</p>
+        </div>
+      `).join('');
+      
+      container.innerHTML = stationsHtml;
+    }
+
+    function displayMissingPersons(persons) {
+      const container = document.getElementById('missing-persons-container');
+      
+      const personsHtml = persons.map(person => `
+        <div class="data-card">
+          <h4>${person.name}</h4>
+          <p><strong>Age:</strong> ${person.age}</p>
+          <p><strong>Gender:</strong> ${person.gender}</p>
+          <p><strong>Status:</strong> <span class="status ${person.status.toLowerCase()}">${person.status}</span></p>
+          <p><strong>Last Seen:</strong> ${person.last_seen_location}</p>
+          <p><strong>Date:</strong> ${new Date(person.last_seen_date).toLocaleDateString()}</p>
+          <p><strong>Contact:</strong> ${person.contact_person} (${person.contact_phone})</p>
+          <p><strong>Description:</strong> ${person.description}</p>
+        </div>
+      `).join('');
+      
+      container.innerHTML = personsHtml;
+    }
+
+    function displayAnalytics(analytics) {
+      const container = document.getElementById('analytics-container');
+      
+      container.innerHTML = `
+        <div class="analytics-grid">
+          <div class="stat-card">
+            <h3>${analytics.total_crimes}</h3>
+            <p>Total Crime Reports</p>
+          </div>
+          <div class="stat-card">
+            <h3>${analytics.pending_crimes}</h3>
+            <p>Pending Cases</p>
+          </div>
+          <div class="stat-card">
+            <h3>${analytics.total_users}</h3>
+            <p>Registered Users</p>
+          </div>
+          <div class="stat-card">
+            <h3>${analytics.total_missing}</h3>
+            <p>Missing Persons</p>
+          </div>
+          <div class="stat-card">
+            <h3>${analytics.total_wanted}</h3>
+            <p>Active Wanted</p>
+          </div>
+        </div>
+        
+        <div class="recent-activity">
+          <h3>Recent Activity</h3>
+          ${analytics.recent_activity.map(activity => `
+            <div class="activity-item">
+              <span class="activity-type">${activity.activity_type}</span>
+              <span class="activity-details">${activity.details}</span>
+              <span class="activity-time">${new Date(activity.created_at).toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
     </script>
   </body>
 </html>
