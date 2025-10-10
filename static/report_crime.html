@@ -274,6 +274,12 @@
             </div>
         </section>
 
+        <!-- Reporter info (visible so non-auth users can provide a reporter name/ID) -->
+        <div class="max-w-6xl mx-auto mt-6 px-4">
+            <label for="reporter-id" class="block text-sm font-medium text-gray-300">Reporter Name / ID (optional)</label>
+            <input type="text" id="reporter-id" name="reporter-id" class="mt-2 block w-full max-w-sm rounded-lg border border-gray-600 bg-input-dark p-3 text-white placeholder-gray-500 focus:border-accent-blue focus:ring focus:ring-accent-blue focus:ring-opacity-50" placeholder="Enter your name or identifier">
+        </div>
+
         <!-- 2. SUSPECT INFORMATION SECTION (Hidden by Default) -->
         <section id="suspect-info-content" class="tab-content hidden opacity-0">
             <div class="bg-card-dark p-6 sm:p-8 rounded-xl shadow-2xl space-y-8">
@@ -383,9 +389,13 @@
             </div>
             <!-- Action Button for SUSPECT INFORMATION SECTION -->
             <div class="flex justify-end pt-6">
-                <button type="submit" class="bg-accent-blue hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition duration-300 shadow-lg shadow-blue-500/50">
-                    Submit Final Report
-                </button>
+                <div class="flex items-center space-x-4">
+                    <label class="text-sm text-gray-400">Attach Evidence (optional)</label>
+                    <input type="file" id="evidence-input" multiple accept="image/*,video/*,application/pdf" class="text-sm text-gray-300 bg-input-dark p-2 rounded-lg" />
+                    <button type="submit" id="submit-report-btn" class="bg-accent-blue hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition duration-300 shadow-lg shadow-blue-500/50">
+                        Submit Final Report
+                    </button>
+                </div>
             </div>
         </section>
         
@@ -645,6 +655,145 @@
   document.addEventListener('DOMContentLoaded', () => {
       populateDropdowns();
       showTab('new-crime');
+  });
+
+  // Helper to upload evidence files and return array of file URLs
+  async function uploadEvidenceFiles(files) {
+      const uploaded = [];
+      for (const file of files) {
+          const form = new FormData();
+          form.append('file', file);
+          try {
+              const res = await fetch('/api/upload', { method: 'POST', body: form });
+              if (!res.ok) throw new Error('Upload failed');
+              const data = await res.json();
+              uploaded.push({ filename: data.filename, url: data.file_url });
+          } catch (err) {
+              console.error('File upload error:', err);
+          }
+      }
+      return uploaded;
+  }
+
+  // Build the payload based on form values and post to /api/crimes
+  document.getElementById('crime-report-form').addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      // Ensure suspect tab was reached
+      if (document.getElementById('suspect-info-content').classList.contains('hidden')) {
+          console.log('Please complete the Crime Details step before submitting.');
+          return;
+      }
+
+      const submitBtn = document.getElementById('submit-report-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      // Collect location
+      const location = {
+          district: document.getElementById('district').value,
+          area: document.getElementById('area-name').value,
+          city: document.getElementById('city').value,
+          latitude: document.getElementById('latitude').value || null,
+          longitude: document.getElementById('longitude').value || null
+      };
+
+      // Crime details
+      const crime = {
+          type: document.getElementById('crime-type').value,
+          description: document.getElementById('crime-description').value,
+          incident_date: document.getElementById('date-time').value || null
+      };
+
+      // Victim
+      const victim = {
+          name: document.getElementById('victim-name').value || null,
+          dob: document.getElementById('victim-dob').value || null,
+          gender: document.getElementById('victim-gender').value || null,
+          address: document.getElementById('victim-address').value || null,
+          phone: document.getElementById('victim-phone').value || null,
+          email: document.getElementById('victim-email').value || null,
+          injury_details: document.getElementById('injury-details').value || null
+      };
+
+      // Suspect/weapon/witness
+      const criminal = {
+          name: document.getElementById('suspect-name').value || null,
+          age: document.getElementById('suspect-age').value || null,
+          gender: document.getElementById('suspect-gender').value || null,
+          address: document.getElementById('suspect-address').value || null,
+          previous_crimes: document.getElementById('previous-crimes').value || null
+      };
+
+      const weapon = {
+          name: document.getElementById('weapon-name').value || null,
+          type: document.getElementById('weapon-type').value || null,
+          description: document.getElementById('weapon-description').value || null
+      };
+
+      const witness = {
+          name: document.getElementById('witness-name').value || null,
+          phone: document.getElementById('witness-phone').value || null,
+          protection_required: document.getElementById('protection-required').value || null
+      };
+
+      // Reporter id: If your app has an auth system, set this to the current user's id. For now try to read from a hidden input.
+      const reporter_id = document.getElementById('reporter-id').value || null;
+
+      // Evidence files
+      const evidenceInput = document.getElementById('evidence-input');
+      let evidence_files = [];
+      if (evidenceInput && evidenceInput.files.length > 0) {
+          evidence_files = await uploadEvidenceFiles(evidenceInput.files);
+      }
+
+      // Build final payload matching backend CrimeData model
+      const payload = {
+          location,
+          crime,
+          victim,
+          criminal,
+          weapon,
+          witness,
+          reporter_id,
+          incident_date: crime.incident_date,
+          evidence_files // array of {filename, url}
+      };
+
+      try {
+          const res = await fetch('/api/crimes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+              // Try to parse JSON, fall back to text if response is empty or non-JSON
+              let errMsg = 'Submission failed';
+              try {
+                  const errJson = await res.json();
+                  errMsg = errJson.detail || errJson.message || JSON.stringify(errJson);
+              } catch (parseErr) {
+                  // If body is empty or not JSON, read text
+                  try { errMsg = await res.text() || errMsg; } catch (e) { /* ignore */ }
+              }
+              throw new Error(errMsg);
+          }
+
+          // Parse success body safely
+          let data = null;
+          try { data = await res.json(); } catch (parseErr) { data = null; }
+          console.log('Report created', data || '(no JSON body)');
+          // Show success to user
+          submitBtn.textContent = 'Submitted ✓';
+          setTimeout(() => { submitBtn.textContent = 'Submit Final Report'; submitBtn.disabled = false; }, 3000);
+
+      } catch (err) {
+          console.error('Submission error:', err);
+          alert('Failed to submit report: ' + (err.message || String(err)));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Final Report';
+      }
   });
 
 // --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---

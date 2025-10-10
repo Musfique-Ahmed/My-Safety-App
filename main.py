@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+import logging
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 import hashlib
@@ -15,6 +16,17 @@ import mysql.connector
 from mysql.connector import Error
 
 app = FastAPI()
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
+
+
+@app.exception_handler(Exception)
+async def all_exceptions_handler(request, exc):
+    # Log the full exception so server logs contain the stacktrace
+    logging.exception("Unhandled exception: %s", exc)
+    # Always return JSON to the client (prevents empty/non-JSON responses)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +63,15 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 UPLOAD_DIR = "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+def _read_html(path: str) -> str:
+    """Read an HTML file with utf-8 and replace undecodable bytes to avoid crashes.
+
+    Returns the file content as a string. Raises FileNotFoundError if missing.
+    """
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        return f.read()
+
 # ==================== PYDANTIC MODELS ====================
 
 class UserCreate(BaseModel):
@@ -69,6 +90,10 @@ class CrimeData(BaseModel):
     criminal: Optional[dict] = None
     weapon: Optional[dict] = None
     witness: Optional[dict] = None
+    # New optional fields collected by the frontend
+    reporter_id: Optional[str] = None
+    incident_date: Optional[str] = None
+    evidence_files: Optional[List[dict]] = None
 
 class MissingPersonData(BaseModel):
     name: str
@@ -98,7 +123,7 @@ class StatusUpdate(BaseModel):
 class ChatMessage(BaseModel):
     user_id: int
     message: str
-    report_id: Optional[int] = None
+    report_id: Optional[str] = None
     is_admin: Optional[bool] = False
 
 class EmergencyAlert(BaseModel):
@@ -163,67 +188,67 @@ def hash_password(password: str):
 async def read_root():
     """Serve the main landing page (home.html)"""
     try:
-        return HTMLResponse(content=open("static/home.html").read())
+        return HTMLResponse(content=_read_html("static/home.html"))
     except FileNotFoundError:
         # Fallback to index.html if home.html doesn't exist
-        return HTMLResponse(content=open("static/index.html").read())
+        return HTMLResponse(content=_read_html("static/index.html"))
 
 # ==================== STATIC PAGE ENDPOINTS ====================
 
 @app.get("/dashboard")
 async def get_dashboard_page():
     """Serve the main dashboard page (index.html)"""
-    return HTMLResponse(content=open("static/index.html").read())
+    return HTMLResponse(content=_read_html("static/index.html"))
 
 @app.get("/home")
 async def get_home_page():
     """Alternative route to home page"""
-    return HTMLResponse(content=open("static/home.html").read())
+    return HTMLResponse(content=_read_html("static/home.html"))
 
 @app.get("/report-crime")
 async def get_report_crime_page():
     """Serve the crime reporting page"""
-    return HTMLResponse(content=open("static/report_crime.html").read())
+    return HTMLResponse(content=_read_html("static/report_crime.html"))
 
 @app.get("/missing-person")
 async def get_missing_person_page():
     """Serve the missing persons page"""
-    return HTMLResponse(content=open("static/missing_person.html").read())
+    return HTMLResponse(content=_read_html("static/missing_person.html"))
 
 @app.get("/wanted-criminals")
 async def get_wanted_criminals_page():
     """Serve the wanted criminals page"""
-    return HTMLResponse(content=open("static/wanted_criminal.html").read())
+    return HTMLResponse(content=_read_html("static/wanted_criminal.html"))
 
 @app.get("/chatbox")
 async def get_chatbox_page():
     """Serve the community chatbox page"""
-    return HTMLResponse(content=open("static/user_chatbox.html").read())
+    return HTMLResponse(content=_read_html("static/user_chatbox.html"))
 
 @app.get("/report-missing")
 async def get_report_missing_page():
     """Serve the missing person report form"""
-    return HTMLResponse(content=open("static/report_missing_person.html").read())
+    return HTMLResponse(content=_read_html("static/report_missing_person.html"))
 
 @app.get("/login")
 async def get_login_page():
     """Serve the login page"""
-    return HTMLResponse(content=open("static/login.html").read())
+    return HTMLResponse(content=_read_html("static/login.html"))
 
 @app.get("/signup")
 async def get_signup_page():
     """Serve the signup page"""
-    return HTMLResponse(content=open("static/signup.html").read())
+    return HTMLResponse(content=_read_html("static/signup.html"))
 
 @app.get("/admin")
 async def get_admin_dashboard_page():
     """Serve the admin dashboard page"""
-    return HTMLResponse(content=open("static/admin_dashboard.html").read())
+    return HTMLResponse(content=_read_html("static/admin_dashboard.html"))
 
 @app.get("/admin-dashboard")
 async def get_admin_dashboard_alt():
     """Alternative route to admin dashboard"""
-    return HTMLResponse(content=open("static/admin_dashboard.html").read())
+    return HTMLResponse(content=_read_html("static/admin_dashboard.html"))
 
 # ==================== USER AUTHENTICATION ENDPOINTS ====================
 
@@ -346,18 +371,21 @@ async def submit_crime_report(crime_data: CrimeData):
             # Insert into crime table
             result = conn.execute(
                 text("""
-                    INSERT INTO crime (location_data, crime_data, victim_data, criminal_data, 
-                                     weapon_data, witness_data, status, created_at)
-                    VALUES (:location_data, :crime_data, :victim_data, :criminal_data, 
-                            :weapon_data, :witness_data, :status, :created_at)
+                    INSERT INTO crime (reporter_id, incident_date, location_data, crime_data, victim_data, criminal_data, 
+                                     weapon_data, witness_data, evidence_files, status, created_at)
+                    VALUES (:reporter_id, :incident_date, :location_data, :crime_data, :victim_data, :criminal_data, 
+                            :weapon_data, :witness_data, :evidence_files, :status, :created_at)
                 """),
                 {
+                    "reporter_id": crime_data.reporter_id,
+                    "incident_date": crime_data.incident_date,
                     "location_data": json.dumps(crime_data.location),
                     "crime_data": json.dumps(crime_data.crime),
                     "victim_data": json.dumps(crime_data.victim) if crime_data.victim else None,
                     "criminal_data": json.dumps(crime_data.criminal) if crime_data.criminal else None,
                     "weapon_data": json.dumps(crime_data.weapon) if crime_data.weapon else None,
                     "witness_data": json.dumps(crime_data.witness) if crime_data.witness else None,
+                    "evidence_files": json.dumps(crime_data.evidence_files) if crime_data.evidence_files else None,
                     "status": "Pending",
                     "created_at": datetime.utcnow()
                 }
