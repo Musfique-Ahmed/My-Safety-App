@@ -464,7 +464,7 @@
 
   // Track whether the suspect tab has been enabled
   let suspectTabEnabled = false;
-
+// ...existing code...
   /**
    * Dynamically populates the District, Crime Type, and Weapon Type dropdowns.
    */
@@ -473,35 +473,58 @@
       const crimeTypeSelect = document.getElementById('crime-type');
       const weaponTypeSelect = document.getElementById('weapon-type');
 
-      // Populate Districts
-      bangladeshDistricts.forEach(district => {
-          const option = document.createElement('option');
-          option.value = district;
-          option.textContent = district;
-          districtSelect.appendChild(option);
-      });
+      if (districtSelect) {
+          // Populate Districts
+          bangladeshDistricts.forEach(district => {
+              const option = document.createElement('option');
+              option.value = district;
+              option.textContent = district;
+              districtSelect.appendChild(option);
+          });
+      }
 
-      // Populate Crime Types
-      crimeTypes.forEach(type => {
-          const option = document.createElement('option');
-          // Use the English name as the value (first word before parenthesis)
-          const value = type.split(' ')[0].replace('(', '');
-          option.value = value;
-          option.textContent = type;
-          crimeTypeSelect.appendChild(option);
-      });
+      if (crimeTypeSelect) {
+          // Populate Crime Types
+          crimeTypes.forEach(type => {
+              const option = document.createElement('option');
+              // Use the English name as the value (first word before parenthesis)
+              const value = type.split(' ')[0].replace('(', '');
+              option.value = value;
+              option.textContent = type;
+              crimeTypeSelect.appendChild(option);
+          });
+      }
 
-      // Populate Weapon Types
-      weaponTypes.forEach(type => {
-          const option = document.createElement('option');
-          // Use the English name as the value
-          const value = type.split(' ')[0].replace('(', '');
-          option.value = value;
-          option.textContent = type;
-          weaponTypeSelect.appendChild(option);
-      });
+      if (weaponTypeSelect) {
+          // Populate Weapon Types
+          weaponTypes.forEach(type => {
+              const option = document.createElement('option');
+              // Use the English name as the value
+              const value = type.split(' ')[0].replace('(', '');
+              option.value = value;
+              option.textContent = type;
+              weaponTypeSelect.appendChild(option);
+          });
+      }
   }
   
+// ...existing code...
+
+  // Single, authoritative submit handler (removes duplicate "simple" handler)
+  document.addEventListener('DOMContentLoaded', () => {
+    // Populate selects and initialize tab on DOM ready
+    try { populateDropdowns(); } catch (e) { console.error('populateDropdowns failed', e); }
+    try { showTab('new-crime'); } catch (e) { /* ignore if showTab not available yet */ }
+
+    const form = document.getElementById('crime-report-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async function (event) {
+      // ...existing submit handler...
+    });
+  });
+  
+// ...existing code...
   /**
    * Uses Geolocation API to get the user's current coordinates.
    */
@@ -601,7 +624,7 @@
   
   /**
    * Enables the Suspect Information tab and automatically switches the view.
-   * This function is called by the "Save Crime Details and Continue" button.
+   * This function is called by the "Save New Crime Details and Continue" button.
    */
   function enableSuspectTab() {
       // In a real application, you would first validate the "Add New Crime" form fields here.
@@ -619,181 +642,135 @@
       console.log("Crime Details Saved (conceptually)! Moving to Suspect Information.");
   }
 
+  // --- Replace the older handlers with this robust submission logic ---
+  const API_BASE = 'http://localhost:8000'; // change if your backend runs elsewhere
 
-  // Add a simple error handler for final form submission
-  document.getElementById('crime-report-form').addEventListener('submit', function(event) {
-      event.preventDefault();
-      
-      // NOTE: Only runs if the user is on the Suspect Information tab and clicks the final submit button.
-      if (document.getElementById('suspect-info-content').classList.contains('hidden')) {
-          console.log("Attempted submission from the wrong tab state.");
-          return;
-      }
-
-      // In a real app, collect all form data and send it to your DBMS here.
-      
-      console.log("Final Report Submitted! All data (Crime + Suspect) ready for database insertion.");
-      
-      // Confirmation message simulation (no alert/confirm)
-      const submitButton = event.target.querySelector('button[type="submit"]');
-      const originalText = submitButton.textContent;
-      submitButton.textContent = "Final Report Submitted Successfully!";
-      submitButton.classList.remove('bg-accent-blue', 'hover:bg-blue-700');
-      submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
-      
-      // Optional: reset form after success
-      // event.target.reset(); 
-
-      setTimeout(() => {
-          submitButton.textContent = originalText;
-          submitButton.classList.add('bg-accent-blue', 'hover:bg-blue-700');
-          submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-      }, 3000);
-  });
-
-  // Initialize the view and populate dropdowns on load
-  document.addEventListener('DOMContentLoaded', () => {
-      populateDropdowns();
-      showTab('new-crime');
-  });
-
-  // Helper to upload evidence files and return array of file URLs
+  // Upload evidence files to backend /api/upload — throws on failure
   async function uploadEvidenceFiles(files) {
-      const uploaded = [];
-      for (const file of files) {
-          const form = new FormData();
-          form.append('file', file);
-          try {
-              const res = await fetch('/api/upload', { method: 'POST', body: form });
-              if (!res.ok) throw new Error('Upload failed');
-              const data = await res.json();
-              uploaded.push({ filename: data.filename, url: data.file_url });
-          } catch (err) {
-              console.error('File upload error:', err);
-          }
+    const uploaded = [];
+    for (const file of files) {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+      if (!res.ok) {
+        let body = '';
+        try { body = await res.text(); } catch (e) { body = res.statusText; }
+        throw new Error(`Upload failed: ${res.status} ${res.statusText} — ${body}`);
       }
-      return uploaded;
+      const data = await res.json().catch(()=>({}));
+      uploaded.push({ filename: data.filename || file.name, url: data.file_url || data.url || null });
+    }
+    return uploaded;
   }
 
-  // Build the payload based on form values and post to /api/crimes
-  document.getElementById('crime-report-form').addEventListener('submit', async function(event) {
+  // Single, authoritative submit handler (removes duplicate "simple" handler)
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('crime-report-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async function (event) {
       event.preventDefault();
 
-      // Ensure suspect tab was reached
-      if (document.getElementById('suspect-info-content').classList.contains('hidden')) {
-          console.log('Please complete the Crime Details step before submitting.');
-          return;
+      // Prevent accidental submits from "Add New Crime" tab
+      const suspectSection = document.getElementById('suspect-info-content');
+      if (suspectSection && suspectSection.classList.contains('hidden')) {
+        alert('Please complete the Crime Details step before submitting.');
+        return;
       }
 
       const submitBtn = document.getElementById('submit-report-btn');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-
-      // Collect location
-      const location = {
-          district: document.getElementById('district').value,
-          area: document.getElementById('area-name').value,
-          city: document.getElementById('city').value,
-          latitude: document.getElementById('latitude').value || null,
-          longitude: document.getElementById('longitude').value || null
-      };
-
-      // Crime details
-      const crime = {
-          type: document.getElementById('crime-type').value,
-          description: document.getElementById('crime-description').value,
-          incident_date: document.getElementById('date-time').value || null
-      };
-
-      // Victim
-      const victim = {
-          name: document.getElementById('victim-name').value || null,
-          dob: document.getElementById('victim-dob').value || null,
-          gender: document.getElementById('victim-gender').value || null,
-          address: document.getElementById('victim-address').value || null,
-          phone: document.getElementById('victim-phone').value || null,
-          email: document.getElementById('victim-email').value || null,
-          injury_details: document.getElementById('injury-details').value || null
-      };
-
-      // Suspect/weapon/witness
-      const criminal = {
-          name: document.getElementById('suspect-name').value || null,
-          age: document.getElementById('suspect-age').value || null,
-          gender: document.getElementById('suspect-gender').value || null,
-          address: document.getElementById('suspect-address').value || null,
-          previous_crimes: document.getElementById('previous-crimes').value || null
-      };
-
-      const weapon = {
-          name: document.getElementById('weapon-name').value || null,
-          type: document.getElementById('weapon-type').value || null,
-          description: document.getElementById('weapon-description').value || null
-      };
-
-      const witness = {
-          name: document.getElementById('witness-name').value || null,
-          phone: document.getElementById('witness-phone').value || null,
-          protection_required: document.getElementById('protection-required').value || null
-      };
-
-      // Reporter id: If your app has an auth system, set this to the current user's id. For now try to read from a hidden input.
-      const reporter_id = document.getElementById('reporter-id').value || null;
-
-      // Evidence files
-      const evidenceInput = document.getElementById('evidence-input');
-      let evidence_files = [];
-      if (evidenceInput && evidenceInput.files.length > 0) {
-          evidence_files = await uploadEvidenceFiles(evidenceInput.files);
-      }
-
-      // Build final payload matching backend CrimeData model
-      const payload = {
-          location,
-          crime,
-          victim,
-          criminal,
-          weapon,
-          witness,
-          reporter_id,
-          incident_date: crime.incident_date,
-          evidence_files // array of {filename, url}
-      };
+      const origText = submitBtn ? submitBtn.textContent : 'Submit';
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
       try {
-          const res = await fetch('/api/crimes', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-          });
+        // Collect fields (guard against missing elements)
+        const get = id => (document.getElementById(id) ? document.getElementById(id).value : null);
 
-          if (!res.ok) {
-              // Try to parse JSON, fall back to text if response is empty or non-JSON
-              let errMsg = 'Submission failed';
-              try {
-                  const errJson = await res.json();
-                  errMsg = errJson.detail || errJson.message || JSON.stringify(errJson);
-              } catch (parseErr) {
-                  // If body is empty or not JSON, read text
-                  try { errMsg = await res.text() || errMsg; } catch (e) { /* ignore */ }
-              }
-              throw new Error(errMsg);
+        const payload = {
+          location: {
+            district: get('district'),
+            area: get('area-name'),
+            city: get('city'),
+            latitude: get('latitude') || null,
+            longitude: get('longitude') || null
+          },
+          crime: {
+            type: get('crime-type'),
+            description: get('crime-description'),
+            incident_date: get('date-time') || null
+          },
+          victim: {
+            name: get('victim-name') || null,
+            dob: get('victim-dob') || null,
+            gender: get('victim-gender') || null,
+            address: get('victim-address') || null,
+            phone: get('victim-phone') || null,
+            email: get('victim-email') || null,
+            injury_details: get('injury-details') || null
+          },
+          criminal: {
+            name: get('suspect-name') || null,
+            age: get('suspect-age') || null,
+            gender: get('suspect-gender') || null,
+            address: get('suspect-address') || null,
+            previous_crimes: get('previous-crimes') || null
+          },
+          weapon: {
+            name: get('weapon-name') || null,
+            type: get('weapon-type') || null,
+            description: get('weapon-description') || null
+          },
+          witness: {
+            name: get('witness-name') || null,
+            phone: get('witness-phone') || null,
+            protection_required: get('protection-required') || null
+          },
+          reporter_id: get('reporter-id') || null,
+          incident_date: get('date-time') || null,
+          evidence_files: []
+        };
+
+        // Upload evidence if any
+        const evidenceInput = document.getElementById('evidence-input');
+        if (evidenceInput && evidenceInput.files && evidenceInput.files.length > 0) {
+          try {
+            payload.evidence_files = await uploadEvidenceFiles(evidenceInput.files);
+          } catch (uploadErr) {
+            throw new Error('Evidence upload failed: ' + uploadErr.message);
           }
+        }
 
-          // Parse success body safely
-          let data = null;
-          try { data = await res.json(); } catch (parseErr) { data = null; }
-          console.log('Report created', data || '(no JSON body)');
-          // Show success to user
-          submitBtn.textContent = 'Submitted ✓';
-          setTimeout(() => { submitBtn.textContent = 'Submit Final Report'; submitBtn.disabled = false; }, 3000);
+        // Send to backend (use full origin so Live Server and backend ports work)
+        const res = await fetch(`${API_BASE}/api/crimes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          let bodyText = '';
+          try {
+            const ct = res.headers.get('content-type') || '';
+            bodyText = ct.includes('application/json') ? JSON.stringify(await res.json()) : await res.text();
+          } catch (e) { bodyText = '<unable to read response body>'; }
+          throw new Error(`Server: ${res.status} ${res.statusText} — ${bodyText}`);
+        }
+
+        // Success
+        let data = null;
+        try { data = await res.json(); } catch (e) { data = null; }
+        if (submitBtn) submitBtn.textContent = 'Submitted ✓';
+        console.info('Report created', data);
+        setTimeout(() => {
+          if (submitBtn) { submitBtn.textContent = origText; submitBtn.disabled = false; }
+        }, 2500);
 
       } catch (err) {
-          console.error('Submission error:', err);
-          alert('Failed to submit report: ' + (err.message || String(err)));
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit Final Report';
+        console.error('Submission error:', err);
+        alert('Failed to submit report: ' + (err.message || String(err)));
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
       }
+    });
   });
 
 // --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
