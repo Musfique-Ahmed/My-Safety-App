@@ -233,10 +233,90 @@
     } else { alert("Geolocation not supported."); }
   }
 
-  document.getElementById("reportForm").addEventListener("submit", e=>{
+  const API_BASE = 'http://localhost:8000'; // change if backend runs on different host/port
+
+  async function uploadFileIfPresent(fileInput) {
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
+    const form = new FormData();
+    form.append('file', fileInput.files[0]);
+    const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const txt = await res.text().catch(()=>res.statusText);
+      throw new Error('Upload failed: ' + txt);
+    }
+    const data = await res.json();
+    return data.file_url || null;
+  }
+
+  document.getElementById("reportForm").addEventListener("submit", async function(e){
     e.preventDefault();
-    alert("✅ Report submitted successfully!");
-    e.target.reset();
+    const submitBtn = e.submitter || null;
+
+    try {
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
+
+      // collect fields by name
+      const full_name = (document.querySelector('input[name="full_name"]')||{}).value || null;
+      const nickname = (document.querySelector('input[name="nickname"]')||{}).value || null;
+      const hometown = (document.querySelector('input[name="hometown"]')||{}).value || null;
+      const age = (document.querySelector('input[name="age"]')||{}).value || null;
+      const weight = (document.querySelector('input[name="weight"]')||{}).value || null;
+      const hair_color = (document.querySelector('input[name="hair_color"]')||{}).value || null;
+      const photo_input = document.querySelector('input[name="photo_file"]');
+      const last_seen_time = (document.querySelector('input[name="last_seen_time"]')||{}).value || null;
+      const last_seen_location = (document.querySelector('input[name="last_seen_location"], #location')||{}).value || null;
+      const description = (document.querySelector('textarea[name="description"]')||{}).value || null;
+      const medical_needs = (document.querySelector('textarea[name="medical_needs"]')||{}).value || null;
+      const reporter_name = (document.querySelector('input[name="reporter_name"]')||{}).value || null;
+      const reporter_phone = (document.querySelector('input[name="reporter_phone"]')||{}).value || null;
+      const reporter_email = (document.querySelector('input[name="reporter_email"]')||{}).value || null;
+      const reporter_relation = (document.querySelector('input[name="reporter_relation"]')||{}).value || null;
+
+      // upload photo if present
+      let photo_url = null;
+      try { photo_url = await uploadFileIfPresent(photo_input); } catch (uploadErr) {
+        console.error('Photo upload failed', uploadErr);
+        alert('Photo upload failed: ' + uploadErr.message);
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
+        return;
+      }
+
+      // build payload
+      const payload = {
+        full_name, nickname, hometown,
+        age: age ? Number(age) : null,
+        weight: weight ? Number(weight) : null,
+        hair_color, photo_url,
+        last_seen_time: last_seen_time || null,
+        last_seen_location: last_seen_location || null,
+        description, medical_needs,
+        reporter_name, reporter_phone, reporter_email, reporter_relation
+      };
+
+      const resp = await fetch(`${API_BASE}/api/missing-persons`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        let body = '';
+        try { body = await resp.json(); } catch { body = await resp.text().catch(()=>resp.statusText); }
+        console.error('Submit failed', resp.status, body);
+        alert('Failed to submit: ' + (body.detail || JSON.stringify(body)));
+        return;
+      }
+
+      const data = await resp.json().catch(()=>null);
+      alert('✅ Report submitted successfully. ID: ' + (data && data.id ? data.id : 'n/a'));
+      e.target.reset();
+
+    } catch (err) {
+      console.error('Submission error', err);
+      alert('Submission error: ' + (err.message || err));
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
+    }
   });
 
 // --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
