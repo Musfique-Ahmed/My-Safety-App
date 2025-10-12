@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Query
+from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -572,36 +572,80 @@ async def get_crime_by_id(crime_id: int):
 # ==================== MISSING PERSON ENDPOINTS ====================
 
 @app.post("/api/missing-persons")
-async def submit_missing_person_report(missing_person: MissingPersonData):
-    with engine.connect() as conn:
+async def submit_missing_person_report(payload: Dict[str, Any] = Body(...)):
+    """
+    Accept flexible JSON payloads from the frontend (accepts 'name' or 'full_name' etc.)
+    and insert a row into missing_person. Creates table if it doesn't exist.
+    """
+    # Resolve name (support multiple frontend key names)
+    name = payload.get("name") or payload.get("full_name") or payload.get("fullName")
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing required field: name/full_name")
+
+    def to_int(v):
         try:
-            result = conn.execute(
-                text("""
-                    INSERT INTO missing_person (name, age, gender, description, last_seen_location, 
-                                              last_seen_date, contact_info, photo_url, status, created_at)
-                    VALUES (:name, :age, :gender, :description, :last_seen_location, 
-                            :last_seen_date, :contact_info, :photo_url, :status, :created_at)
-                """),
-                {
-                    "name": missing_person.name,
-                    "age": missing_person.age,
-                    "gender": missing_person.gender,
-                    "description": missing_person.description,
-                    "last_seen_location": missing_person.last_seen_location,
-                    "last_seen_date": missing_person.last_seen_date,
-                    "contact_info": missing_person.contact_info,
-                    "photo_url": missing_person.photo_url,
-                    "status": "Missing",
-                    "created_at": datetime.utcnow()
-                }
-            )
-            conn.commit()
-            missing_id = result.lastrowid
-            print(f"Missing person report submitted with ID: {missing_id}")
-            return {"message": "Missing person report submitted successfully", "missing_id": missing_id}
-        except Exception as e:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to submit missing person report: {str(e)}")
+            return int(v) if v not in (None, "") else None
+        except Exception:
+            return None
+
+    def parse_datetime(v):
+        try:
+            return datetime.fromisoformat(v) if v else None
+        except Exception:
+            try:
+                return datetime.strptime(v, "%Y-%m-%dT%H:%M")
+            except Exception:
+                return None
+
+    # Map payload keys to DB columns (best-effort)
+    params = {
+        "name": name,
+        "age": to_int(payload.get("age") or payload.get("age_years")),
+        "gender": payload.get("gender") or payload.get("sex"),
+        "description": payload.get("description") or payload.get("clothing") or payload.get("appearance"),
+        "last_seen_location": payload.get("last_seen_location") or payload.get("location") or payload.get("last_seen_place"),
+        "last_seen_date": parse_datetime(payload.get("last_seen_time") or payload.get("last_seen_date")),
+        "contact_info": payload.get("contact_info") or payload.get("reporter_phone") or payload.get("reporter_contact"),
+        "photo_url": payload.get("photo_url") or payload.get("photo_url_path") or payload.get("photo"),
+        "status": payload.get("status") or "Missing",
+        "created_at": datetime.utcnow()
+    }
+
+    create_sql = text("""
+    CREATE TABLE IF NOT EXISTS missing_person (
+      missing_id INT AUTO_INCREMENT PRIMARY KEY,
+      name TEXT,
+      age INT NULL,
+      gender VARCHAR(32) NULL,
+      description TEXT,
+      last_seen_location TEXT,
+      last_seen_date DATETIME NULL,
+      contact_info TEXT,
+      photo_url TEXT,
+      status VARCHAR(64) DEFAULT 'Missing',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    insert_sql = text("""
+      INSERT INTO missing_person
+        (name, age, gender, description, last_seen_location, last_seen_date, contact_info, photo_url, status, created_at)
+      VALUES
+        (:name, :age, :gender, :description, :last_seen_location, :last_seen_date, :contact_info, :photo_url, :status, :created_at)
+    """)
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(create_sql)
+            conn.execute(insert_sql, params)
+            last = conn.execute(text("SELECT LAST_INSERT_ID() AS id")).first()
+            new_id = last.id if last is not None else None
+        logging.info("Missing person inserted id=%s name=%s", new_id, params["name"])
+        return {"message": "Missing person report created", "id": new_id}
+    except Exception:
+        logging.exception("Failed to insert missing person")
+        raise HTTPException(status_code=500, detail="Failed to save missing person")
 
 @app.get("/api/missing-persons")
 async def get_all_missing_persons(
