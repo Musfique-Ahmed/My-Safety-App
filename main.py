@@ -1,31 +1,33 @@
-import os
-import json
-import logging
-import shutil
-import uuid
-import hashlib
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-
-from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Body
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+import logging
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
+import hashlib
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+import json
+import os
+import uuid
+import asyncio
+import mysql.connector
+from mysql.connector import Error
 
-# --- CONFIG ---
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
-UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/mysafetydb"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})
-
-# --- APP SETUP ---
 app = FastAPI()
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
+
+
+@app.exception_handler(Exception)
+async def all_exceptions_handler(request, exc):
+    # Log the full exception so server logs contain the stacktrace
+    logging.exception("Unhandled exception: %s", exc)
+    # Always return JSON to the client (prevents empty/non-JSON responses)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,38 +37,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/mysafetydb"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})
+
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'mysafetydb',
+    'port': 3306
+}
+
+def get_db_connection():
+    try:
+        connection = mysql.connector.connect(**DB_CONFIG)
+        return connection
+    except Error as e:
+        print(f"Error connecting to database: {e}")
+        return None
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def _read_html(path: str) -> str:
-    full = os.path.join(STATIC_DIR, path)
-    if not os.path.isfile(full):
-        raise FileNotFoundError(full)
-    with open(full, "r", encoding="utf-8") as f:
+    """Read an HTML file with utf-8 and replace undecodable bytes to avoid crashes.
+
+    Returns the file content as a string. Raises FileNotFoundError if missing.
+    """
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
         return f.read()
 
-def hash_password(password: str) -> str:
-    """
-    Simple SHA-256 password hashing for demo purposes.
-    Replace with a proper salted algorithm (bcrypt/argon2) in production.
-    """
-    if password is None:
-        return ""
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+# ==================== PYDANTIC MODELS ====================
 
-# ----------------- Pydantic models -----------------
-class CrimeData(BaseModel):
-    location: Optional[Dict[str, Any]] = None
-    crime: Optional[Dict[str, Any]] = None
-    victim: Optional[Dict[str, Any]] = None
-    criminal: Optional[Dict[str, Any]] = None
-    weapon: Optional[Dict[str, Any]] = None
-    witness: Optional[Dict[str, Any]] = None
-    reporter_id: Optional[Any] = None
-    incident_date: Optional[str] = None
-    evidence_files: Optional[List[Dict[str, Any]]] = None
-
-# Minimal Pydantic model stubs (prevent NameError). Expand fields as needed.
 class UserCreate(BaseModel):
     email: str
     username: str
@@ -76,44 +84,42 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class UserUpdate(BaseModel):
-    role_hint: Optional[str] = None
-    status: Optional[str] = None
-    station_id: Optional[int] = None
+class CrimeData(BaseModel):
+    location: dict
+    crime: dict
+    victim: Optional[dict] = None
+    criminal: Optional[dict] = None
+    weapon: Optional[dict] = None
+    witness: Optional[dict] = None
+    # New optional fields collected by the frontend
+    reporter_id: Optional[str] = None
+    incident_date: Optional[str] = None
+    evidence_files: Optional[List[dict]] = None
 
 class MissingPersonData(BaseModel):
     name: str
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    description: Optional[str] = None
-    last_seen_location: Optional[str] = None
-    last_seen_date: Optional[str] = None
-    contact_info: Optional[str] = None
+    age: int
+    gender: str
+    description: str
+    last_seen_location: str
+    last_seen_date: str
+    contact_info: str
     photo_url: Optional[str] = None
 
-class WantedCriminalCreate(BaseModel):
-    name: str
-    alias: Optional[str] = None
-    age_range: Optional[str] = None
-    gender: Optional[str] = None
-    description: Optional[str] = None
-    height: Optional[str] = None
-    weight: Optional[str] = None
-    hair_color: Optional[str] = None
-    eye_color: Optional[str] = None
-    distinguishing_marks: Optional[str] = None
-    crimes_committed: Optional[str] = None
-    reward_amount: Optional[float] = None
-    danger_level: Optional[str] = None
-    last_known_location: Optional[str] = None
-    photo_url: Optional[str] = None
-    added_by: Optional[int] = None
+class ComplaintVerification(BaseModel):
+    complaint_id: int
+    status: str
 
-class CriminalSighting(BaseModel):
-    last_seen_time: Optional[str] = None
-    last_seen_location: Optional[str] = None
-    still_with_finder: Optional[bool] = False
-    reporter_contact: Optional[str] = None
+class CaseAssignment(BaseModel):
+    user_id: int
+    crime_id: int
+    duty_role: str
+
+class StatusUpdate(BaseModel):
+    crime_id: int
+    new_status: str
+    notes: str
+    changed_by: int
 
 class ChatMessage(BaseModel):
     user_id: int
@@ -121,20 +127,52 @@ class ChatMessage(BaseModel):
     report_id: Optional[str] = None
     is_admin: Optional[bool] = False
 
-class CaseAssignment(BaseModel):
-    crime_id: int
-    user_id: int
-    duty_role: Optional[str] = None
-
 class EmergencyAlert(BaseModel):
+    location: dict
     alert_type: str
-    location: Dict[str, Any]
-    description: Optional[str] = None
-    severity: Optional[str] = None
+    description: str
+    severity: str = "High"
+
+class CriminalSighting(BaseModel):
+    criminal_id: int
+    last_seen_time: str
+    last_seen_location: str
+    still_with_finder: bool = False
+    reporter_contact: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    user_id: int
+    role_hint: Optional[str] = None
+    status: Optional[str] = None
+    station_id: Optional[int] = None
+
+class WantedCriminalCreate(BaseModel):
+    name: str
+    alias: Optional[str] = None
+    age_range: str
+    gender: str
+    description: str
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    hair_color: Optional[str] = None
+    eye_color: Optional[str] = None
+    distinguishing_marks: Optional[str] = None
+    crimes_committed: str
+    reward_amount: Optional[float] = 0
+    danger_level: str = "Medium"
+    last_known_location: Optional[str] = None
+    photo_url: Optional[str] = None
+    added_by: int
+
+class AdminAction(BaseModel):
+    action_type: str
+    target_id: int
+    notes: Optional[str] = None
+    admin_id: int
 
 class PoliceStationCreate(BaseModel):
     station_name: str
-    station_code: Optional[str] = None
+    station_code: str
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -142,114 +180,10 @@ class PoliceStationCreate(BaseModel):
     longitude: Optional[float] = None
     jurisdiction_area: Optional[str] = None
 
-class StatusUpdate(BaseModel):
-    new_status: str
-    notes: Optional[str] = None
-    changed_by: Optional[int] = None
+def hash_password(password: str):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-
-# ----------------- Static page endpoints -----------------
-@app.get("/report-crime", response_class=HTMLResponse)
-async def serve_report_crime():
-    try:
-        return HTMLResponse(content=_read_html("report_crime.html"), status_code=200)
-    except Exception as e:
-        logging.exception("Failed to read report_crime.html")
-        raise HTTPException(status_code=500, detail="Cannot load page")
-
-
-# ----------------- Upload endpoint -----------------
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    try:
-        ext = os.path.splitext(file.filename)[1] or ""
-        safe_name = f"{uuid.uuid4().hex}{ext}"
-        dest_path = os.path.join(UPLOAD_DIR, safe_name)
-        with open(dest_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        file_url = f"/static/uploads/{safe_name}"
-        logging.info("Uploaded file saved: %s", dest_path)
-        return JSONResponse({"filename": safe_name, "file_url": file_url})
-    except Exception:
-        logging.exception("Upload failed")
-        raise HTTPException(status_code=500, detail="File upload failed")
-
-
-# ----------------- Crime submission endpoint -----------------
-@app.post("/api/crimes")
-async def submit_crime_report(crime_data: CrimeData):
-    # Basic validation
-    if not crime_data.location or not crime_data.crime:
-        raise HTTPException(status_code=400, detail="Missing required fields: location or crime")
-
-    # Normalize reporter_id
-    reporter_id_value: Optional[int] = None
-    if crime_data.reporter_id is not None and crime_data.reporter_id != "":
-        try:
-            reporter_id_value = int(crime_data.reporter_id)
-        except Exception:
-            # keep None if it cannot be parsed
-            reporter_id_value = None
-
-    # Parse incident_date
-    incident_dt = None
-    if crime_data.incident_date:
-        try:
-            incident_dt = datetime.fromisoformat(crime_data.incident_date)
-        except Exception:
-            try:
-                incident_dt = datetime.strptime(crime_data.incident_date, "%Y-%m-%dT%H:%M")
-            except Exception:
-                incident_dt = None
-
-    # Prepare JSON/text payloads for DB
-    try:
-        location_json = json.dumps(crime_data.location, ensure_ascii=False) if crime_data.location else None
-        crime_json = json.dumps(crime_data.crime, ensure_ascii=False) if crime_data.crime else None
-        victim_json = json.dumps(crime_data.victim, ensure_ascii=False) if crime_data.victim else None
-        criminal_json = json.dumps(crime_data.criminal, ensure_ascii=False) if crime_data.criminal else None
-        weapon_json = json.dumps(crime_data.weapon, ensure_ascii=False) if crime_data.weapon else None
-        witness_json = json.dumps(crime_data.witness, ensure_ascii=False) if crime_data.witness else None
-        evidence_json = json.dumps(crime_data.evidence_files, ensure_ascii=False) if crime_data.evidence_files else None
-    except Exception:
-        logging.exception("Failed to serialize payload")
-        raise HTTPException(status_code=400, detail="Invalid payload format")
-
-    logging.info("Inserting crime report: reporter_id=%s incident_date=%s", reporter_id_value, crime_data.incident_date)
-
-    insert_sql = text("""
-        INSERT INTO crime
-            (reporter_id, incident_date, location_data, crime_data, victim_data, criminal_data, weapon_data, witness_data, evidence_files, status, created_at)
-        VALUES
-            (:reporter_id, :incident_date, :location_data, :crime_data, :victim_data, :criminal_data, :weapon_data, :witness_data, :evidence_files, :status, :created_at)
-    """)
-
-    params = {
-        "reporter_id": reporter_id_value,
-        "incident_date": incident_dt,
-        "location_data": location_json,
-        "crime_data": crime_json,
-        "victim_data": victim_json,
-        "criminal_data": criminal_json,
-        "weapon_data": weapon_json,
-        "witness_data": witness_json,
-        "evidence_files": evidence_json,
-        "status": "Pending",
-        "created_at": datetime.utcnow()
-    }
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(insert_sql, params)
-            # Get last insert id (MySQL)
-            last_id_row = conn.execute(text("SELECT LAST_INSERT_ID() AS id")).first()
-            crime_id = last_id_row.id if last_id_row is not None else None
-        logging.info("Crime report inserted with id=%s", crime_id)
-        return {"message": "Crime report submitted successfully", "crime_id": crime_id}
-    except Exception:
-        logging.exception("Failed to submit crime report (DB error)")
-        raise HTTPException(status_code=500, detail="Failed to submit crime report")
-
+# ==================== ROOT ENDPOINT (LANDING PAGE) ====================
 
 @app.get("/")
 async def read_root():
@@ -259,7 +193,6 @@ async def read_root():
     except FileNotFoundError:
         # Fallback to index.html if home.html doesn't exist
         return HTMLResponse(content=_read_html("static/index.html"))
-
 
 # ==================== STATIC PAGE ENDPOINTS ====================
 
@@ -413,95 +346,82 @@ async def get_user_by_id(user_id: int):
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        ext = os.path.splitext(file.filename)[1] or ""
-        safe_name = f"{uuid.uuid4().hex}{ext}"
-        dest_path = os.path.join(UPLOAD_DIR, safe_name)
-        with open(dest_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        file_url = f"/static/uploads/{safe_name}"
-        logging.info("Uploaded file saved: %s", dest_path)
-        return JSONResponse({"filename": safe_name, "file_url": file_url})
-    except Exception:
-        logging.exception("Upload failed")
-        raise HTTPException(status_code=500, detail="File upload failed")
-
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        # Save file
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Return file URL
+        file_url = f"/static/uploads/{unique_filename}"
+        return {"file_url": file_url, "filename": unique_filename}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 # ==================== CRIME DATA ENDPOINTS ====================
 
 @app.post("/api/crimes")
 async def submit_crime_report(crime_data: CrimeData):
-    # Basic validation
-    if not crime_data.location or not crime_data.crime:
-        raise HTTPException(status_code=400, detail="Missing required fields: location or crime")
-
-    # Normalize reporter_id
-    reporter_id_value: Optional[int] = None
-    if crime_data.reporter_id is not None and crime_data.reporter_id != "":
+    with engine.connect() as conn:
         try:
-            reporter_id_value = int(crime_data.reporter_id)
-        except Exception:
-            # keep None if it cannot be parsed
-            reporter_id_value = None
+            # Validate reporter_id: if provided, ensure it exists in appuser; if not, null it
+            reporter_id_val = None
+            if crime_data.reporter_id:
+                try:
+                    # try to coerce to int where possible
+                    maybe_id = int(crime_data.reporter_id)
+                except Exception:
+                    maybe_id = None
 
-    # Parse incident_date
-    incident_dt = None
-    if crime_data.incident_date:
-        try:
-            incident_dt = datetime.fromisoformat(crime_data.incident_date)
-        except Exception:
-            try:
-                incident_dt = datetime.strptime(crime_data.incident_date, "%Y-%m-%dT%H:%M")
-            except Exception:
-                incident_dt = None
+                if maybe_id is not None:
+                    user_row = conn.execute(
+                        text("SELECT user_id FROM appuser WHERE user_id = :uid"),
+                        {"uid": maybe_id}
+                    ).fetchone()
+                    if user_row:
+                        reporter_id_val = maybe_id
+                    else:
+                        # Unknown reporter_id -> treat as anonymous (NULL)
+                        reporter_id_val = None
 
-    # Prepare JSON/text payloads for DB
-    try:
-        location_json = json.dumps(crime_data.location, ensure_ascii=False) if crime_data.location else None
-        crime_json = json.dumps(crime_data.crime, ensure_ascii=False) if crime_data.crime else None
-        victim_json = json.dumps(crime_data.victim, ensure_ascii=False) if crime_data.victim else None
-        criminal_json = json.dumps(crime_data.criminal, ensure_ascii=False) if crime_data.criminal else None
-        weapon_json = json.dumps(crime_data.weapon, ensure_ascii=False) if crime_data.weapon else None
-        witness_json = json.dumps(crime_data.witness, ensure_ascii=False) if crime_data.witness else None
-        evidence_json = json.dumps(crime_data.evidence_files, ensure_ascii=False) if crime_data.evidence_files else None
-    except Exception:
-        logging.exception("Failed to serialize payload")
-        raise HTTPException(status_code=400, detail="Invalid payload format")
-
-    logging.info("Inserting crime report: reporter_id=%s incident_date=%s", reporter_id_value, crime_data.incident_date)
-
-    insert_sql = text("""
-        INSERT INTO crime
-            (reporter_id, incident_date, location_data, crime_data, victim_data, criminal_data, weapon_data, witness_data, evidence_files, status, created_at)
-        VALUES
-            (:reporter_id, :incident_date, :location_data, :crime_data, :victim_data, :criminal_data, :weapon_data, :witness_data, :evidence_files, :status, :created_at)
-    """)
-
-    params = {
-        "reporter_id": reporter_id_value,
-        "incident_date": incident_dt,
-        "location_data": location_json,
-        "crime_data": crime_json,
-        "victim_data": victim_json,
-        "criminal_data": criminal_json,
-        "weapon_data": weapon_json,
-        "witness_data": witness_json,
-        "evidence_files": evidence_json,
-        "status": "Pending",
-        "created_at": datetime.utcnow()
-    }
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(insert_sql, params)
-            # Get last insert id (MySQL)
-            last_id_row = conn.execute(text("SELECT LAST_INSERT_ID() AS id")).first()
-            crime_id = last_id_row.id if last_id_row is not None else None
-        logging.info("Crime report inserted with id=%s", crime_id)
-        return {"message": "Crime report submitted successfully", "crime_id": crime_id}
-    except Exception:
-        logging.exception("Failed to submit crime report (DB error)")
-        raise HTTPException(status_code=500, detail="Failed to submit crime report")
-
+            # Insert into crime table
+            result = conn.execute(
+                text("""
+                    INSERT INTO crime (reporter_id, incident_date, location_data, crime_data, victim_data, criminal_data, 
+                                     weapon_data, witness_data, evidence_files, status, created_at)
+                    VALUES (:reporter_id, :incident_date, :location_data, :crime_data, :victim_data, :criminal_data, 
+                            :weapon_data, :witness_data, :evidence_files, :status, :created_at)
+                """),
+                {
+                    "reporter_id": reporter_id_val,
+                    "incident_date": crime_data.incident_date,
+                    "location_data": json.dumps(crime_data.location),
+                    "crime_data": json.dumps(crime_data.crime),
+                    "victim_data": json.dumps(crime_data.victim) if crime_data.victim else None,
+                    "criminal_data": json.dumps(crime_data.criminal) if crime_data.criminal else None,
+                    "weapon_data": json.dumps(crime_data.weapon) if crime_data.weapon else None,
+                    "witness_data": json.dumps(crime_data.witness) if crime_data.witness else None,
+                    "evidence_files": json.dumps(crime_data.evidence_files) if crime_data.evidence_files else None,
+                    "status": "Pending",
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            crime_id = result.lastrowid
+            print(f"Crime report submitted with ID: {crime_id}")
+            return {"message": "Crime report submitted successfully", "crime_id": crime_id}
+        except IntegrityError as ie:
+            conn.rollback()
+            # Return a 400 with a clear message about referential integrity
+            raise HTTPException(status_code=400, detail=f"Failed to submit crime report due to integrity error: {str(ie)}")
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to submit crime report: {str(e)}")
 
 @app.get("/api/crimes")
 async def get_all_crimes(
@@ -572,80 +492,36 @@ async def get_crime_by_id(crime_id: int):
 # ==================== MISSING PERSON ENDPOINTS ====================
 
 @app.post("/api/missing-persons")
-async def submit_missing_person_report(payload: Dict[str, Any] = Body(...)):
-    """
-    Accept flexible JSON payloads from the frontend (accepts 'name' or 'full_name' etc.)
-    and insert a row into missing_person. Creates table if it doesn't exist.
-    """
-    # Resolve name (support multiple frontend key names)
-    name = payload.get("name") or payload.get("full_name") or payload.get("fullName")
-    if not name:
-        raise HTTPException(status_code=400, detail="Missing required field: name/full_name")
-
-    def to_int(v):
+async def submit_missing_person_report(missing_person: MissingPersonData):
+    with engine.connect() as conn:
         try:
-            return int(v) if v not in (None, "") else None
-        except Exception:
-            return None
-
-    def parse_datetime(v):
-        try:
-            return datetime.fromisoformat(v) if v else None
-        except Exception:
-            try:
-                return datetime.strptime(v, "%Y-%m-%dT%H:%M")
-            except Exception:
-                return None
-
-    # Map payload keys to DB columns (best-effort)
-    params = {
-        "name": name,
-        "age": to_int(payload.get("age") or payload.get("age_years")),
-        "gender": payload.get("gender") or payload.get("sex"),
-        "description": payload.get("description") or payload.get("clothing") or payload.get("appearance"),
-        "last_seen_location": payload.get("last_seen_location") or payload.get("location") or payload.get("last_seen_place"),
-        "last_seen_date": parse_datetime(payload.get("last_seen_time") or payload.get("last_seen_date")),
-        "contact_info": payload.get("contact_info") or payload.get("reporter_phone") or payload.get("reporter_contact"),
-        "photo_url": payload.get("photo_url") or payload.get("photo_url_path") or payload.get("photo"),
-        "status": payload.get("status") or "Missing",
-        "created_at": datetime.utcnow()
-    }
-
-    create_sql = text("""
-    CREATE TABLE IF NOT EXISTS missing_person (
-      missing_id INT AUTO_INCREMENT PRIMARY KEY,
-      name TEXT,
-      age INT NULL,
-      gender VARCHAR(32) NULL,
-      description TEXT,
-      last_seen_location TEXT,
-      last_seen_date DATETIME NULL,
-      contact_info TEXT,
-      photo_url TEXT,
-      status VARCHAR(64) DEFAULT 'Missing',
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """)
-
-    insert_sql = text("""
-      INSERT INTO missing_person
-        (name, age, gender, description, last_seen_location, last_seen_date, contact_info, photo_url, status, created_at)
-      VALUES
-        (:name, :age, :gender, :description, :last_seen_location, :last_seen_date, :contact_info, :photo_url, :status, :created_at)
-    """)
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(create_sql)
-            conn.execute(insert_sql, params)
-            last = conn.execute(text("SELECT LAST_INSERT_ID() AS id")).first()
-            new_id = last.id if last is not None else None
-        logging.info("Missing person inserted id=%s name=%s", new_id, params["name"])
-        return {"message": "Missing person report created", "id": new_id}
-    except Exception:
-        logging.exception("Failed to insert missing person")
-        raise HTTPException(status_code=500, detail="Failed to save missing person")
+            result = conn.execute(
+                text("""
+                    INSERT INTO missing_person (name, age, gender, description, last_seen_location, 
+                                              last_seen_date, contact_info, photo_url, status, created_at)
+                    VALUES (:name, :age, :gender, :description, :last_seen_location, 
+                            :last_seen_date, :contact_info, :photo_url, :status, :created_at)
+                """),
+                {
+                    "name": missing_person.name,
+                    "age": missing_person.age,
+                    "gender": missing_person.gender,
+                    "description": missing_person.description,
+                    "last_seen_location": missing_person.last_seen_location,
+                    "last_seen_date": missing_person.last_seen_date,
+                    "contact_info": missing_person.contact_info,
+                    "photo_url": missing_person.photo_url,
+                    "status": "Missing",
+                    "created_at": datetime.utcnow()
+                }
+            )
+            conn.commit()
+            missing_id = result.lastrowid
+            print(f"Missing person report submitted with ID: {missing_id}")
+            return {"message": "Missing person report submitted successfully", "missing_id": missing_id}
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to submit missing person report: {str(e)}")
 
 @app.get("/api/missing-persons")
 async def get_all_missing_persons(

@@ -154,15 +154,15 @@
           </div>
         </div>
         <div class="mt-3">
-          <label class="block mb-1">Photo Upload</label>
-          <input type="file" name="photo_file" accept="image/*" class="w-full text-sm text-gray-300">
+          <label class="block mb-1">Photo / Evidence Upload (you can attach multiple)</label>
+          <input type="file" name="photo_files" id="photo_files" accept="image/*,video/*,application/pdf" multiple class="w-full text-sm text-gray-300">
         </div>
       </div>
 
       <!-- Last Seen -->
       <div>
         <h2 class="text-xl font-semibold mb-3">Last Seen</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block mb-1">Time & Date</label>
             <input type="datetime-local" name="last_seen_time" class="w-full px-3 py-2 bg-slate-900 rounded text-white">
@@ -236,16 +236,21 @@
   const API_BASE = 'http://localhost:8000'; // change if backend runs on different host/port
 
   async function uploadFileIfPresent(fileInput) {
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
-    const form = new FormData();
-    form.append('file', fileInput.files[0]);
-    const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
-    if (!res.ok) {
-      const txt = await res.text().catch(()=>res.statusText);
-      throw new Error('Upload failed: ' + txt);
+    // Upload multiple files and return array of { filename, url }
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return [];
+    const uploaded = [];
+    for (const file of fileInput.files) {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+      if (!res.ok) {
+        const txt = await res.text().catch(()=>res.statusText);
+        throw new Error('Upload failed: ' + txt);
+      }
+      const data = await res.json();
+      uploaded.push({ filename: data.filename || file.name, url: data.file_url || null });
     }
-    const data = await res.json();
-    return data.file_url || null;
+    return uploaded;
   }
 
   document.getElementById("reportForm").addEventListener("submit", async function(e){
@@ -256,14 +261,14 @@
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
       // collect fields by name
-      const full_name = (document.querySelector('input[name="full_name"]')||{}).value || null;
+      const full_name = (document.querySelector('input[name="full_name"]')||{}).value || '';
       const nickname = (document.querySelector('input[name="nickname"]')||{}).value || null;
       const hometown = (document.querySelector('input[name="hometown"]')||{}).value || null;
       const age = (document.querySelector('input[name="age"]')||{}).value || null;
       const weight = (document.querySelector('input[name="weight"]')||{}).value || null;
       const hair_color = (document.querySelector('input[name="hair_color"]')||{}).value || null;
-      const photo_input = document.querySelector('input[name="photo_file"]');
-      const last_seen_time = (document.querySelector('input[name="last_seen_time"]')||{}).value || null;
+      const photo_input = document.querySelector('input[name="photo_files"]');
+      const last_seen_time = (document.querySelector('input[name="last_seen_time"]')||{}).value || '';
       const last_seen_location = (document.querySelector('input[name="last_seen_location"], #location')||{}).value || null;
       const description = (document.querySelector('textarea[name="description"]')||{}).value || null;
       const medical_needs = (document.querySelector('textarea[name="medical_needs"]')||{}).value || null;
@@ -272,25 +277,73 @@
       const reporter_email = (document.querySelector('input[name="reporter_email"]')||{}).value || null;
       const reporter_relation = (document.querySelector('input[name="reporter_relation"]')||{}).value || null;
 
-      // upload photo if present
-      let photo_url = null;
-      try { photo_url = await uploadFileIfPresent(photo_input); } catch (uploadErr) {
-        console.error('Photo upload failed', uploadErr);
-        alert('Photo upload failed: ' + uploadErr.message);
+      // client-side validation: require name and last_seen_time
+      if (!full_name.trim()) {
+        alert('Please enter the missing person\'s full name.');
+        document.querySelector('input[name="full_name"]').focus();
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
+        return;
+      }
+      if (!last_seen_time) {
+        alert('Please provide the last seen date and time.');
+        document.querySelector('input[name="last_seen_time"]').focus();
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
         return;
       }
 
-      // build payload
+      // Normalize reporter phone to digits and a basic E.164-like format for common BD numbers
+      function normalizePhone(phone) {
+        if (!phone) return null;
+        const digits = phone.replace(/[^0-9+]/g, '');
+        // if starts with +, keep it; if starts with 880, prefix +; if starts with 0, assume country 88 (Bangladesh) -> +88...
+        if (digits.startsWith('+')) return digits;
+        if (digits.startsWith('880')) return '+' + digits;
+        if (digits.startsWith('0')) return '+88' + digits.substring(1);
+        // fallback: return digits as-is
+        return digits;
+      }
+
+      const normalized_reporter_phone = normalizePhone(reporter_phone);
+
+
+      // upload files (photo_files) if present - returns array of {filename, url}
+      let uploadedFiles = [];
+      try {
+        uploadedFiles = await uploadFileIfPresent(photo_input);
+      } catch (uploadErr) {
+        console.error('File upload failed', uploadErr);
+        alert('File upload failed: ' + uploadErr.message);
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
+        return;
+      }
+
+      // set photo_url to the first uploaded file (if any) and evidence_files to all uploaded
+      const photo_url = uploadedFiles.length > 0 ? uploadedFiles[0].url : null;
+      const evidence_files = uploadedFiles.length > 0 ? uploadedFiles : [];
+
+      // build contact_info object
+      const contact_info = {
+        name: reporter_name || null,
+        phone: normalized_reporter_phone || null,
+        email: reporter_email || null,
+        relation: reporter_relation || null
+      };
+
+      // build payload and include contact_info, photo_url, evidence_files
       const payload = {
-        full_name, nickname, hometown,
+        name: full_name,
+        nickname,
+        hometown,
         age: age ? Number(age) : null,
         weight: weight ? Number(weight) : null,
-        hair_color, photo_url,
-        last_seen_time: last_seen_time || null,
+        hair_color,
+        photo_url,
+        evidence_files,
         last_seen_location: last_seen_location || null,
-        description, medical_needs,
-        reporter_name, reporter_phone, reporter_email, reporter_relation
+        last_seen_date: last_seen_time || null,
+        description,
+        medical_needs,
+        contact_info
       };
 
       const resp = await fetch(`${API_BASE}/api/missing-persons`, {
@@ -308,7 +361,7 @@
       }
 
       const data = await resp.json().catch(()=>null);
-      alert('✅ Report submitted successfully. ID: ' + (data && data.id ? data.id : 'n/a'));
+      alert('✅ Report submitted successfully. ID: ' + (data && (data.missing_id || data.missingId || data.id) ? (data.missing_id||data.missingId||data.id) : 'n/a'));
       e.target.reset();
 
     } catch (err) {
