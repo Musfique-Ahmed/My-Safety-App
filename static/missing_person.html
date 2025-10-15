@@ -145,7 +145,92 @@
 
 lucide.createIcons();
 
-let missingData = [];
+let missingData = [
+  {
+    id: 1,
+    name: "Nahiyan",
+    nickname: null,
+    photo_url: "contents/nahiyan.jpg",
+    hometown: "Mirpur, Dhaka",
+    last_seen_location: "Mirpur-10 Market",
+    last_seen_time: "2025-10-10T14:30:00",
+    description: "Wearing a blue shirt and black jeans. Small scar on left eyebrow.",
+    still_with_finder: false,
+    age: 29,
+    weight_kg: 68,
+    hair_color: "Black"
+  },
+  {
+    id: 2,
+    name: "Maysha Alam",
+    nickname: null,
+    photo_url: "contents/maysha.jpg",
+    hometown: "Banani, Dhaka",
+    last_seen_location: "Banani flyover",
+    last_seen_time: "2025-10-08T20:15:00",
+    description: "Light green salwar, carries a brown sling bag.",
+    still_with_finder: false,
+    age: 24,
+    weight_kg: 55,
+    hair_color: "Brown"
+  },
+  {
+    id: 3,
+    name: "Sayma Talukdar",
+    nickname: "Rupa",
+    photo_url: "contents/sayma.jpg",
+    hometown: "Chattogram",
+    last_seen_location: "Patenga Beach",
+    last_seen_time: "2025-09-30T09:00:00",
+    description: "Wearing a white kurta and sandals, limps on right leg.",
+    still_with_finder: false,
+    age: 41,
+    weight_kg: 76,
+    hair_color: "Black"
+  },
+  {
+    id: 4,
+    name: "Tasfiya Binte Karim",
+    nickname: "Tasu",
+    photo_url: "contents/tasfiya.jpg",
+    hometown: "Rajshahi",
+    last_seen_location: "Boalia Bus Stand",
+    last_seen_time: "2025-10-05T11:20:00",
+    description: "Short haircut, wears glasses, often uses a pink backpack.",
+    still_with_finder: false,
+    age: 26,
+    weight_kg: 52,
+    hair_color: "Black"
+  },
+  {
+    id: 5,
+    name: "Shoyeb Rohan",
+    nickname: null,
+    photo_url: "contents/rohan.jpg",
+    hometown: "Khulna",
+    last_seen_location: "Khalishpur Market",
+    last_seen_time: "2025-10-09T22:05:00",
+    description: "Tall, broad-shouldered; wearing dark jacket.",
+    still_with_finder: false,
+    age: 5,
+    weight_kg: 15,
+    hair_color: "Grey"
+  }
+  {
+    id: 6,
+    name: "Azmain Islam",
+    nickname: "Roza",
+    photo_url: "contents/azmain.jpg",
+    hometown: "Khulna",
+    last_seen_location: "Khalishpur Market",
+    last_seen_time: "2025-10-09T22:05:00",
+    description: "Tall, broad-shouldered; wearing dark jacket.",
+    still_with_finder: false,
+    age: 45,
+    weight_kg: 85,
+    hair_color: "Grey"
+  }
+];
 
 async function loadMissingPersons() {
     try {

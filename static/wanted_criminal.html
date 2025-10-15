@@ -187,7 +187,86 @@
 <script>
 "use strict";
 // Data (with age, height_cm, complexion)
-let wantedData = [];
+let wantedData = [
+  {
+    id: 1,
+    name: "Kopa Anas",
+    photo_url: "contents/anas.png",
+    last_seen_location: "Mirpur, Dhaka",
+    last_seen_time: "2025-10-10T14:30:00",
+    crimes: ["Eveteasing"],
+    reward: 50000,
+    age: 34,
+    height_cm: 175,
+    complexion: "Medium",
+    note: "Armed; approach with caution."
+  },
+  {
+    id: 2,
+    name: "Kallu Jamme",
+    photo_url: "contents/jami.jpg",
+    last_seen_location: "Banani, Dhaka",
+    last_seen_time: "2025-10-08T20:15:00",
+    crimes: ["Fraud/Scam", "Extortion"],
+    reward: 20000,
+    age: 29,
+    height_cm: 160,
+    complexion: "Fair",
+    note: "Known to use forged documents."
+  },
+  {
+    id: 3,
+    name: "Rog kata Rishi",
+    photo_url: "contents/rishi.jpg",
+    last_seen_location: "Chattogram - Patenga",
+    last_seen_time: "2025-09-30T09:00:00",
+    crimes: ["Assault", "Vandalism"],
+    reward: 15000,
+    age: 41,
+    height_cm: 168,
+    complexion: "Dark",
+    note: "Often in groups; may carry blunt objects."
+  },
+  {
+    id: 4,
+    name: "Jongi Jabir",
+    photo_url: "contents/jabir.jpg",
+    last_seen_location: "Sylhet - Zindabazar",
+    last_seen_time: "2025-10-01T18:45:00",
+    crimes: ["Burglary"],
+    reward: 10000,
+    age: 38,
+    height_cm: 172,
+    complexion: "Medium",
+    note: "Uses motorcycle for escape."
+  },
+  {
+    id: 5,
+    name: "Sutta Sahran",
+    photo_url: "contents/sahran.jpg",
+    last_seen_location: "Rajshahi - Boalia",
+    last_seen_time: "2025-10-05T11:20:00",
+    crimes: ["Cyber Crime"],
+    reward: 30000,
+    age: 26,
+    height_cm: 158,
+    complexion: "Fair",
+    note: "Targets online marketplaces."
+  },
+  {
+    id: 6,
+    name: "Taleban Tushin",
+    photo_url: "contents/tushin.jpg",
+    last_seen_location: "Khulna - Khalishpur",
+    last_seen_time: "2025-10-09T22:05:00",
+    crimes: ["Homicide"],
+    reward: 100000,
+    age: 45,
+    height_cm: 180,
+    complexion: "Dark",
+    note: "Highly dangerous. Do not approach."
+  }
+];
 
 async function loadWantedCriminals() {
     try {

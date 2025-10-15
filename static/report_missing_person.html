@@ -233,144 +233,89 @@
     } else { alert("Geolocation not supported."); }
   }
 
-  const API_BASE = 'http://localhost:8000'; // change if backend runs on different host/port
+  // Point frontend to your backend (change if your backend uses another host/port)
+  const API_BASE = 'http://localhost:8000';
 
   async function uploadFileIfPresent(fileInput) {
-    // Upload multiple files and return array of { filename, url }
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return [];
-    const uploaded = [];
-    for (const file of fileInput.files) {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
-      if (!res.ok) {
-        const txt = await res.text().catch(()=>res.statusText);
-        throw new Error('Upload failed: ' + txt);
-      }
-      const data = await res.json();
-      uploaded.push({ filename: data.filename || file.name, url: data.file_url || null });
-    }
-    return uploaded;
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
+    const form = new FormData();
+    form.append('file', fileInput.files[0]);
+    const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+    const raw = await res.text().catch(()=>res.statusText);
+    if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText} — ${raw}`);
+    try { return JSON.parse(raw).file_url || JSON.parse(raw).url || null; } catch { return raw; }
   }
 
-  document.getElementById("reportForm").addEventListener("submit", async function(e){
-    e.preventDefault();
-    const submitBtn = e.submitter || null;
+  // Debug-friendly submit handler
+  (function () {
+    const form = document.getElementById('reportForm');
+    if (!form) { console.warn('reportForm not found'); return; }
 
-    try {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = e.submitter || form.querySelector('button[type="submit"]') || null;
+      const origText = submitBtn ? submitBtn.textContent : null;
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
-      // collect fields by name
-      const full_name = (document.querySelector('input[name="full_name"]')||{}).value || '';
-      const nickname = (document.querySelector('input[name="nickname"]')||{}).value || null;
-      const hometown = (document.querySelector('input[name="hometown"]')||{}).value || null;
-      const age = (document.querySelector('input[name="age"]')||{}).value || null;
-      const weight = (document.querySelector('input[name="weight"]')||{}).value || null;
-      const hair_color = (document.querySelector('input[name="hair_color"]')||{}).value || null;
-      const photo_input = document.querySelector('input[name="photo_files"]');
-      const last_seen_time = (document.querySelector('input[name="last_seen_time"]')||{}).value || '';
-      const last_seen_location = (document.querySelector('input[name="last_seen_location"], #location')||{}).value || null;
-      const description = (document.querySelector('textarea[name="description"]')||{}).value || null;
-      const medical_needs = (document.querySelector('textarea[name="medical_needs"]')||{}).value || null;
-      const reporter_name = (document.querySelector('input[name="reporter_name"]')||{}).value || null;
-      const reporter_phone = (document.querySelector('input[name="reporter_phone"]')||{}).value || null;
-      const reporter_email = (document.querySelector('input[name="reporter_email"]')||{}).value || null;
-      const reporter_relation = (document.querySelector('input[name="reporter_relation"]')||{}).value || null;
-
-      // client-side validation: require name and last_seen_time
-      if (!full_name.trim()) {
-        alert('Please enter the missing person\'s full name.');
-        document.querySelector('input[name="full_name"]').focus();
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
-        return;
-      }
-      if (!last_seen_time) {
-        alert('Please provide the last seen date and time.');
-        document.querySelector('input[name="last_seen_time"]').focus();
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
-        return;
-      }
-
-      // Normalize reporter phone to digits and a basic E.164-like format for common BD numbers
-      function normalizePhone(phone) {
-        if (!phone) return null;
-        const digits = phone.replace(/[^0-9+]/g, '');
-        // if starts with +, keep it; if starts with 880, prefix +; if starts with 0, assume country 88 (Bangladesh) -> +88...
-        if (digits.startsWith('+')) return digits;
-        if (digits.startsWith('880')) return '+' + digits;
-        if (digits.startsWith('0')) return '+88' + digits.substring(1);
-        // fallback: return digits as-is
-        return digits;
-      }
-
-      const normalized_reporter_phone = normalizePhone(reporter_phone);
-
-
-      // upload files (photo_files) if present - returns array of {filename, url}
-      let uploadedFiles = [];
       try {
-        uploadedFiles = await uploadFileIfPresent(photo_input);
-      } catch (uploadErr) {
-        console.error('File upload failed', uploadErr);
-        alert('File upload failed: ' + uploadErr.message);
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
-        return;
+        // Collect fields (adapt selectors if your inputs use different IDs/names)
+        const get = sel => (document.querySelector(sel) || {}).value || null;
+        const payload = {
+          full_name: get('input[name="full_name"]') || get('#full_name'),
+          nickname: get('input[name="nickname"]'),
+          hometown: get('input[name="hometown"]'),
+          age: get('input[name="age"]'),
+          weight: get('input[name="weight"]'),
+          hair_color: get('input[name="hair_color"]'),
+          photo_url: null,
+          last_seen_time: get('input[name="last_seen_time"]'),
+          last_seen_location: get('input[name="last_seen_location"], #location'),
+          description: (document.querySelector('textarea[name="description"]')||{}).value || null,
+          medical_needs: (document.querySelector('textarea[name="medical_needs"]')||{}).value || null,
+          reporter_name: get('input[name="reporter_name"]'),
+          reporter_phone: get('input[name="reporter_phone"]'),
+          reporter_email: get('input[name="reporter_email"]'),
+          reporter_relation: get('input[name="reporter_relation"]')
+        };
+
+        // upload photo if present
+        const photoInput = document.querySelector('input[type="file"][name="photo_file"], input[type="file"]#photo_file');
+        if (photoInput && photoInput.files && photoInput.files.length) {
+          payload.photo_url = await uploadFileIfPresent(photoInput);
+          console.info('Uploaded photo ->', payload.photo_url);
+        }
+
+        console.info('Sending payload to', `${API_BASE}/api/missing-persons`, payload);
+        const res = await fetch(`${API_BASE}/api/missing-persons`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const rawBody = await res.text().catch(()=> '');
+        let parsed = null;
+        try { parsed = rawBody ? JSON.parse(rawBody) : null; } catch (err) { parsed = null; }
+
+        if (!res.ok) {
+          // Show full server response and status for debugging
+          const serverMsg = parsed?.detail || parsed?.message || rawBody || res.statusText;
+          console.error('Submit failed', res.status, res.statusText, parsed || rawBody);
+          alert(`Failed to submit: ${res.status} ${res.statusText}\n\n${serverMsg}`);
+          return;
+        }
+
+        console.info('Submit success', parsed || rawBody);
+        alert('Report submitted successfully:\n' + (parsed ? JSON.stringify(parsed, null, 2) : rawBody || 'OK'));
+        form.reset();
+
+      } catch (err) {
+        console.error('Submission error', err);
+        alert('Submission error: ' + (err.message || String(err)));
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
       }
-
-      // set photo_url to the first uploaded file (if any) and evidence_files to all uploaded
-      const photo_url = uploadedFiles.length > 0 ? uploadedFiles[0].url : null;
-      const evidence_files = uploadedFiles.length > 0 ? uploadedFiles : [];
-
-      // build contact_info object
-      const contact_info = {
-        name: reporter_name || null,
-        phone: normalized_reporter_phone || null,
-        email: reporter_email || null,
-        relation: reporter_relation || null
-      };
-
-      // build payload and include contact_info, photo_url, evidence_files
-      const payload = {
-        name: full_name,
-        nickname,
-        hometown,
-        age: age ? Number(age) : null,
-        weight: weight ? Number(weight) : null,
-        hair_color,
-        photo_url,
-        evidence_files,
-        last_seen_location: last_seen_location || null,
-        last_seen_date: last_seen_time || null,
-        description,
-        medical_needs,
-        contact_info
-      };
-
-      const resp = await fetch(`${API_BASE}/api/missing-persons`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!resp.ok) {
-        let body = '';
-        try { body = await resp.json(); } catch { body = await resp.text().catch(()=>resp.statusText); }
-        console.error('Submit failed', resp.status, body);
-        alert('Failed to submit: ' + (body.detail || JSON.stringify(body)));
-        return;
-      }
-
-      const data = await resp.json().catch(()=>null);
-      alert('✅ Report submitted successfully. ID: ' + (data && (data.missing_id || data.missingId || data.id) ? (data.missing_id||data.missingId||data.id) : 'n/a'));
-      e.target.reset();
-
-    } catch (err) {
-      console.error('Submission error', err);
-      alert('Submission error: ' + (err.message || err));
-    } finally {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report'; }
-    }
-  });
+    });
+  })();
 
 // --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
 const reportDropdownMenu = document.getElementById('report-dropdown-menu');
