@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
     body {font-family: 'Inter', sans-serif;}
@@ -226,11 +227,41 @@
   themeToggle.addEventListener("click",()=>{document.documentElement.classList.toggle("dark"); lucide.createIcons();});
 
   function useMyLocation(){
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(pos=>{
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
         document.getElementById("location").value = pos.coords.latitude.toFixed(6)+", "+pos.coords.longitude.toFixed(6);
-      },err=> alert("Location access denied or unavailable."));
-    } else { alert("Geolocation not supported."); }
+      }, (err) => {
+        let message = "Location access denied or unavailable.";
+        if (err && typeof err.code === "number") {
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              message = "Location access was denied. Please allow access and try again.";
+              break;
+            case err.POSITION_UNAVAILABLE:
+              message = "Location information is unavailable right now.";
+              break;
+            case err.TIMEOUT:
+              message = "Fetching location timed out. Please try again.";
+              break;
+            default:
+              message = "Unable to retrieve location.";
+          }
+        }
+        Swal.fire({
+          icon: 'error',
+          title: 'Location Error',
+          text: message,
+          confirmButtonColor: '#EF4444'
+        });
+      });
+    } else {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Unsupported Feature',
+        text: 'Geolocation is not supported by this browser.',
+        confirmButtonColor: '#F59E0B'
+      });
+    }
   }
 
   // Point frontend to your backend (change if your backend uses another host/port)
@@ -300,17 +331,32 @@
           // Show full server response and status for debugging
           const serverMsg = parsed?.detail || parsed?.message || rawBody || res.statusText;
           console.error('Submit failed', res.status, res.statusText, parsed || rawBody);
-          alert(`Failed to submit: ${res.status} ${res.statusText}\n\n${serverMsg}`);
+          await Swal.fire({
+            icon: 'error',
+            title: 'Submission Failed',
+            text: `Failed to submit: ${res.status} ${res.statusText}. ${serverMsg || ''}`.trim(),
+            confirmButtonColor: '#EF4444'
+          });
           return;
         }
 
         console.info('Submit success', parsed || rawBody);
-        alert('Report submitted successfully:\n' + (parsed ? JSON.stringify(parsed, null, 2) : rawBody || 'OK'));
+        await Swal.fire({
+          icon: 'success',
+          title: 'Report Submitted',
+          text: parsed?.message || 'Your missing person report has been submitted successfully.',
+          confirmButtonColor: '#10B981'
+        });
         form.reset();
 
       } catch (err) {
         console.error('Submission error', err);
-        alert('Submission error: ' + (err.message || String(err)));
+        await Swal.fire({
+          icon: 'error',
+          title: 'Unexpected Error',
+          text: 'Submission error: ' + (err.message || String(err)),
+          confirmButtonColor: '#EF4444'
+        });
       } finally {
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
       }

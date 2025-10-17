@@ -6,6 +6,7 @@
     <title>My Safety - Report Crime</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -673,8 +674,13 @@
 
       // Prevent accidental submits from "Add New Crime" tab
       const suspectSection = document.getElementById('suspect-info-content');
-      if (suspectSection && suspectSection.classList.contains('hidden')) {
-        alert('Please complete the Crime Details step before submitting.');
+            if (suspectSection && suspectSection.classList.contains('hidden')) {
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'Complete Crime Details',
+                    text: 'Please finish the crime information before submitting the report.',
+                    confirmButtonColor: '#3B82F6'
+                });
         return;
       }
 
@@ -760,14 +766,25 @@
         let data = null;
         try { data = await res.json(); } catch (e) { data = null; }
         if (submitBtn) submitBtn.textContent = 'Submitted ✓';
-        console.info('Report created', data);
+                console.info('Report created', data);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Report Submitted',
+                    text: (data && data.message) ? data.message : 'Your crime report has been submitted successfully.',
+                    confirmButtonColor: '#3B82F6'
+                });
         setTimeout(() => {
           if (submitBtn) { submitBtn.textContent = origText; submitBtn.disabled = false; }
         }, 2500);
 
       } catch (err) {
         console.error('Submission error:', err);
-        alert('Failed to submit report: ' + (err.message || String(err)));
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Submission Failed',
+                    text: 'Failed to submit report: ' + (err.message || String(err)),
+                    confirmButtonColor: '#EF4444'
+                });
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
       }
     });

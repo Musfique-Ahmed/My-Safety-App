@@ -1,0 +1,2 @@
+- [x] Integrate SweetAlert2 into report crime submission flow
+- [x] Integrate SweetAlert2 into missing person submission flow
