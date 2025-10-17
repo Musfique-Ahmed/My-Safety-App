@@ -1,2 +1,4 @@
 - [x] Integrate SweetAlert2 into report crime submission flow
 - [x] Integrate SweetAlert2 into missing person submission flow
+- [x] Integrate SweetAlert2 alerts in missing_person listing page (modal/panic)
+- [x] Integrate SweetAlert2 notification flow in wanted criminal sighting modal

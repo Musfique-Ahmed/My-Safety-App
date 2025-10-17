@@ -154,6 +154,17 @@ let missingData = [];
 
 const $ = (sel) => document.querySelector(sel);
 
+const escapeHtml = (str) => String(str).replace(/[&<>"'`=\/]/g, (char) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+  '`': '&#96;',
+  '=': '&#61;',
+  '/': '&#47;'
+}[char] || char));
+
 const fmt = (value) => {
   if (!value) return "Unknown";
   const date = typeof value === "string" ? new Date(value) : value;
@@ -347,25 +358,49 @@ const openModal = (item) => {
     }
   });
 
-  $("#toggleFinderBtn").onclick = () => {
-    const ok = confirm("Is this person still with you?");
-    if (!ok) return;
+  $("#toggleFinderBtn").onclick = async () => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: 'Is the person with you?',
+      text: 'Confirm if this missing person is still with you.',
+      showCancelButton: true,
+      confirmButtonText: 'Yes',
+      cancelButtonText: 'No',
+      confirmButtonColor: '#10B981',
+      cancelButtonColor: '#6B7280'
+    });
+    if (!result.isConfirmed) return;
     item.still_with_finder = !item.still_with_finder;
     render();
-    alert("✔ Status updated: Still with finder");
+    await Swal.fire({
+      icon: 'success',
+      title: 'Status Updated',
+      text: 'Marked as still with the finder.',
+      confirmButtonColor: '#10B981'
+    });
   };
 
-  $("#submitFound").onclick = () => {
+  $("#submitFound").onclick = async () => {
     const location = $("#foundLocation").value.trim();
     const name = $("#finderName").value.trim();
     const phone = $("#finderPhone").value.trim();
     const email = $("#finderEmail").value.trim();
     if (!location) {
-      alert("Please add a location or enable GPS.");
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Location Required',
+        text: 'Please add a location or enable GPS before submitting.',
+        confirmButtonColor: '#F59E0B'
+      });
       return;
     }
     if (!name || !phone) {
-      alert("Please add your name and phone number.");
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Contact Details Needed',
+        text: 'Please provide your name and phone number.',
+        confirmButtonColor: '#F59E0B'
+      });
       return;
     }
     const payload = {
@@ -376,7 +411,13 @@ const openModal = (item) => {
       finder_email: email || null,
       found_time: new Date().toISOString()
     };
-    alert("📣 Report submitted:\n\n" + JSON.stringify(payload, null, 2));
+    console.info('Finder report payload', payload);
+    await Swal.fire({
+      icon: 'success',
+      title: 'Report Submitted',
+      text: 'Thank you for reporting. A team member will reach out if more information is needed.',
+      confirmButtonColor: '#10B981'
+    });
     closeModal();
   };
 };
@@ -455,8 +496,13 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 });
 
 // Panic button functionality
-document.getElementById('panic-btn').addEventListener('click', () => {
-    alert('🚨 PANIC ALERT SENT! Emergency services have been notified.');
+document.getElementById('panic-btn').addEventListener('click', async () => {
+  await Swal.fire({
+    icon: 'warning',
+    title: 'Panic Alert Sent',
+    text: 'Emergency services have been notified.',
+    confirmButtonColor: '#EF4444'
+  });
 });
 // --- END USER MENU DROPDOWN LOGIC ---
 

@@ -8,6 +8,7 @@
   <!-- Tailwind + Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -350,10 +351,70 @@ function openModal(item){
       last_seen_location: $("#seen_location").value,
       still_with_finder: $("#still_with_finder").checked
     };
-    alert("🚓 Notification sent to police with your sighting.\n\n" + JSON.stringify(payload,null,2));
-    closeModal();
+    console.info('Criminal sighting payload', payload);
+    Swal.fire({
+      icon: 'success',
+      title: 'Notification Sent',
+      text: 'Thanks for reporting. Police have been notified of the sighting.',
+      confirmButtonColor: '#3B82F6'
+    }).then(() => closeModal());
   };
 }
+
+async function fillWithGeo(inputEl) {
+  if (!inputEl) return;
+  if (!('geolocation' in navigator)) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Unsupported Feature',
+      text: 'Geolocation is not available in this browser.',
+      confirmButtonColor: '#F59E0B'
+    });
+    return;
+  }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    });
+    const { latitude, longitude } = position.coords;
+    inputEl.value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    await Swal.fire({
+      icon: 'success',
+      title: 'Location Added',
+      text: 'We filled in your current coordinates.',
+      confirmButtonColor: '#10B981'
+    });
+  } catch (error) {
+    let message = 'Unable to retrieve your location.';
+    if (error && typeof error.code === 'number') {
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message = 'Location permission was denied. Please allow access and try again.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          message = 'Location information is unavailable right now.';
+          break;
+        case error.TIMEOUT:
+          message = 'The request to get location timed out. Please try again.';
+          break;
+        default:
+          message = 'An unexpected error occurred while fetching location.';
+      }
+    }
+    await Swal.fire({
+      icon: 'error',
+      title: 'Location Error',
+      text: message,
+      confirmButtonColor: '#EF4444'
+    });
+  }
+}
+
 function closeModal(){ $("#backdrop").classList.add("hidden"); }
 $("#closeModal").addEventListener("click", closeModal);
 $("#backdrop").addEventListener("click", e=>{ if(e.target.id==="backdrop") closeModal(); });
