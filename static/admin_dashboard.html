@@ -558,11 +558,22 @@
         color: var(--text-primary);
     }
 
-    .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-    }
+  .modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .modal-buttons.stacked {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-buttons.stacked .btn {
+    width: 100%;
+    justify-content: center;
+  }
 
     /* Adjust button styles for modal */
     .modal-buttons .btn {
@@ -1190,11 +1201,19 @@
     const modalOverlay = document.getElementById('custom-modal-overlay');
     const modalMessage = document.getElementById('modal-message');
     const modalButtons = document.getElementById('modal-buttons');
+    const adminUsersCache = new Map();
+    const ROLE_ACTIONS = [
+      { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
+      { value: 'Admin', label: 'Make Admin', className: 'btn btn-primary' },
+      { value: 'Detective', label: 'Make Detective', className: 'btn btn-secondary' },
+      { value: 'Officer', label: 'Make Officer', className: 'btn btn-secondary' },
+      { value: 'User', label: 'Demote to User', className: 'btn btn-danger' }
+    ];
 
-    function closeModal(event) {
-        if (event && event.target !== modalOverlay) {
-            return;
-        }
+  function closeModal(event) {
+    if (event && event.currentTarget === modalOverlay && event.target !== modalOverlay) {
+      return;
+    }
         modalOverlay.classList.remove('show');
     }
 
@@ -1205,11 +1224,12 @@
     function showAlert(message) {
         modalMessage.textContent = message;
         modalButtons.innerHTML = ''; // Clear previous buttons
+    modalButtons.classList.remove('stacked');
 
-        const okButton = document.createElement('button');
-        okButton.className = 'btn btn-primary';
-        okButton.textContent = 'OK';
-        okButton.onclick = closeModal;
+  const okButton = document.createElement('button');
+  okButton.className = 'btn btn-primary';
+  okButton.textContent = 'OK';
+  okButton.onclick = () => closeModal();
         modalButtons.appendChild(okButton);
 
         modalOverlay.classList.add('show');
@@ -1223,6 +1243,7 @@
     function showConfirm(message, callback) {
         modalMessage.textContent = message;
         modalButtons.innerHTML = '';
+    modalButtons.classList.remove('stacked');
 
         const noButton = document.createElement('button');
         noButton.className = 'btn btn-secondary';
@@ -1405,6 +1426,63 @@
       });
     }
 
+    function formatUserStatus(status) {
+      const raw = (status || 'Unknown').toString().trim();
+      const normalized = raw.toLowerCase();
+      const classMap = {
+        'active': 'status-verified',
+        'inactive': 'status-pending',
+        'suspended': 'status-under-investigation',
+        'pending': 'status-pending',
+        'banned': 'status-case-closed'
+      };
+      const className = classMap[normalized] || 'status-reported';
+      const label = raw.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      return { className, label };
+    }
+
+    function formatDateTimeDisplay(value) {
+      if (!value) {
+        return 'N/A';
+      }
+      try {
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) {
+          return value;
+        }
+        return dt.toLocaleString();
+      } catch (err) {
+        return value;
+      }
+    }
+
+    function renderUserRows(users, tbody) {
+      tbody.innerHTML = '';
+      users.forEach(user => {
+        const numericId = Number(user.user_id ?? user.id ?? 0);
+        const validId = Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+        const statusInfo = formatUserStatus(user.status);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>USR-${String(validId || user.user_id || user.id || '000').padStart(3, '0')}</td>
+          <td>${user.username || 'N/A'}</td>
+          <td>${user.email || 'N/A'}</td>
+          <td>${user.role_hint || 'User'}</td>
+          <td>
+            <span class="status-badge ${statusInfo.className}">${statusInfo.label}</span>
+          </td>
+          <td>${formatDateTimeDisplay(user.created_at)}</td>
+          <td>
+            <button class="action-btn" onclick="openUserActions(${validId})" ${validId === 0 ? 'disabled' : ''}>
+              <span>⚙️</span>
+              Manage
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
 
     // Tab switching functionality
     function showTab(tabName, event) {
@@ -1430,6 +1508,8 @@
       // Load data for specific tabs (uses local mock data)
       if (tabName === 'overview') {
         loadCrimesOverview();
+      } else if (tabName === 'users') {
+        loadUsers();
       } else if (tabName === 'verify-reports') {
         loadComplaints();
       } else if (tabName === 'case-management') {
@@ -1690,23 +1770,110 @@
       showAlert(`Loading crime details and AI-generated summary for CRIME-${crimeId.toString().padStart(3, '0')}...`);
     }
 
+    async function openUserActions(userId) {
+      const numericId = Number(userId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Unable to determine which user to manage. Please refresh and try again.');
+        return;
+      }
+
+      let user = adminUsersCache.get(numericId);
+
+      if (!user) {
+        try {
+          const response = await fetch(resolveApiUrl(`/api/admin/users/${numericId}`), { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          const payload = await response.json().catch(() => ({}));
+          if (payload && payload.user) {
+            user = payload.user;
+            adminUsersCache.set(numericId, user);
+          }
+        } catch (error) {
+          console.error('Error loading user details:', error);
+          showAlert('Unable to load user details at this time.');
+          return;
+        }
+      }
+
+      if (!user) {
+        showAlert('User details are unavailable.');
+        return;
+      }
+
+      const currentRole = (user.role_hint || 'User').trim();
+      modalMessage.innerHTML = `
+        <h3 style="margin-bottom: 0.75rem;">Manage ${user.username || user.email || `USR-${String(numericId).padStart(3, '0')}`}</h3>
+        <p style="margin-bottom: 0.25rem; color: var(--text-secondary);">Current role: <strong>${currentRole}</strong></p>
+        <p style="color: var(--text-secondary);">Select a new role to assign to this user.</p>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.add('stacked');
+
+      ROLE_ACTIONS.forEach(action => {
+        const actionButton = document.createElement('button');
+        actionButton.className = action.className;
+        actionButton.textContent = action.label;
+        const isCurrentRole = currentRole.toLowerCase() === action.value.toLowerCase();
+        if (isCurrentRole) {
+          actionButton.disabled = true;
+          actionButton.title = 'User already has this role';
+        }
+        actionButton.onclick = () => updateUserRole(numericId, action.value, actionButton);
+        modalButtons.appendChild(actionButton);
+      });
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.onclick = () => {
+        modalButtons.classList.remove('stacked');
+        closeModal();
+      };
+      modalButtons.appendChild(cancelButton);
+
+      modalOverlay.classList.add('show');
+    }
+
     // Replace the existing load functions with these database-connected versions:
 
     // Load users from database
     async function loadUsers() {
+      const tbody = document.getElementById('users-table');
+      if (!tbody) {
+        return;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading users...</td></tr>';
+
       try {
-        const response = await fetch('/api/admin/users');
-        const data = await response.json();
-        
-        if (data.success) {
-          displayUsers(data.users);
-        } else {
-          console.error('Failed to load users:', data.error);
-          document.getElementById('users-container').innerHTML = '<p>Error loading users</p>';
+        const response = await fetch(resolveApiUrl('/api/admin/users?limit=100'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const users = Array.isArray(payload.users) ? payload.users : [];
+
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No users found.</td></tr>';
+          return;
+        }
+
+        adminUsersCache.clear();
+        users.forEach(user => {
+          const idValue = Number(user.user_id ?? user.id);
+          if (Number.isFinite(idValue)) {
+            adminUsersCache.set(idValue, user);
+          }
+        });
+
+        renderUserRows(users, tbody);
       } catch (error) {
-        console.error('Error loading users:', error);
-        document.getElementById('users-container').innerHTML = '<p>Error loading users</p>';
+        console.error('Error loading users from API:', error);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load users right now.</td></tr>';
       }
     }
 
@@ -1784,20 +1951,11 @@
 
     // Display functions (add these if they don't exist)
     function displayUsers(users) {
-      const container = document.getElementById('users-container');
-      
-      const usersHtml = users.map(user => `
-        <div class="data-card">
-          <h4>${user.full_name || user.username}</h4>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Role:</strong> ${user.role_hint}</p>
-          <p><strong>Status:</strong> <span class="status ${user.status.toLowerCase()}">${user.status}</span></p>
-          <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
-          <p><strong>Joined:</strong> ${new Date(user.created_at).toLocaleDateString()}</p>
-        </div>
-      `).join('');
-      
-      container.innerHTML = usersHtml;
+      const tbody = document.getElementById('users-table');
+      if (!tbody) {
+        return;
+      }
+      renderUserRows(users, tbody);
     }
 
     function displayWantedCriminals(criminals) {
@@ -1893,6 +2051,39 @@
           `).join('')}
         </div>
       `;
+    }
+
+    async function showUserStats() {
+      try {
+        const response = await fetch(resolveApiUrl('/api/admin/user-stats'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const stats = await response.json();
+
+        const roleBreakdown = Array.isArray(stats.role_distribution) && stats.role_distribution.length
+          ? stats.role_distribution.map(r => `${r.role_hint || 'Unknown'}: ${r.count}`).join('\n')
+          : 'No role data available.';
+
+        const statusBreakdown = Array.isArray(stats.status_distribution) && stats.status_distribution.length
+          ? stats.status_distribution.map(s => `${s.status || 'Unknown'}: ${s.count}`).join('\n')
+          : 'No status data available.';
+
+        showAlert(
+`Total Users: ${stats.total_users ?? 0}
+Recent 30-Day Registrations: ${stats.recent_registrations ?? 0}
+
+Role Distribution:
+${roleBreakdown}
+
+Status Distribution:
+${statusBreakdown}`
+        );
+      } catch (error) {
+        console.error('Error fetching user statistics:', error);
+        showAlert('Unable to load user statistics right now. Please try again later.');
+      }
     }
 
     if (document.readyState === 'loading') {

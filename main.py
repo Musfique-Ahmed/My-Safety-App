@@ -1386,6 +1386,60 @@ async def get_dashboard_data():
 
 # ==================== ADMIN ENDPOINTS ====================
 
+@app.get("/api/admin/users")
+async def get_users_for_admin(
+    status: Optional[str] = Query(None, description="Filter users by status"),
+    role: Optional[str] = Query(None, description="Filter users by role"),
+    search: Optional[str] = Query(None, description="Search by username, email, or full name"),
+    limit: int = Query(200, ge=1, le=1000, description="Maximum number of users to return")
+):
+    """Return a filtered list of application users for the admin dashboard."""
+    with engine.connect() as conn:
+        try:
+            base_query = [
+                "SELECT user_id, username, email, full_name, phone, role_hint, status, station_id,",
+                "       created_at, updated_at, last_login",
+                "  FROM appuser"
+            ]
+            conditions = []
+            params: Dict[str, Any] = {"limit": limit}
+
+            if status:
+                conditions.append("status = :status")
+                params["status"] = status
+
+            if role:
+                conditions.append("role_hint = :role")
+                params["role"] = role
+
+            if search:
+                conditions.append(
+                    "(username LIKE :search OR email LIKE :search OR full_name LIKE :search)"
+                )
+                params["search"] = f"%{search}%"
+
+            if conditions:
+                base_query.append(" WHERE " + " AND ".join(conditions))
+
+            base_query.append(" ORDER BY created_at DESC LIMIT :limit")
+            query = "".join(base_query)
+
+            result = conn.execute(text(query), params).mappings().fetchall()
+
+            users: List[Dict[str, Any]] = []
+            for row in result:
+                user = dict(row)
+                for dt_field in ("created_at", "updated_at", "last_login"):
+                    value = user.get(dt_field)
+                    if isinstance(value, datetime):
+                        user[dt_field] = value.isoformat()
+                users.append(user)
+
+            return {"success": True, "users": users, "count": len(users)}
+        except Exception as exc:
+            print(f"Error fetching users for admin: {exc}")
+            return {"success": False, "error": "Failed to load users", "users": []}
+
 @app.put("/api/admin/users/{user_id}")
 async def update_user_by_admin(user_id: int, user_update: UserUpdate):
     """Admin endpoint to update user details"""
