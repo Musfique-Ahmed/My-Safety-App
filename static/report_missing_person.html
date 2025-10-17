@@ -236,10 +236,11 @@
   // Point frontend to your backend (change if your backend uses another host/port)
   const API_BASE = 'http://localhost:8000';
 
-  async function uploadFileIfPresent(fileInput) {
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
+  async function uploadFileIfPresentById(fileInputElem) {
+    if (!fileInputElem || !fileInputElem.files || fileInputElem.files.length === 0) return null;
     const form = new FormData();
-    form.append('file', fileInput.files[0]);
+    // upload first file only (adjust if you want multiple uploads)
+    form.append('file', fileInputElem.files[0]);
     const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
     const raw = await res.text().catch(()=>res.statusText);
     if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText} — ${raw}`);
@@ -279,10 +280,9 @@
         };
 
         // upload photo if present
-        const photoInput = document.querySelector('input[type="file"][name="photo_file"], input[type="file"]#photo_file');
+        const photoInput = document.getElementById('photo_files'); // matches your form input
         if (photoInput && photoInput.files && photoInput.files.length) {
-          payload.photo_url = await uploadFileIfPresent(photoInput);
-          console.info('Uploaded photo ->', payload.photo_url);
+          payload.photo_url = await uploadFileIfPresentById(photoInput);
         }
 
         console.info('Sending payload to', `${API_BASE}/api/missing-persons`, payload);
