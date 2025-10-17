@@ -41,7 +41,7 @@ We appreciate the contributions from our amazing team members:
 | [Musfique Ahmed](https://github.com/Musfique-Ahmed) | Lead Developer | [@Musfique-Ahmed](https://github.com/Musfique-Ahmed) |
 | [Tasfiya Binte Karim](https://github.com/TasfiyaBintaKarim) | Frontend Developer | [@TasfiyaBintaKarim](https://github.com/TasfiyaBintaKarim) |
 | [Farhan Tarek Jamee](https://github.com/collaborator2) | Backend Developer | [@Farhan-Jamee](https://github.com/Farhan-Jamee) |
-| [Sayma Talukdar](https://github.com/collaborator3) | UI/UX Designer, Frontend Developer | [@collaborator3](https://github.com/collaborator3) |
+| [Sayma Talukdar](https://github.com/saymaaTalukder) | UI/UX Designer, Frontend Developer | [@saymaaTalukder](https://github.com/saymaaTalukder) |
 
 <!-- Add more collaborators as needed -->
 
