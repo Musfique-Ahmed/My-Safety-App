@@ -570,22 +570,41 @@ async def submit_missing_person(payload: Dict[str, Any] = Body(...)):
       raise HTTPException(status_code=500, detail="Failed to save missing person")
 # ...existing code...
 
-@app.get("/api/missing-persons")
-async def get_all_missing_persons(
-    status: Optional[str] = Query(None, description="Filter by status")
-):
-    with engine.connect() as conn:
-        query = "SELECT * FROM missing_person"
-        params = {}
+# @app.get("/api/missing-persons")
+# async def get_all_missing_persons(
+#     status: Optional[str] = Query(None, description="Filter by status")
+# ):
+#     with engine.connect() as conn:
+#         query = "SELECT * FROM missing_person"
+#         params = {}
         
-        if status:
-            query += " WHERE status = :status"
-            params["status"] = status
+#         if status:
+#             query += " WHERE status = :status"
+#             params["status"] = status
             
-        query += " ORDER BY created_at DESC"
+#         query += " ORDER BY created_at DESC"
         
-        result = conn.execute(text(query), params).mappings().fetchall()
-        return {"missing_persons": [dict(row) for row in result]}
+#         result = conn.execute(text(query), params).mappings().fetchall()
+#         return {"missing_persons": [dict(row) for row in result]}
+
+@app.get("/api/missing-persons")
+async def get_missing_persons():
+    query = text("""
+        SELECT missing_id, reporter_id, name, age, gender, description,
+               last_seen_location, last_seen_date, last_seen_time, height,
+               weight, hair_color, eye_color, distinguishing_marks,
+               clothing_description, contact_person, contact_phone,
+               photo_url, status, police_case_number, created_at, updated_at
+        FROM missing_person
+        ORDER BY COALESCE(updated_at, created_at) DESC
+    """)
+    try:
+        with engine.connect() as conn:
+            rows = [dict(row) for row in conn.execute(query).mappings()]
+        return rows
+    except Exception:
+        logging.exception("Failed to fetch missing persons")
+        raise HTTPException(status_code=500, detail="Failed to fetch missing persons")
 
 @app.get("/api/missing-persons/{missing_id}")
 async def get_missing_person_by_id(missing_id: int):
