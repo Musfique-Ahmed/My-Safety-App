@@ -1,15 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- const API_BASE default is set via inline script below -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - My Safety</title>
   <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
-  <script>
-    // Define API base for all fetch calls used in this page
-    const API_BASE = window.API_BASE || 'http://127.0.0.1:8000';
-  </script>
   <style>
     :root {
       --dark-bg: #0f0f0f;
@@ -360,6 +355,35 @@
       background: var(--accent-green);
       color: white;
     }
+    .danger-badge {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .danger-low {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+    }
+    .danger-medium {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+    }
+    .danger-high {
+      background: rgba(239, 68, 68, 0.18);
+      color: var(--accent-red);
+    }
+    .danger-extreme {
+      background: rgba(139, 92, 246, 0.2);
+      color: var(--accent-purple);
+    }
+    .danger-unknown {
+      background: rgba(107, 114, 128, 0.2);
+      color: var(--accent-gray);
+    }
     .action-btn {
       background: transparent;
       color: var(--text-secondary);
@@ -563,11 +587,139 @@
         color: var(--text-primary);
     }
 
-    .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-    }
+  .modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .modal-buttons.stacked {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-buttons.stacked .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .stats-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .stats-header h3 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .stats-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .stats-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.85rem;
+  }
+
+  .stats-metric {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .stats-metric span {
+    display: block;
+  }
+
+  .stats-metric .metric-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .stats-metric .metric-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  .stats-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .stats-chart {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  .stats-chart h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .chart-wrapper {
+    position: relative;
+    height: 220px;
+  }
+
+  .stats-insights {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+  }
+
+  .stats-insights h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stats-insights ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .stats-insights li {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+  }
+
+  .stats-empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    padding: 1.5rem 0;
+  }
 
     /* Adjust button styles for modal */
     .modal-buttons .btn {
@@ -584,6 +736,7 @@
     }
     /* End Custom Modal Styles */
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- Custom Modal HTML Structure -->
@@ -638,7 +791,7 @@
       <button class="tab-btn" onclick="showTab('add-crime', event)">Add Crime</button>
       <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
       <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
-      <button class="tab-btn" onclick="showTab('chat', event)">Chat</button>
+      <!--<button class="tab-btn" onclick="showTab('chat', event)">Chat</button>-->
       <button class="tab-btn" onclick="showTab('analytics', event)">Analytics</button>
     </div>
 
@@ -1195,26 +1348,70 @@
     const modalOverlay = document.getElementById('custom-modal-overlay');
     const modalMessage = document.getElementById('modal-message');
     const modalButtons = document.getElementById('modal-buttons');
-
-    function closeModal(event) {
-        if (event && event.target !== modalOverlay) {
-            return;
+    function coerceModalMessage(value) {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      if (value instanceof Error) {
+        return value.message;
+      }
+      if (typeof value === 'string') {
+        return value;
+      }
+      if (typeof value === 'object') {
+        try {
+          const serialized = JSON.stringify(value, null, 2);
+          return serialized || String(value);
+        } catch (_) {
+          return String(value);
         }
-        modalOverlay.classList.remove('show');
+      }
+      return String(value);
     }
+
+    const adminUsersCache = new Map();
+    const wantedCriminalCache = new Map();
+    const ROLE_ACTIONS = [
+      { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
+      { value: 'Admin', label: 'Make Admin', className: 'btn btn-primary' },
+      { value: 'Detective', label: 'Make Detective', className: 'btn btn-secondary' },
+      { value: 'Officer', label: 'Make Officer', className: 'btn btn-secondary' },
+      { value: 'User', label: 'Demote to User', className: 'btn btn-danger' }
+    ];
+    const chartInstances = { role: null, status: null };
+    const CHART_COLOR_PALETTE = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#6366f1', '#14b8a6', '#ec4899'];
+
+  function closeModal(event) {
+    if (event && event.currentTarget === modalOverlay && event.target !== modalOverlay) {
+      return;
+    }
+    modalButtons.classList.remove('stacked');
+    modalOverlay.classList.remove('show');
+    Object.keys(chartInstances).forEach(key => {
+      if (chartInstances[key]) {
+        try {
+          chartInstances[key].destroy();
+        } catch (_) {
+          // no-op
+        }
+        chartInstances[key] = null;
+      }
+    });
+  }
 
     /**
      * Shows a custom alert modal.
      * @param {string} message - The message to display.
      */
-    function showAlert(message) {
-        modalMessage.textContent = message;
+  function showAlert(message) {
+    modalMessage.textContent = coerceModalMessage(message);
         modalButtons.innerHTML = ''; // Clear previous buttons
+    modalButtons.classList.remove('stacked');
 
-        const okButton = document.createElement('button');
-        okButton.className = 'btn btn-primary';
-        okButton.textContent = 'OK';
-        okButton.onclick = closeModal;
+  const okButton = document.createElement('button');
+  okButton.className = 'btn btn-primary';
+  okButton.textContent = 'OK';
+  okButton.onclick = () => closeModal();
         modalButtons.appendChild(okButton);
 
         modalOverlay.classList.add('show');
@@ -1225,9 +1422,10 @@
      * @param {string} message - The message to confirm.
      * @param {function(boolean): void} callback - The function to call with the result (true for yes, false for no).
      */
-    function showConfirm(message, callback) {
-        modalMessage.textContent = message;
+  function showConfirm(message, callback) {
+    modalMessage.textContent = coerceModalMessage(message);
         modalButtons.innerHTML = '';
+    modalButtons.classList.remove('stacked');
 
         const noButton = document.createElement('button');
         noButton.className = 'btn btn-secondary';
@@ -1323,6 +1521,405 @@
     
     // --- End Mock Data ---
 
+    // Resolve API endpoints so dashboard works from FastAPI static hosting or Live Server.
+    const API_BASE = window.location.origin.includes(':8000') ? '' : 'http://localhost:8000';
+
+    function resolveApiUrl(path) {
+      if (!path.startsWith('/')) {
+        return `${API_BASE}/${path}`;
+      }
+      return `${API_BASE}${path}`;
+    }
+
+    function normalizeStatus(status) {
+      const raw = (status || 'Pending').toString().trim();
+      const normalized = raw.toLowerCase().replace(/_/g, ' ');
+      const classMap = {
+        'pending': 'status-pending',
+        'reported': 'status-reported',
+        'under investigation': 'status-under-investigation',
+        'in progress': 'status-in-progress',
+        'case closed': 'status-case-closed',
+        'solved': 'status-resolved',
+        'resolved': 'status-resolved',
+        'verified': 'status-verified'
+      };
+      const className = classMap[normalized] || 'status-pending';
+      const display = raw.replace(/_/g, ' ');
+      return { className, display };
+    }
+
+    function formatCrimeLocation(locationData, fallback = {}) {
+      if (typeof locationData === 'string' && locationData.trim()) {
+        return locationData.trim();
+      }
+
+      if (locationData && typeof locationData === 'object') {
+        const candidates = [
+          locationData.area,
+          locationData.area_name,
+          locationData.neighborhood,
+          locationData.town,
+          locationData.city,
+          locationData.district,
+          locationData.address,
+          locationData.address_line,
+          locationData.formatted_address
+        ].filter(part => typeof part === 'string' && part.trim());
+
+        if (candidates.length) {
+          const uniqueParts = Array.from(new Set(candidates.map(text => text.trim())));
+          return uniqueParts.join(', ');
+        }
+      }
+
+      const fallbackParts = [
+        fallback.area,
+        fallback.area_name,
+        fallback.city,
+        fallback.district
+      ].filter(part => typeof part === 'string' && part.trim());
+
+      return fallbackParts.join(', ') || 'N/A';
+    }
+
+    function renderCrimeRows(crimes, tbody) {
+      tbody.innerHTML = '';
+      crimes.forEach(crime => {
+        const locationText = formatCrimeLocation(crime.location_data, crime);
+        const statusInfo = normalizeStatus(crime.status);
+        const displayStatus = statusInfo.display
+          .toLowerCase()
+          .replace(/\b\w/g, char => char.toUpperCase());
+        const numericId = crime.crime_id || crime.id || 0;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>CR-${String(numericId).padStart(3, '0')}</td>
+          <td>${locationText}</td>
+          <td><span class="status-badge ${statusInfo.className}">${displayStatus}</span></td>
+          <td>
+            <button class="action-btn" onclick="viewCrimeDetails(${numericId})">
+              <span>📄</span>
+              Summarize
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function formatUserStatus(status) {
+      const raw = (status || 'Unknown').toString().trim();
+      const normalized = raw.toLowerCase();
+      const classMap = {
+        'active': 'status-verified',
+        'inactive': 'status-pending',
+        'suspended': 'status-under-investigation',
+        'pending': 'status-pending',
+        'banned': 'status-case-closed'
+      };
+      const className = classMap[normalized] || 'status-reported';
+      const label = raw.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      return { className, label };
+    }
+
+    function formatDateTimeDisplay(value) {
+      if (!value) {
+        return 'N/A';
+      }
+      try {
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) {
+          return value;
+        }
+        return dt.toLocaleString();
+      } catch (err) {
+        return value;
+      }
+    }
+
+    function formatNumberDisplay(value) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric.toLocaleString();
+      }
+      return value ?? 0;
+    }
+
+    function formatCurrencyBDT(value) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return `BDT ${numeric.toLocaleString()}`;
+      }
+      return 'BDT 0';
+    }
+
+    function formatDangerLevel(level) {
+      const raw = (level || 'Unknown').toString().trim();
+      const normalized = raw.toLowerCase();
+      const classMap = {
+        'low': 'danger-low',
+        'medium': 'danger-medium',
+        'high': 'danger-high',
+        'extreme': 'danger-extreme'
+      };
+      const className = classMap[normalized] || 'danger-unknown';
+      const label = raw.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      return { className, label };
+    }
+
+    function buildCrimesSummary(value, maxItems = 3) {
+      if (!value) {
+        return 'N/A';
+      }
+      let items = [];
+      if (Array.isArray(value)) {
+        items = value;
+      } else if (typeof value === 'string') {
+        items = value.split(',');
+      }
+      const cleaned = items.map(item => item && item.toString().trim()).filter(Boolean);
+      if (!cleaned.length) {
+        return 'N/A';
+      }
+      if (cleaned.length <= maxItems) {
+        return cleaned.join(', ');
+      }
+      const limited = cleaned.slice(0, maxItems).join(', ');
+      return `${limited}...`;
+    }
+
+    function renderUserRows(users, tbody) {
+      tbody.innerHTML = '';
+      users.forEach(user => {
+        const numericId = Number(user.user_id ?? user.id ?? 0);
+        const validId = Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+        const statusInfo = formatUserStatus(user.status);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>USR-${String(validId || user.user_id || user.id || '000').padStart(3, '0')}</td>
+          <td>${user.username || 'N/A'}</td>
+          <td>${user.email || 'N/A'}</td>
+          <td>${user.role_hint || 'User'}</td>
+          <td>
+            <span class="status-badge ${statusInfo.className}">${statusInfo.label}</span>
+          </td>
+          <td>${formatDateTimeDisplay(user.created_at)}</td>
+          <td>
+            <button class="action-btn" onclick="openUserActions(${validId})" ${validId === 0 ? 'disabled' : ''}>
+              <span>⚙️</span>
+              Manage
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderWantedCriminalRows(criminals, tbody) {
+      const dataset = Array.isArray(criminals) ? criminals : [];
+
+      if (!dataset.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No wanted criminals found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      dataset.forEach(criminal => {
+        const numericId = Number(criminal.criminal_id ?? criminal.id ?? 0);
+        const validId = Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+        const crimesSummary = buildCrimesSummary(criminal.crimes_committed, 3);
+        const dangerInfo = formatDangerLevel(criminal.danger_level);
+        const statusInfo = normalizeStatus(criminal.status);
+        const rewardDisplay = formatCurrencyBDT(criminal.reward_amount);
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>WNT-${String(validId || 0).padStart(3, '0')}</td>
+          <td>${criminal.name || 'Unknown'}</td>
+          <td>${criminal.alias || '&mdash;'}</td>
+          <td title="${criminal.crimes_committed || crimesSummary}">${crimesSummary}</td>
+          <td><span class="danger-badge ${dangerInfo.className}">${dangerInfo.label}</span></td>
+          <td>${rewardDisplay}</td>
+          <td><span class="status-badge ${statusInfo.className}">${statusInfo.display}</span></td>
+          <td>
+            ${validId > 0 ? `
+              <button class="action-btn" onclick="viewWantedCriminal(${validId})">
+                <span>👁️</span>
+                View
+              </button>
+              <button class="action-btn" onclick="openWantedCriminalActions(${validId})">
+                <span>⚙️</span>
+                Manage
+              </button>
+            ` : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function viewWantedCriminal(criminalId) {
+      const numericId = Number(criminalId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Unable to load criminal details right now.');
+        return;
+      }
+
+      let record = wantedCriminalCache.get(numericId);
+
+      if (!record) {
+        try {
+          const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${numericId}`), { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          const payload = await response.json().catch(() => ({}));
+          record = payload.wanted_criminal || payload;
+          if (record) {
+            wantedCriminalCache.set(numericId, record);
+          }
+        } catch (error) {
+          console.error('Error loading wanted criminal details:', error);
+          showAlert('Unable to fetch criminal details at this time.');
+          return;
+        }
+      }
+
+      if (!record) {
+        showAlert('Criminal record not found.');
+        return;
+      }
+
+      const displayId = `WNT-${String(numericId).padStart(3, '0')}`;
+      const dangerInfo = formatDangerLevel(record.danger_level);
+      const statusInfo = normalizeStatus(record.status);
+      const rewardDisplay = formatCurrencyBDT(record.reward_amount);
+      const crimesDetail = Array.isArray(record.crimes_committed)
+        ? record.crimes_committed.join(', ')
+        : (record.crimes_committed || 'N/A');
+      const locationDetail = record.last_known_location || 'Unknown';
+      const wantedSinceDisplay = formatDateTimeDisplay(record.wanted_since);
+      const captureDateDisplay = formatDateTimeDisplay(record.capture_date);
+      const updatedDisplay = formatDateTimeDisplay(record.updated_at || record.created_at);
+
+      const details = [
+        `Record: ${displayId}`,
+        `Name: ${record.name || 'N/A'}`,
+        `Alias: ${record.alias || 'N/A'}`,
+        `Danger Level: ${dangerInfo.label}`,
+        `Status: ${statusInfo.display}`,
+        `Crimes: ${crimesDetail}`,
+        `Reward: ${rewardDisplay}`,
+        `Age Range: ${record.age_range || 'N/A'}`,
+        `Gender: ${record.gender || 'N/A'}`,
+        `Height: ${record.height || 'N/A'}`,
+        `Weight: ${record.weight || 'N/A'}`,
+        `Distinguishing Marks: ${record.distinguishing_marks || 'N/A'}`,
+        `Last Known Location: ${locationDetail}`,
+        `Wanted Since: ${wantedSinceDisplay}`,
+        `Capture Date: ${captureDateDisplay}`,
+        `Reported By: ${record.added_by || 'N/A'}`,
+        `Last Updated: ${updatedDisplay}`
+      ];
+
+      if (record.description) {
+        details.push('', 'Description:', record.description);
+      }
+
+      showAlert(details.join('\n'));
+    }
+
+    function openWantedCriminalActions(criminalId) {
+      const numericId = Number(criminalId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('No management actions available.');
+        return;
+      }
+
+      showAlert(`Management tools for WNT-${String(numericId).padStart(3, '0')} will be available soon.`);
+    }
+
+    function generateChartColors(count) {
+      const colors = [];
+      for (let i = 0; i < count; i += 1) {
+        colors.push(CHART_COLOR_PALETTE[i % CHART_COLOR_PALETTE.length]);
+      }
+      return colors;
+    }
+
+    function renderDoughnutChart(canvasId, labels, data, chartKey) {
+      if (typeof Chart === 'undefined') {
+        return;
+      }
+
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) {
+        return;
+      }
+
+      if (chartInstances[chartKey]) {
+        chartInstances[chartKey].destroy();
+      }
+
+      const total = data.reduce((sum, value) => sum + value, 0);
+      const backgroundColor = generateChartColors(labels.length);
+
+      chartInstances[chartKey] = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [
+            {
+              data,
+              backgroundColor,
+              borderWidth: 1,
+              borderColor: 'rgba(26, 26, 26, 0.95)',
+              hoverBorderColor: '#ffffff',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '58%',
+          radius: '92%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#f3f4f6',
+                usePointStyle: true,
+                padding: 16,
+                font: {
+                  size: 12,
+                  family: 'Inter, Arial, sans-serif'
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  const label = context.label || 'Unknown';
+                  const value = Number(context.parsed) || 0;
+                  const share = total ? ((value / total) * 100).toFixed(1) : 0;
+                  return `${label}: ${value} (${share}%)`;
+                }
+              }
+            },
+            title: {
+              display: false
+            }
+          },
+          animation: {
+            duration: 600,
+            easing: 'easeOutQuart'
+          }
+        }
+      });
+    }
+
 
     // Tab switching functionality
     function showTab(tabName, event) {
@@ -1345,23 +1942,17 @@
         document.querySelector(`.tab-btn[onclick*="'${tabName}'"]`).classList.add('active');
       }
       
-      // Load data for specific tabs (uses real API calls)
+      // Load data for specific tabs (uses local mock data)
       if (tabName === 'overview') {
         loadCrimesOverview();
       } else if (tabName === 'users') {
         loadUsers();
       } else if (tabName === 'wanted-criminals') {
         loadWantedCriminals();
-      } else if (tabName === 'police-stations') {
-        loadPoliceStations();
-      } else if (tabName === 'missing-persons') {
-        loadMissingPersons();
       } else if (tabName === 'verify-reports') {
         loadComplaints();
       } else if (tabName === 'case-management') {
         loadCaseAssignments();
-      } else if (tabName === 'analytics') {
-        loadAnalytics();
       }
       // Auto-scroll chat when opening chat tab
       if (tabName === 'chat') {
@@ -1370,34 +1961,48 @@
       }
     }
 
-    // Add crime form submission (real API)
+    // Add crime form submission
     document.getElementById('add-crime-form').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const submitBtn = this.querySelector('button[type="submit"]');
-      const originalText = submitBtn.innerHTML;
+      const formData = new FormData(this);
+      const crimeData = Object.fromEntries(formData);
+      
+      // Process the form data to match database schema (omitted for brevity, assume valid)
+      
       try {
+        // Show loading state
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<span>⏳</span> Adding Crime...';
         submitBtn.disabled = true;
-        const formData = new FormData(this);
-        const payload = {
-          reporter_id: 1, // default admin reporter
-          crime_data: JSON.stringify({ type: formData.get('crime_type'), description: formData.get('description'), priority: formData.get('priority') }),
-          location_data: JSON.stringify({ city: formData.get('city'), area: formData.get('area_name'), details: formData.get('location_details') }),
-          status: (formData.get('status') || 'pending').replace('_',' ').replace(/\b\w/g, c => c.toUpperCase()),
-          priority_level: (formData.get('priority') || 'medium').replace(/\b\w/g, c => c.toUpperCase())
-        };
-        const resp = await fetch(`${API_BASE}/crime/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const created = await resp.json();
-        showAlert(`Crime added successfully!\nCrime ID: CR-${String(created.crime_id).padStart(3,'0')}`);
+        
+        // --- MOCK DATA SIMULATION START ---
+        await new Promise(resolve => setTimeout(resolve, 1500)); 
+        const newCrimeId = crimesData.length + 1;
+
+        // Add to mock data
+        crimesData.push({
+            crime_id: newCrimeId,
+            area_name: crimeData.area_name,
+            city: crimeData.city,
+            status: crimeData.status,
+        });
+
+        showAlert(`Crime added successfully!\nCrime ID: CR-${newCrimeId.toString().padStart(3, '0')}`);
         this.reset();
+        
+        // Refresh the overview table if we're on that tab
         if (document.getElementById('overview').classList.contains('active')) {
           loadCrimesOverview();
         }
+        // --- MOCK DATA SIMULATION END ---
+        
       } catch (error) {
-        console.error('Error adding crime:', error);
+        console.error('Error:', error);
         showAlert(`Error adding crime: ${error.message}`);
       } finally {
+        // Reset button state
+        const submitBtn = this.querySelector('button[type="submit"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
       }
@@ -1406,40 +2011,30 @@
     // Load crimes for overview tab
     async function loadCrimesOverview() {
       const tbody = document.getElementById('crimes-table');
+      if (!tbody) {
+        return;
+      }
+
       tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading crime reports...</td></tr>';
+
       try {
-        // --- REAL API CALL ---
-        const response = await fetch(`${API_BASE}/api/crimes`);
-        const result = await response.json();
-        // --- END REAL API CALL ---
-        
-        if (result.crimes) {
-          tbody.innerHTML = ''; // Clear existing rows
-          
-          result.crimes.forEach(crime => {
-            const row = document.createElement('tr');
-            const locationData = crime.location_data || {};
-            const crimeData = crime.crime_data || {};
-            row.innerHTML = `
-              <td>CR-${crime.crime_id.toString().padStart(3, '0')}</td>
-              <td>${locationData.area || locationData.city || 'N/A'}, ${locationData.city || 'N/A'}</td>
-              <td><span class="status-badge status-${(crime.status || 'pending').replace('_', '-').toLowerCase()}">${(crime.status || 'pending').replace('_', ' ')}</span></td>
-              <td>
-                <button class="action-btn" onclick="viewCrimeDetails(${crime.crime_id})">
-                  <span>📄</span>
-                  Summarize
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Failed to load crimes.</td></tr>';
-            console.error('Data Error loading crimes:', result.message || 'Unknown error');
+        const response = await fetch(resolveApiUrl('/api/crimes?limit=25'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const crimes = Array.isArray(payload.crimes) ? payload.crimes : [];
+
+        if (crimes.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No crime reports found.</td></tr>';
+          return;
+        }
+
+        renderCrimeRows(crimes, tbody);
       } catch (error) {
-        console.error('Process Error loading crimes:', error);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">An error occurred while processing crime data.</td></tr>';
+        console.error('Error loading crimes from API:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Unable to load crime reports right now.</td></tr>';
       }
     }
 
@@ -1448,10 +2043,10 @@
       const tbody = document.getElementById('complaints-table');
       tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading user complaints...</td></tr>';
       try {
-        // --- REAL API CALL ---
-        const response = await fetch(`${API_BASE}/api/admin/complaints`);
-        const result = await response.json();
-        // --- END REAL API CALL ---
+        // --- MOCK DATA SIMULATION ---
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        const result = { success: true, complaints: complaintsData };
+        // --- END MOCK DATA SIMULATION ---
         
         if (result.success) {
           tbody.innerHTML = ''; // Clear existing rows
@@ -1505,10 +2100,10 @@
       const tbody = document.getElementById('assignments-table');
       tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading case assignments...</td></tr>';
       try {
-        // --- REAL API CALL ---
-        const response = await fetch(`${API_BASE}/api/admin/case-assignments`);
-        const result = await response.json();
-        // --- END REAL API CALL ---
+        // --- MOCK DATA SIMULATION ---
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        const result = { success: true, assignments: assignmentsData };
+        // --- END MOCK DATA SIMULATION ---
         
         if (result.success) {
           tbody.innerHTML = ''; // Clear existing rows
@@ -1549,21 +2144,13 @@
       showConfirm(`Are you sure you want to verify complaint COMP-${complaintId.toString().padStart(3, '0')}? This will flag it for escalation.`, async (confirmed) => {
         if (confirmed) {
           try {
-            // Real API call to verify complaint
-            const response = await fetch(`${API_BASE}/api/admin/complaints/${complaintId}/verify`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-            const result = await response.json();
+            // Simulated verification and update of mock data
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
+            if(index !== -1) complaintsData[index].status = 'verified';
 
-            if (result.success) {
-              showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **VERIFIED**!`);
-              loadComplaints(); // Refresh the table
-            } else {
-              showAlert(`Error verifying complaint: ${result.message || 'Unknown error'}`);
-            }
+            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **VERIFIED**!`);
+            loadComplaints(); // Refresh the table
           } catch (error) {
             console.error('Error:', error);
             showAlert(`Error verifying complaint: ${error.message}`);
@@ -1576,21 +2163,13 @@
       showConfirm(`Are you sure you want to **REJECT** complaint COMP-${complaintId.toString().padStart(3, '0')}? This action cannot be undone.`, async (confirmed) => {
         if (confirmed) {
           try {
-            // Real API call to reject complaint
-            const response = await fetch(`${API_BASE}/api/admin/complaints/${complaintId}/reject`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-            const result = await response.json();
-
-            if (result.success) {
-              showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **REJECTED** and archived.`);
-              loadComplaints(); // Refresh the table
-            } else {
-              showAlert(`Error rejecting complaint: ${result.message || 'Unknown error'}`);
-            }
+            // Simulated rejection and removal from mock data
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
+            if(index !== -1) complaintsData.splice(index, 1);
+            
+            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **REJECTED** and archived.`);
+            loadComplaints(); // Refresh the table
           } catch (error) {
             console.error('Error:', error);
             showAlert(`Error rejecting complaint: ${error.message}`);
@@ -1630,429 +2209,267 @@
       showAlert(`Loading crime details and AI-generated summary for CRIME-${crimeId.toString().padStart(3, '0')}...`);
     }
 
-    function viewUserDetails(userId) {
-      console.log(`Viewing user details: ${userId}`);
-      showAlert(`Loading detailed information for User ID: ${userId}...`);
-    }
+    async function openUserActions(userId) {
+      const numericId = Number(userId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Unable to determine which user to manage. Please refresh and try again.');
+        return;
+      }
 
-    function viewCriminalDetails(criminalId) {
-      console.log(`Viewing criminal details: ${criminalId}`);
-      showAlert(`Loading detailed information for Criminal ID: ${criminalId}...`);
-    }
+      let user = adminUsersCache.get(numericId);
 
-    function viewMissingPersonDetails(missingId) {
-      console.log(`Viewing missing person details: ${missingId}`);
-      showAlert(`Loading detailed information for Missing Person ID: ${missingId}...`);
-    }
-
-    function showUserStats() {
-      showAlert(`User Statistics:\n\n• Total Users: Loading from database...\n• Active Users: Loading from database...\n• New Registrations (30 days): Loading from database...`);
-    }
-
-    function showAddCriminalForm() {
-      document.getElementById('add-criminal-form').style.display = 'block';
-    }
-
-    function hideAddCriminalForm() {
-      document.getElementById('add-criminal-form').style.display = 'none';
-    }
-
-    // Add Wanted Criminal submission
-    (function() {
-      const form = document.getElementById('criminal-form');
-      if (!form) return;
-      form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
+      if (!user) {
         try {
-          submitBtn.innerHTML = '<span>⏳</span> Adding...';
-          submitBtn.disabled = true;
-          const fd = new FormData(form);
-          const payload = {
-            name: fd.get('name'),
-            alias: fd.get('alias') || '',
-            age_range: fd.get('age_range') || '',
-            gender: fd.get('gender') || '',
-            description: fd.get('description') || '',
-            crimes_committed: fd.get('crimes_committed') || '',
-            danger_level: fd.get('danger_level') || 'Medium',
-            reward_amount: fd.get('reward_amount') || '',
-            last_known_location: fd.get('last_known_location') || '',
-            photo_url: fd.get('photo_url') || ''
-          };
-          const resp = await fetch(`${API_BASE}/wanted_criminals/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          await resp.json();
-          showAlert('Wanted criminal added successfully.');
-          form.reset();
-          hideAddCriminalForm();
-          if (document.getElementById('wanted-criminals').classList.contains('active')) {
-            loadWantedCriminals();
+          const response = await fetch(resolveApiUrl(`/api/admin/users/${numericId}`), { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
           }
-        } catch (err) {
-          console.error('Add criminal error:', err);
-          showAlert(`Error adding criminal: ${err.message}`);
-        } finally {
-          submitBtn.innerHTML = originalText;
-          submitBtn.disabled = false;
-        }
-      });
-    })();
-
-    function showAddStationForm() {
-      document.getElementById('add-station-form').style.display = 'block';
-    }
-
-    function hideAddStationForm() {
-      document.getElementById('add-station-form').style.display = 'none';
-    }
-
-    // Add Police Station submission
-    (function() {
-      const form = document.getElementById('station-form');
-      if (!form) return;
-      form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        try {
-          submitBtn.innerHTML = '<span>⏳</span> Adding...';
-          submitBtn.disabled = true;
-          const fd = new FormData(form);
-          const payload = {
-            station_name: fd.get('station_name'),
-            station_code: fd.get('station_code'),
-            address: fd.get('address') || '',
-            phone: fd.get('phone') || '',
-            email: fd.get('email') || '',
-            latitude: fd.get('latitude') || '',
-            longitude: fd.get('longitude') || '',
-            jurisdiction_area: fd.get('jurisdiction_area') || ''
-          };
-          const resp = await fetch(`${API_BASE}/police_stations/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          await resp.json();
-          showAlert('Police station added successfully.');
-          form.reset();
-          hideAddStationForm();
-          if (document.getElementById('police-stations').classList.contains('active')) {
-            loadPoliceStations();
+          const payload = await response.json().catch(() => ({}));
+          if (payload && payload.user) {
+            user = payload.user;
+            adminUsersCache.set(numericId, user);
           }
-        } catch (err) {
-          console.error('Add station error:', err);
-          showAlert(`Error adding station: ${err.message}`);
-        } finally {
-          submitBtn.innerHTML = originalText;
-          submitBtn.disabled = false;
+        } catch (error) {
+          console.error('Error loading user details:', error);
+          showAlert('Unable to load user details at this time.');
+          return;
         }
+      }
+
+      if (!user) {
+        showAlert('User details are unavailable.');
+        return;
+      }
+
+      const currentRole = (user.role_hint || 'User').trim();
+      modalMessage.innerHTML = `
+        <h3 style="margin-bottom: 0.75rem;">Manage ${user.username || user.email || `USR-${String(numericId).padStart(3, '0')}`}</h3>
+        <p style="margin-bottom: 0.25rem; color: var(--text-secondary);">Current role: <strong>${currentRole}</strong></p>
+        <p style="color: var(--text-secondary);">Select a new role to assign to this user.</p>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.add('stacked');
+
+      ROLE_ACTIONS.forEach(action => {
+        const actionButton = document.createElement('button');
+        actionButton.className = action.className;
+        actionButton.textContent = action.label;
+        const isCurrentRole = currentRole.toLowerCase() === action.value.toLowerCase();
+        if (isCurrentRole) {
+          actionButton.disabled = true;
+          actionButton.title = 'User already has this role';
+        }
+        actionButton.onclick = () => updateUserRole(numericId, action.value, actionButton);
+        modalButtons.appendChild(actionButton);
       });
-    })();
 
-    function showAssignCaseForm() {
-      document.getElementById('assign-case-form').style.display = 'block';
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.onclick = () => {
+        modalButtons.classList.remove('stacked');
+        closeModal();
+      };
+      modalButtons.appendChild(cancelButton);
+
+      modalOverlay.classList.add('show');
     }
 
-    function hideAssignCaseForm() {
-      document.getElementById('assign-case-form').style.display = 'none';
-    }
+    async function updateUserRole(userId, targetRole, sourceButton) {
+      const button = sourceButton || null;
+      const originalText = button ? button.textContent : '';
 
-    // Assign Case submission
-    (function() {
-      const form = document.getElementById('case-assignment-form');
-      if (!form) return;
-      form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        try {
-          submitBtn.innerHTML = '<span>⏳</span> Assigning...';
-          submitBtn.disabled = true;
-          const fd = new FormData(form);
-          const payload = {
-            crime_id: fd.get('crime_id'),
-            user_id: fd.get('user_id'),
-            duty_role: fd.get('duty_role')
-          };
-          const resp = await fetch(`${API_BASE}/case_assignments/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          await resp.json();
-          showAlert('Case assigned successfully.');
-          form.reset();
-          hideAssignCaseForm();
-          if (document.getElementById('case-management').classList.contains('active')) {
-            loadCaseAssignments();
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Updating...';
+      }
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/admin/users/${userId}`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, role_hint: targetRole })
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          let errorMessage = errorPayload.detail || errorPayload.error || `Request failed with status ${response.status}`;
+          if (Array.isArray(errorMessage)) {
+            errorMessage = errorMessage.map(item => item.msg || JSON.stringify(item)).join('\n');
           }
-        } catch (err) {
-          console.error('Assign case error:', err);
-          showAlert(`Error assigning case: ${err.message}`);
-        } finally {
-          submitBtn.innerHTML = originalText;
-          submitBtn.disabled = false;
+          throw new Error(errorMessage);
         }
-      });
-    })();
+
+        adminUsersCache.delete(userId);
+        modalButtons.classList.remove('stacked');
+        closeModal();
+        await loadUsers();
+        showAlert(`User role updated to ${targetRole}.`);
+      } catch (error) {
+        console.error('Error updating user role:', error);
+        showAlert(error.message || 'Failed to update user role.');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+    }
+
+    // Replace the existing load functions with these database-connected versions:
 
     // Load users from database
     async function loadUsers() {
       const tbody = document.getElementById('users-table');
+      if (!tbody) {
+        return;
+      }
+
       tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading users...</td></tr>';
+
       try {
-        const response = await fetch(`${API_BASE}/api/admin/users`);
-        const data = await response.json();
-        
-        if (data.success) {
-          tbody.innerHTML = '';
-          data.users.forEach(user => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${user.user_id}</td>
-              <td>${user.username}</td>
-              <td>${user.email}</td>
-              <td>${user.role_hint}</td>
-              <td><span class="status-badge status-${user.status.toLowerCase()}">${user.status}</span></td>
-              <td>${new Date(user.created_at).toLocaleDateString()}</td>
-              <td>
-                <button class="action-btn" onclick="viewUserDetails(${user.user_id})">
-                  <span>👁️</span>
-                  View
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Failed to load users.</td></tr>';
+        const response = await fetch(resolveApiUrl('/api/admin/users?limit=100'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const users = Array.isArray(payload.users) ? payload.users : [];
+
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No users found.</td></tr>';
+          return;
+        }
+
+        adminUsersCache.clear();
+        users.forEach(user => {
+          const idValue = Number(user.user_id ?? user.id);
+          if (Number.isFinite(idValue)) {
+            adminUsersCache.set(idValue, user);
+          }
+        });
+
+        renderUserRows(users, tbody);
       } catch (error) {
-        console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Error loading users.</td></tr>';
+        console.error('Error loading users from API:', error);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load users right now.</td></tr>';
       }
     }
 
     // Load wanted criminals from database
     async function loadWantedCriminals() {
       const tbody = document.getElementById('wanted-criminals-table');
+      if (!tbody) {
+        return;
+      }
+
       tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Loading wanted criminals...</td></tr>';
+
       try {
-        const response = await fetch(`${API_BASE}/api/admin/wanted-criminals`);
-        const data = await response.json();
-        
-        if (data.success) {
-          tbody.innerHTML = '';
-          data.criminals.forEach(criminal => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${criminal.criminal_id}</td>
-              <td>${criminal.name}</td>
-              <td>${criminal.alias || 'N/A'}</td>
-              <td>${criminal.crimes_committed}</td>
-              <td><span class="status-badge status-${criminal.danger_level.toLowerCase()}">${criminal.danger_level}</span></td>
-              <td>BDT ${criminal.reward_amount}</td>
-              <td><span class="status-badge status-${criminal.status.toLowerCase()}">${criminal.status}</span></td>
-              <td>
-                <button class="action-btn" onclick="viewCriminalDetails(${criminal.criminal_id})">
-                  <span>👁️</span>
-                  View
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Failed to load wanted criminals.</td></tr>';
+        const response = await fetch(resolveApiUrl('/api/wanted-criminals'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => []);
+        const criminals = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload.wanted_criminals) ? payload.wanted_criminals : []);
+
+        wantedCriminalCache.clear();
+        criminals.forEach(record => {
+          const idValue = Number(record.criminal_id ?? record.id);
+          if (Number.isFinite(idValue)) {
+            wantedCriminalCache.set(idValue, record);
+          }
+        });
+
+        renderWantedCriminalRows(criminals, tbody);
       } catch (error) {
         console.error('Error loading criminals:', error);
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Error loading wanted criminals.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load wanted criminals right now.</td></tr>';
       }
     }
 
     // Load police stations from database
     async function loadPoliceStations() {
-      const tbody = document.getElementById('stations-table');
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading police stations...</td></tr>';
       try {
-        const response = await fetch(`${API_BASE}/api/admin/police-stations`);
+        const response = await fetch('/api/admin/police-stations');
         const data = await response.json();
+        
         if (data.success) {
-          tbody.innerHTML = '';
-          data.stations.forEach(station => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${station.station_id}</td>
-              <td>${station.station_name}</td>
-              <td>${station.station_code}</td>
-              <td>${station.address || 'N/A'}</td>
-              <td>${station.phone || 'N/A'}</td>
-              <td>${station.jurisdiction_area || 'N/A'}</td>
-              <td>
-                <button class="action-btn" onclick="viewStationDetails(${station.station_id})">
-                  <span>👁️</span>
-                  View
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
+          displayPoliceStations(data.stations);
         } else {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Failed to load stations.</td></tr>';
+          console.error('Failed to load stations:', data.error);
+          document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
         }
       } catch (error) {
         console.error('Error loading stations:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Error loading stations.</td></tr>';
+        document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
       }
     }
 
     // Load missing persons from database
     async function loadMissingPersons() {
-      const tbody = document.getElementById('missing-persons-table');
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Loading missing persons...</td></tr>';
       try {
-        const response = await fetch(`${API_BASE}/api/admin/missing-persons`);
+        const response = await fetch('/api/admin/missing-persons');
         const data = await response.json();
         
         if (data.success) {
-          tbody.innerHTML = '';
-          data.missing_persons.forEach(person => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${person.missing_id}</td>
-              <td>${person.name}</td>
-              <td>${person.age || 'N/A'}</td>
-              <td>${person.gender || 'N/A'}</td>
-              <td>${person.last_seen_location || 'N/A'}</td>
-              <td>${person.last_seen_date ? new Date(person.last_seen_date).toLocaleDateString() : 'N/A'}</td>
-              <td><span class="status-badge status-${person.status.toLowerCase()}">${person.status}</span></td>
-              <td>
-                <button class="action-btn" onclick="viewMissingPersonDetails(${person.missing_id})">
-                  <span>👁️</span>
-                  View
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
+          displayMissingPersons(data.missing_persons);
         } else {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Failed to load missing persons.</td></tr>';
+          console.error('Failed to load missing persons:', data.error);
+          document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
         }
       } catch (error) {
         console.error('Error loading missing persons:', error);
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Error loading missing persons.</td></tr>';
+        document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
       }
     }
 
     // Load analytics from database
     async function loadAnalytics() {
       try {
-        const response = await fetch(`${API_BASE}/api/admin/analytics`);
+        const response = await fetch('/api/admin/analytics');
         const data = await response.json();
         
         if (data.success) {
-          const analytics = data.analytics;
-          
-          // Update analytics overview cards
-          const analyticsOverview = document.getElementById('analytics-overview');
-          analyticsOverview.innerHTML = `
-            <div style="background: var(--dark-card); padding: 1.5rem; border-radius: 12px; text-align: center;">
-              <h3 style="color: var(--accent-red); font-size: 2rem; margin-bottom: 0.5rem;">${analytics.total_crimes}</h3>
-              <p style="color: var(--text-secondary);">Total Crime Reports</p>
-            </div>
-            <div style="background: var(--dark-card); padding: 1.5rem; border-radius: 12px; text-align: center;">
-              <h3 style="color: var(--accent-purple); font-size: 2rem; margin-bottom: 0.5rem;">${analytics.pending_crimes}</h3>
-              <p style="color: var(--text-secondary);">Pending Cases</p>
-            </div>
-            <div style="background: var(--dark-card); padding: 1.5rem; border-radius: 12px; text-align: center;">
-              <h3 style="color: var(--accent-green); font-size: 2rem; margin-bottom: 0.5rem;">${analytics.total_users}</h3>
-              <p style="color: var(--text-secondary);">Registered Users</p>
-            </div>
-            <div style="background: var(--dark-card); padding: 1.5rem; border-radius: 12px; text-align: center;">
-              <h3 style="color: var(--accent-blue); font-size: 2rem; margin-bottom: 0.5rem;">${analytics.total_missing}</h3>
-              <p style="color: var(--text-secondary);">Missing Persons</p>
-            </div>
-            <div style="background: var(--dark-card); padding: 1.5rem; border-radius: 12px; text-align: center;">
-              <h3 style="color: var(--accent-gray); font-size: 2rem; margin-bottom: 0.5rem;">${analytics.total_wanted}</h3>
-              <p style="color: var(--text-secondary);">Active Wanted</p>
-            </div>
-          `;
-          
-          // Update activity log
-          const activityLog = document.getElementById('activity-log');
-          activityLog.innerHTML = analytics.recent_activity.map(activity => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--dark-surface); border-radius: 8px; margin-bottom: 0.5rem;">
-              <div>
-                <span style="font-weight: 600; color: var(--accent-purple);">${activity.activity_type}</span>
-                <span style="color: var(--text-secondary); margin-left: 0.5rem;">${activity.details}</span>
-              </div>
-              <span style="font-size: 0.875rem; color: var(--text-muted);">
-                ${new Date(activity.created_at).toLocaleDateString()}
-              </span>
-            </div>
-          `).join('');
+          displayAnalytics(data.analytics);
         } else {
           console.error('Failed to load analytics:', data.error);
-          document.getElementById('analytics-overview').innerHTML = '<p>Error loading analytics</p>';
+          document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
         }
       } catch (error) {
         console.error('Error loading analytics:', error);
-        document.getElementById('analytics-overview').innerHTML = '<p>Error loading analytics</p>';
+        document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
       }
     }
 
     // Display functions (add these if they don't exist)
     function displayUsers(users) {
-      const container = document.getElementById('users-container');
-      
-      const usersHtml = users.map(user => `
-        <div class="data-card">
-          <h4>${user.full_name || user.username}</h4>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Role:</strong> ${user.role_hint}</p>
-          <p><strong>Status:</strong> <span class="status ${user.status.toLowerCase()}">${user.status}</span></p>
-          <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
-          <p><strong>Joined:</strong> ${new Date(user.created_at).toLocaleDateString()}</p>
-        </div>
-      `).join('');
-      
-      container.innerHTML = usersHtml;
+      const tbody = document.getElementById('users-table');
+      if (!tbody) {
+        return;
+      }
+      renderUserRows(users, tbody);
     }
-
-    function displayWantedCriminals(criminals) {
-      const container = document.getElementById('wanted-criminals-container');
-      
-      const criminalsHtml = criminals.map(criminal => `
-        <div class="data-card">
-          <h4>${criminal.name}</h4>
-          ${criminal.alias ? `<p><strong>Alias:</strong> ${criminal.alias}</p>` : ''}
-          <p><strong>Age Range:</strong> ${criminal.age_range}</p>
-          <p><strong>Danger Level:</strong> <span class="priority ${criminal.danger_level.toLowerCase()}">${criminal.danger_level}</span></p>
-          <p><strong>Crimes:</strong> ${criminal.crimes_committed}</p>
-          <p><strong>Reward:</strong> BDT ${criminal.reward_amount}</p>
-          <p><strong>Status:</strong> <span class="status ${criminal.status.toLowerCase()}">${criminal.status}</span></p>
-        </div>
-      `).join('');
-      
-      container.innerHTML = criminalsHtml;
-    }
-
     function displayPoliceStations(stations) {
-      // no-op: table rendering handled in loadPoliceStations()
-    }
-
-    function viewStationDetails(stationId) {
-      showAlert(`Loading details for Station ID: ${stationId}...`);
+      const container = document.getElementById('police-stations-container');
+      
+      const stationsHtml = stations.map(station => `
+        <div class="data-card">
+          <h4>${station.station_name}</h4>
+          <p><strong>Code:</strong> ${station.station_code}</p>
+          <p><strong>Address:</strong> ${station.address}</p>
+          <p><strong>Phone:</strong> ${station.phone}</p>
+          <p><strong>Email:</strong> ${station.email}</p>
+          <p><strong>Officer in Charge:</strong> ${station.officer_in_charge || 'N/A'}</p>
+          <p><strong>Jurisdiction:</strong> ${station.jurisdiction_area}</p>
+        </div>
+      `).join('');
+      
+      container.innerHTML = stationsHtml;
     }
 
     function displayMissingPersons(persons) {
@@ -2113,77 +2530,151 @@
         </div>
       `;
     }
-  </script>
-  <script>
-    // JavaScript to handle dynamic data fetching and form submissions
-    async function loadCrimes() {
-      const tbody = document.getElementById('crimes-table');
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading crimes...</td></tr>';
 
+    function showUserStatsModal(statsSummary) {
+      const {
+        totalUsers,
+        recentRegistrations,
+        roleDistribution,
+        statusDistribution
+      } = statsSummary;
+
+      const activeEntry = statusDistribution.find(item => (item.label || '').toLowerCase() === 'active');
+      const activeCount = activeEntry ? activeEntry.count : 0;
+      const activeRate = totalUsers ? ((activeCount / totalUsers) * 100).toFixed(1) : '0.0';
+      const topRole = roleDistribution.reduce((best, current) => {
+        if (!best || current.count > best.count) {
+          return current;
+        }
+        return best;
+      }, null);
+
+      const metrics = [
+        { label: 'Total Users', value: totalUsers },
+        { label: 'New (30 Days)', value: recentRegistrations, prefix: '+' },
+        { label: 'Unique Roles', value: roleDistribution.length },
+        { label: 'Active Accounts', value: activeCount }
+      ];
+
+      const roleLabels = roleDistribution.map(item => item.label);
+      const roleCounts = roleDistribution.map(item => item.count);
+      const statusLabels = statusDistribution.map(item => item.label);
+      const statusCounts = statusDistribution.map(item => item.count);
+
+      const hasRoleData = roleCounts.some(count => count > 0);
+      const hasStatusData = statusCounts.some(count => count > 0);
+      const chartLibraryLoaded = typeof Chart !== 'undefined';
+      const roleEmptyMessage = chartLibraryLoaded ? 'Role data is not available yet.' : 'Charts unavailable in this environment.';
+      const statusEmptyMessage = chartLibraryLoaded ? 'Status data is not available yet.' : 'Charts unavailable in this environment.';
+
+      const insights = [
+        topRole ? `Most common role: <strong>${topRole.label}</strong> (${formatNumberDisplay(topRole.count)})` : null,
+        totalUsers ? `Active rate: <strong>${activeRate}%</strong>` : null,
+        roleDistribution.length ? `Role diversity: <strong>${formatNumberDisplay(roleDistribution.length)}</strong> roles in use` : null
+      ].filter(Boolean);
+
+      modalMessage.innerHTML = `
+        <div class="stats-modal">
+          <div class="stats-header">
+            <h3>User Statistics</h3>
+            <p>Live snapshot of account distribution and onboarding momentum.</p>
+          </div>
+          <div class="stats-metrics">
+            ${metrics.map(metric => `
+              <div class="stats-metric">
+                <span class="metric-label">${metric.label}</span>
+                <span class="metric-value">${metric.prefix || ''}${formatNumberDisplay(metric.value ?? 0)}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="stats-charts">
+            <div class="stats-chart">
+              <h4>Role Distribution</h4>
+              ${hasRoleData && chartLibraryLoaded
+                ? '<div class="chart-wrapper"><canvas id="role-distribution-chart"></canvas></div>'
+                : `<div class="stats-empty-state">${roleEmptyMessage}</div>`}
+            </div>
+            <div class="stats-chart">
+              <h4>Status Distribution</h4>
+              ${hasStatusData && chartLibraryLoaded
+                ? '<div class="chart-wrapper"><canvas id="status-distribution-chart"></canvas></div>'
+                : `<div class="stats-empty-state">${statusEmptyMessage}</div>`}
+            </div>
+          </div>
+          ${insights.length ? `
+            <div class="stats-insights">
+              <h4>Quick Insights</h4>
+              <ul>
+                ${insights.map(item => `<li>${item}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'btn btn-primary';
+      closeButton.textContent = 'Close';
+      closeButton.onclick = () => closeModal();
+      modalButtons.appendChild(closeButton);
+
+      modalOverlay.classList.add('show');
+
+      requestAnimationFrame(() => {
+        if (hasRoleData && chartLibraryLoaded) {
+          renderDoughnutChart('role-distribution-chart', roleLabels, roleCounts, 'role');
+        }
+        if (hasStatusData && chartLibraryLoaded) {
+          renderDoughnutChart('status-distribution-chart', statusLabels, statusCounts, 'status');
+        }
+      });
+    }
+
+    async function showUserStats() {
       try {
-        const response = await fetch('/api/crimes');
-        const crimes = await response.json();
+        const response = await fetch(resolveApiUrl('/api/admin/user-stats'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
 
-        tbody.innerHTML = ''; // Clear the loading message
-        crimes.forEach(crime => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${crime.crime_id}</td>
-            <td>${crime.location_data}</td>
-            <td><span class="status-badge status-${crime.status.toLowerCase()}">${crime.status}</span></td>
-            <td><button class="action-btn" onclick="viewCrimeDetails(${crime.crime_id})">View</button></td>
-          `;
-          tbody.appendChild(row);
+        const stats = await response.json();
+
+        const roleDistribution = (Array.isArray(stats.role_distribution) ? stats.role_distribution : [])
+          .map(entry => ({
+            label: entry.role_hint || 'Unknown',
+            count: Number(entry.count) || 0
+          }))
+          .filter(item => item.count >= 0)
+          .sort((a, b) => b.count - a.count);
+
+        const statusDistribution = (Array.isArray(stats.status_distribution) ? stats.status_distribution : [])
+          .map(entry => ({
+            label: entry.status || 'Unknown',
+            count: Number(entry.count) || 0
+          }))
+          .filter(item => item.count >= 0)
+          .sort((a, b) => b.count - a.count);
+
+        showUserStatsModal({
+          totalUsers: Number(stats.total_users) || 0,
+          recentRegistrations: Number(stats.recent_registrations) || 0,
+          roleDistribution,
+          statusDistribution
         });
       } catch (error) {
-        console.error('Error:', error);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Error fetching crimes.</td></tr>';
+        console.error('Error fetching user statistics:', error);
+        showAlert('Unable to load user statistics right now. Please try again later.');
       }
     }
 
-    // Call loadCrimes on page load
-    document.addEventListener('DOMContentLoaded', loadCrimes);
-
-    // Handle form submissions for adding a crime
-    document.getElementById('add-crime-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const formData = new FormData(this);
-      const crimeData = {
-        reporter_id: formData.get('reporter_id') || null,
-        crime_data: formData.get('crime_data') || null,
-        victim_data: formData.get('victim_data') || null,
-        criminal_data: formData.get('criminal_data') || null,
-        weapon_data: formData.get('weapon_data') || null,
-        location_data: formData.get('location_data') || null,
-        status: formData.get('status') || null,
-        priority_level: formData.get('priority_level') || null,
-        incident_date: formData.get('incident_date') || null,
-        evidence_files: formData.get('evidence_files') ? JSON.parse(formData.get('evidence_files')) : null,
-        witness_info: formData.get('witness_info') || null,
-        witness_data: formData.get('witness_data') || null
-      };
-
-      try {
-        const response = await fetch('/api/crime', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(crimeData),
-        });
-        const result = await response.json();
-        if (response.ok) {
-          alert(`Crime added successfully! Crime ID: ${result.crime_id}`);
-        } else {
-          alert(`Error: ${result.detail}`);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred while adding the crime.');
-      }
-    });
-  </script>
-
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => loadCrimesOverview());
+    } else {
+      loadCrimesOverview();
+    }
+    </script>
   </body>
 </html>
