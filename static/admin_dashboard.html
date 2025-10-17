@@ -1318,6 +1318,93 @@
     
     // --- End Mock Data ---
 
+    // Resolve API endpoints so dashboard works from FastAPI static hosting or Live Server.
+    const API_BASE = window.location.origin.includes(':8000') ? '' : 'http://localhost:8000';
+
+    function resolveApiUrl(path) {
+      if (!path.startsWith('/')) {
+        return `${API_BASE}/${path}`;
+      }
+      return `${API_BASE}${path}`;
+    }
+
+    function normalizeStatus(status) {
+      const raw = (status || 'Pending').toString().trim();
+      const normalized = raw.toLowerCase().replace(/_/g, ' ');
+      const classMap = {
+        'pending': 'status-pending',
+        'reported': 'status-reported',
+        'under investigation': 'status-under-investigation',
+        'in progress': 'status-in-progress',
+        'case closed': 'status-case-closed',
+        'solved': 'status-resolved',
+        'resolved': 'status-resolved',
+        'verified': 'status-verified'
+      };
+      const className = classMap[normalized] || 'status-pending';
+      const display = raw.replace(/_/g, ' ');
+      return { className, display };
+    }
+
+    function formatCrimeLocation(locationData, fallback = {}) {
+      if (typeof locationData === 'string' && locationData.trim()) {
+        return locationData.trim();
+      }
+
+      if (locationData && typeof locationData === 'object') {
+        const candidates = [
+          locationData.area,
+          locationData.area_name,
+          locationData.neighborhood,
+          locationData.town,
+          locationData.city,
+          locationData.district,
+          locationData.address,
+          locationData.address_line,
+          locationData.formatted_address
+        ].filter(part => typeof part === 'string' && part.trim());
+
+        if (candidates.length) {
+          const uniqueParts = Array.from(new Set(candidates.map(text => text.trim())));
+          return uniqueParts.join(', ');
+        }
+      }
+
+      const fallbackParts = [
+        fallback.area,
+        fallback.area_name,
+        fallback.city,
+        fallback.district
+      ].filter(part => typeof part === 'string' && part.trim());
+
+      return fallbackParts.join(', ') || 'N/A';
+    }
+
+    function renderCrimeRows(crimes, tbody) {
+      tbody.innerHTML = '';
+      crimes.forEach(crime => {
+        const locationText = formatCrimeLocation(crime.location_data, crime);
+        const statusInfo = normalizeStatus(crime.status);
+        const displayStatus = statusInfo.display
+          .toLowerCase()
+          .replace(/\b\w/g, char => char.toUpperCase());
+        const numericId = crime.crime_id || crime.id || 0;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>CR-${String(numericId).padStart(3, '0')}</td>
+          <td>${locationText}</td>
+          <td><span class="status-badge ${statusInfo.className}">${displayStatus}</span></td>
+          <td>
+            <button class="action-btn" onclick="viewCrimeDetails(${numericId})">
+              <span>📄</span>
+              Summarize
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
 
     // Tab switching functionality
     function showTab(tabName, event) {
@@ -1405,38 +1492,30 @@
     // Load crimes for overview tab
     async function loadCrimesOverview() {
       const tbody = document.getElementById('crimes-table');
+      if (!tbody) {
+        return;
+      }
+
       tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading crime reports...</td></tr>';
+
       try {
-        // --- MOCK DATA SIMULATION ---
-        await new Promise(resolve => setTimeout(resolve, 300)); 
-        const result = { success: true, crimes: crimesData };
-        // --- END MOCK DATA SIMULATION ---
-        
-        if (result.success) {
-          tbody.innerHTML = ''; // Clear existing rows
-          
-          result.crimes.forEach(crime => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>CR-${crime.crime_id.toString().padStart(3, '0')}</td>
-              <td>${crime.area_name || 'N/A'}, ${crime.city || 'N/A'}</td>
-              <td><span class="status-badge status-${(crime.status || 'pending').replace('_', '-')}">${(crime.status || 'pending').replace('_', ' ')}</span></td>
-              <td>
-                <button class="action-btn" onclick="viewCrimeDetails(${crime.crime_id})">
-                  <span>📄</span>
-                  Summarize
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Failed to load crimes.</td></tr>';
-            console.error('Data Error loading crimes:', result.message || 'Unknown error');
+        const response = await fetch(resolveApiUrl('/api/crimes?limit=25'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const crimes = Array.isArray(payload.crimes) ? payload.crimes : [];
+
+        if (crimes.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No crime reports found.</td></tr>';
+          return;
+        }
+
+        renderCrimeRows(crimes, tbody);
       } catch (error) {
-        console.error('Process Error loading crimes:', error);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">An error occurred while processing crime data.</td></tr>';
+        console.error('Error loading crimes from API:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Unable to load crime reports right now.</td></tr>';
       }
     }
 
@@ -1814,6 +1893,12 @@
           `).join('')}
         </div>
       `;
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => loadCrimesOverview());
+    } else {
+      loadCrimesOverview();
     }
     </script>
   </body>
