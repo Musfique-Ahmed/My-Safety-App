@@ -231,6 +231,18 @@
       gap: 1.5rem;
       margin-bottom: 2rem;
     }
+    .form-section-title {
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .form-hint {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 0.35rem;
+    }
     .form-group {
       display: flex;
       flex-direction: column;
@@ -1288,6 +1300,98 @@
             <textarea class="form-textarea" name="location_details" placeholder="Specific location details, landmarks, etc."></textarea>
           </div>
           
+          <h3 class="form-section-title">Victim Details (Optional)</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Victim Name</label>
+              <input type="text" class="form-input" name="victim_name" placeholder="e.g., Jane Doe">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Age</label>
+              <input type="number" class="form-input" name="victim_age" min="0" placeholder="Age in years">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Gender</label>
+              <select class="form-select" name="victim_gender">
+                <option value="">Select Gender</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Victim Contact</label>
+              <input type="text" class="form-input" name="victim_contact" placeholder="Phone or email for follow-up">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Victim Notes</label>
+            <textarea class="form-textarea" name="victim_notes" placeholder="Injuries, medical needs, or other relevant details."></textarea>
+          </div>
+
+          <h3 class="form-section-title">Suspect Details (Optional)</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Suspect Name</label>
+              <input type="text" class="form-input" name="criminal_name" placeholder="e.g., John Smith">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Known Alias</label>
+              <input type="text" class="form-input" name="criminal_alias" placeholder="Alias or nickname">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Last Known Location</label>
+              <input type="text" class="form-input" name="criminal_last_known" placeholder="e.g., Mirpur, Dhaka">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Suspect Description</label>
+            <textarea class="form-textarea" name="criminal_description" placeholder="Physical characteristics, distinctive marks, etc."></textarea>
+          </div>
+
+          <h3 class="form-section-title">Weapon Details (Optional)</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Weapon Type</label>
+              <input type="text" class="form-input" name="weapon_type" placeholder="e.g., Handgun, Knife">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Recovery Status</label>
+              <select class="form-select" name="weapon_recovered">
+                <option value="">Unknown</option>
+                <option value="Recovered">Recovered</option>
+                <option value="Not Recovered">Not Recovered</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Weapon Description</label>
+            <textarea class="form-textarea" name="weapon_description" placeholder="Additional context about the weapon involved."></textarea>
+          </div>
+
+          <h3 class="form-section-title">Witness Details (Optional)</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Witness Name</label>
+              <input type="text" class="form-input" name="witness_name" placeholder="e.g., Abdul Karim">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Witness Contact</label>
+              <input type="text" class="form-input" name="witness_contact" placeholder="Phone or email for coordination">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Witness Statement</label>
+            <textarea class="form-textarea" name="witness_statement" placeholder="Summary of what the witness observed."></textarea>
+          </div>
+
+          <h3 class="form-section-title">Evidence Uploads (Optional)</h3>
+          <div class="form-group">
+            <label class="form-label">Upload Evidence Files</label>
+            <input type="file" class="form-input" id="evidence-files-input" name="evidence_files" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.mp3,.mp4,.zip,.txt">
+            <p class="form-hint">Select one or more files (max 5&nbsp;MB each). Files are stored securely with the crime record.</p>
+          </div>
+
           <div style="margin-top: 2rem;">
             <button type="submit" class="btn btn-primary">
               <span>➕</span>
@@ -2841,6 +2945,49 @@
       const formData = new FormData(this);
       const crimeData = Object.fromEntries(formData);
 
+      const toNumberOrNull = (value) => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+        const normalized = value.toString().trim();
+        if (!normalized) {
+          return null;
+        }
+        const numeric = Number(normalized);
+        return Number.isFinite(numeric) ? numeric : null;
+      };
+
+      const buildCleanObject = (candidate) => {
+        const result = {};
+        Object.entries(candidate).forEach(([key, value]) => {
+          if (value === null || value === undefined) {
+            return;
+          }
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              return;
+            }
+            result[key] = trimmed;
+            return;
+          }
+          if (Array.isArray(value)) {
+            if (value.length) {
+              result[key] = value;
+            }
+            return;
+          }
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            result[key] = value;
+            return;
+          }
+          if (typeof value === 'boolean') {
+            result[key] = value;
+          }
+        });
+        return Object.keys(result).length ? result : null;
+      };
+
       const payload = {
         crime_type: (crimeData.crime_type || '').trim(),
         status: (crimeData.status || '').trim(),
@@ -2852,6 +2999,55 @@
         description: (crimeData.description || '').trim(),
         reporter_id: Number.isFinite(CURRENT_ADMIN_ID) ? CURRENT_ADMIN_ID : null
       };
+
+      const victim = buildCleanObject({
+        name: crimeData.victim_name,
+        age: toNumberOrNull(crimeData.victim_age),
+        gender: crimeData.victim_gender,
+        contact: crimeData.victim_contact,
+        notes: crimeData.victim_notes
+      });
+      if (victim) {
+        payload.victim = victim;
+      }
+
+      const criminal = buildCleanObject({
+        name: crimeData.criminal_name,
+        alias: crimeData.criminal_alias,
+        description: crimeData.criminal_description,
+        last_known_location: crimeData.criminal_last_known
+      });
+      if (criminal) {
+        payload.criminal = criminal;
+      }
+
+      const weapon = buildCleanObject({
+        type: crimeData.weapon_type,
+        description: crimeData.weapon_description,
+        recovered_status: crimeData.weapon_recovered
+      });
+      if (weapon) {
+        payload.weapon = weapon;
+      }
+
+      let witness = buildCleanObject({
+        name: crimeData.witness_name,
+        contact: crimeData.witness_contact
+      });
+
+      const witnessStatement = (crimeData.witness_statement || '').trim();
+      if (witnessStatement) {
+        if (!witness) {
+          witness = {};
+        }
+        witness.statement = witnessStatement;
+        payload.witness = witness;
+        payload.witness_info = witnessStatement;
+      } else if (witness) {
+        payload.witness = witness;
+      }
+
+      const evidenceFiles = formData.getAll('evidence_files').filter(item => item instanceof File && item.size > 0);
 
       if (!payload.crime_type || !payload.status || !payload.city || !payload.area_name || !payload.incident_time || !payload.description) {
         showAlert('Please fill in all required fields before submitting the crime report.');
@@ -2865,6 +3061,47 @@
         if (submitBtn) {
           submitBtn.innerHTML = '<span>⏳</span> Adding Crime...';
           submitBtn.disabled = true;
+        }
+
+        if (evidenceFiles.length) {
+          const uploadedEvidence = [];
+          for (const file of evidenceFiles) {
+            if (file.size > 5 * 1024 * 1024) {
+              throw new Error(`Evidence file "${file.name}" is larger than 5 MB.`);
+            }
+
+            const uploadData = new FormData();
+            uploadData.append('file', file);
+
+            const uploadResponse = await fetch(resolveApiUrl('/api/upload'), {
+              method: 'POST',
+              body: uploadData
+            });
+
+            if (!uploadResponse.ok) {
+              const uploadError = await uploadResponse.json().catch(() => ({}));
+              const detail = uploadError.detail || uploadError.message || `Upload failed with status ${uploadResponse.status}`;
+              throw new Error(detail);
+            }
+
+            const uploadResult = await uploadResponse.json().catch(() => ({}));
+            const fileUrl = uploadResult.file_url || uploadResult.url;
+            if (!fileUrl) {
+              throw new Error('Upload failed: server did not return a file URL.');
+            }
+
+            uploadedEvidence.push({
+              url: fileUrl,
+              stored_name: uploadResult.filename || uploadResult.name || null,
+              original_name: file.name,
+              mime_type: file.type || null,
+              size_bytes: file.size
+            });
+          }
+
+          if (uploadedEvidence.length) {
+            payload.evidence_files = uploadedEvidence;
+          }
         }
 
         const response = await fetch(resolveApiUrl('/api/admin/crimes'), {

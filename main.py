@@ -108,6 +108,12 @@ class AdminCrimeCreate(BaseModel):
     priority: Optional[str] = "medium"
     location_details: Optional[str] = None
     reporter_id: Optional[int] = None
+    victim: Optional[Dict[str, Any]] = None
+    criminal: Optional[Dict[str, Any]] = None
+    weapon: Optional[Dict[str, Any]] = None
+    witness: Optional[Dict[str, Any]] = None
+    evidence_files: Optional[List[Dict[str, Any]]] = None
+    witness_info: Optional[str] = None
 
 class MissingPersonData(BaseModel):
     name: str
@@ -474,6 +480,52 @@ async def create_admin_crime(payload: AdminCrimeCreate):
         "high": "High",
     }
 
+    def clean_structured_value(value: Optional[Any]) -> Optional[Any]:
+        """Strip empty values from nested payloads before serializing."""
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            cleaned: Dict[str, Any] = {}
+            for key, item in value.items():
+                if item is None:
+                    continue
+                if isinstance(item, str):
+                    trimmed = item.strip()
+                    if not trimmed:
+                        continue
+                    cleaned[key] = trimmed
+                elif isinstance(item, (int, float, bool)):
+                    cleaned[key] = item
+                elif isinstance(item, list):
+                    nested_list = clean_structured_value(item)
+                    if nested_list is not None:
+                        cleaned[key] = nested_list
+                elif isinstance(item, dict):
+                    nested_dict = clean_structured_value(item)
+                    if nested_dict is not None:
+                        cleaned[key] = nested_dict
+            return cleaned or None
+        if isinstance(value, list):
+            cleaned_list: List[Any] = []
+            for item in value:
+                if item is None:
+                    continue
+                if isinstance(item, str):
+                    trimmed = item.strip()
+                    if trimmed:
+                        cleaned_list.append(trimmed)
+                elif isinstance(item, (int, float, bool)):
+                    cleaned_list.append(item)
+                else:
+                    nested = clean_structured_value(item)
+                    if nested is not None:
+                        cleaned_list.append(nested)
+            return cleaned_list or None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
     normalized_status_key = (payload.status or "").strip().lower().replace("-", "_")
     status_value = status_map.get(normalized_status_key, (payload.status or "Pending").strip().title() or "Pending")
 
@@ -505,6 +557,21 @@ async def create_admin_crime(payload: AdminCrimeCreate):
         "priority_level": priority_value,
         "source": "admin-dashboard",
     }
+
+    victim_struct = clean_structured_value(payload.victim)
+    criminal_struct = clean_structured_value(payload.criminal)
+    weapon_struct = clean_structured_value(payload.weapon)
+    witness_struct = clean_structured_value(payload.witness)
+    evidence_struct = clean_structured_value(payload.evidence_files)
+    witness_info_value = clean_structured_value(payload.witness_info)
+
+    witness_info_struct: Optional[Dict[str, Any]] = None
+    if witness_info_value:
+        if isinstance(witness_struct, dict):
+            witness_struct.setdefault("statement", witness_info_value)
+        else:
+            witness_struct = {"statement": witness_info_value}
+        witness_info_struct = {"statement": witness_info_value}
 
     created_at = datetime.utcnow()
 
@@ -543,12 +610,12 @@ async def create_admin_crime(payload: AdminCrimeCreate):
                         :incident_date,
                         :location_data,
                         :crime_data,
-                        NULL,
-                        NULL,
-                        NULL,
-                        NULL,
-                        NULL,
-                        NULL,
+                        :victim_data,
+                        :criminal_data,
+                        :weapon_data,
+                        :witness_data,
+                        :evidence_files,
+                        :witness_info,
                         :status,
                         :priority_level,
                         :created_at,
@@ -561,6 +628,12 @@ async def create_admin_crime(payload: AdminCrimeCreate):
                     "incident_date": incident_dt,
                     "location_data": json.dumps(location_payload),
                     "crime_data": json.dumps(crime_payload),
+                    "victim_data": json.dumps(victim_struct) if victim_struct else None,
+                    "criminal_data": json.dumps(criminal_struct) if criminal_struct else None,
+                    "weapon_data": json.dumps(weapon_struct) if weapon_struct else None,
+                    "witness_data": json.dumps(witness_struct) if witness_struct else None,
+                    "evidence_files": json.dumps(evidence_struct) if evidence_struct else None,
+                    "witness_info": json.dumps(witness_info_struct) if witness_info_struct else None,
                     "status": status_value,
                     "priority_level": priority_value,
                     "created_at": created_at,
