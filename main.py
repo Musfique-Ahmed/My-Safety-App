@@ -602,74 +602,95 @@ async def get_missing_person_by_id(missing_id: int):
 
 # ==================== WANTED CRIMINALS ENDPOINTS ====================
 
+# @app.get("/api/wanted-criminals")
+# async def get_wanted_criminals():
+#     with engine.connect() as conn:
+#         try:
+#             result = conn.execute(
+#                 text("SELECT * FROM wanted_criminal WHERE status = 'Active' ORDER BY created_at DESC")
+#             ).mappings().fetchall()
+            
+#             wanted_criminals = []
+#             for row in result:
+#                 criminal = dict(row)
+#                 # Convert database fields to match frontend expectations
+#                 wanted_criminal = {
+#                     "id": criminal["criminal_id"],
+#                     "name": criminal["name"],
+#                     "alias": criminal.get("alias", ""),
+#                     "age": criminal.get("age_range", "Unknown"),
+#                     "height_cm": criminal.get("height", "Unknown"),
+#                     "complexion": criminal.get("distinguishing_marks", "Unknown"),
+#                     "crimes": criminal["crimes_committed"].split(", ") if criminal["crimes_committed"] else [],
+#                     "last_seen_location": criminal.get("last_known_location", "Unknown"),
+#                     "last_seen_time": criminal.get("wanted_since", ""),
+#                     "reward": float(criminal.get("reward_amount", 0)),
+#                     "photo_url": criminal.get("photo_url", "/static/img/placeholder.jpg"),
+#                     "note": criminal.get("description", ""),
+#                     "danger_level": criminal.get("danger_level", "Medium"),
+#                     "status": criminal["status"]
+#                 }
+#                 wanted_criminals.append(wanted_criminal)
+            
+#             return {"wanted_criminals": wanted_criminals}
+#         except Exception as e:
+#             print(f"Error fetching wanted criminals: {e}")
+#             # Return sample data if database is not set up
+#             return {"wanted_criminals": [
+#                 {
+#                     "id": 1,
+#                     "name": "Karim Ahmed",
+#                     "alias": "Black Karim",
+#                     "age": "25-30",
+#                     "height_cm": "175",
+#                     "complexion": "Dark, scar on left cheek",
+#                     "crimes": ["Armed robbery", "assault", "theft"],
+#                     "last_seen_location": "Old Dhaka area",
+#                     "last_seen_time": "2024-01-15",
+#                     "reward": 50000,
+#                     "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
+#                     "note": "Extremely dangerous, do not approach",
+#                     "danger_level": "High",
+#                     "status": "Active"
+#                 },
+#                 {
+#                     "id": 2,
+#                     "name": "Rashida Begum",
+#                     "alias": "Rashi",
+#                     "age": "30-35",
+#                     "height_cm": "160",
+#                     "complexion": "Fair, distinctive tattoo on right arm",
+#                     "crimes": ["Fraud", "embezzlement", "forgery"],
+#                     "last_seen_location": "Uttara sector 7",
+#                     "last_seen_time": "2024-02-20",
+#                     "reward": 25000,
+#                     "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
+#                     "note": "Known for financial crimes",
+#                     "danger_level": "Medium",
+#                     "status": "Active"
+#                 }
+#             ]}
+
+
 @app.get("/api/wanted-criminals")
 async def get_wanted_criminals():
-    with engine.connect() as conn:
-        try:
-            result = conn.execute(
-                text("SELECT * FROM wanted_criminal WHERE status = 'Active' ORDER BY created_at DESC")
-            ).mappings().fetchall()
-            
-            wanted_criminals = []
-            for row in result:
-                criminal = dict(row)
-                # Convert database fields to match frontend expectations
-                wanted_criminal = {
-                    "id": criminal["criminal_id"],
-                    "name": criminal["name"],
-                    "alias": criminal.get("alias", ""),
-                    "age": criminal.get("age_range", "Unknown"),
-                    "height_cm": criminal.get("height", "Unknown"),
-                    "complexion": criminal.get("distinguishing_marks", "Unknown"),
-                    "crimes": criminal["crimes_committed"].split(", ") if criminal["crimes_committed"] else [],
-                    "last_seen_location": criminal.get("last_known_location", "Unknown"),
-                    "last_seen_time": criminal.get("wanted_since", ""),
-                    "reward": float(criminal.get("reward_amount", 0)),
-                    "photo_url": criminal.get("photo_url", "/static/img/placeholder.jpg"),
-                    "note": criminal.get("description", ""),
-                    "danger_level": criminal.get("danger_level", "Medium"),
-                    "status": criminal["status"]
-                }
-                wanted_criminals.append(wanted_criminal)
-            
-            return {"wanted_criminals": wanted_criminals}
-        except Exception as e:
-            print(f"Error fetching wanted criminals: {e}")
-            # Return sample data if database is not set up
-            return {"wanted_criminals": [
-                {
-                    "id": 1,
-                    "name": "Karim Ahmed",
-                    "alias": "Black Karim",
-                    "age": "25-30",
-                    "height_cm": "175",
-                    "complexion": "Dark, scar on left cheek",
-                    "crimes": ["Armed robbery", "assault", "theft"],
-                    "last_seen_location": "Old Dhaka area",
-                    "last_seen_time": "2024-01-15",
-                    "reward": 50000,
-                    "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
-                    "note": "Extremely dangerous, do not approach",
-                    "danger_level": "High",
-                    "status": "Active"
-                },
-                {
-                    "id": 2,
-                    "name": "Rashida Begum",
-                    "alias": "Rashi",
-                    "age": "30-35",
-                    "height_cm": "160",
-                    "complexion": "Fair, distinctive tattoo on right arm",
-                    "crimes": ["Fraud", "embezzlement", "forgery"],
-                    "last_seen_location": "Uttara sector 7",
-                    "last_seen_time": "2024-02-20",
-                    "reward": 25000,
-                    "photo_url": "https://via.placeholder.com/300x300/dc2626/ffffff?text=WANTED",
-                    "note": "Known for financial crimes",
-                    "danger_level": "Medium",
-                    "status": "Active"
-                }
-            ]}
+    query = text(
+        """
+        SELECT criminal_id, name, alias, age_range, gender, description, height, weight,
+               hair_color, eye_color, distinguishing_marks, crimes_committed, reward_amount,
+               danger_level, last_known_location, photo_url, wanted_since, added_by, status,
+               capture_date, created_at, updated_at
+        FROM wanted_criminal
+        ORDER BY COALESCE(updated_at, created_at) DESC
+        """
+    )
+    try:
+        with engine.connect() as conn:
+            rows = [dict(row) for row in conn.execute(query).mappings()]
+        return rows
+    except Exception:
+        logging.exception("Failed to fetch wanted criminals")
+        raise HTTPException(status_code=500, detail="Failed to fetch wanted criminals")
 
 @app.get("/api/wanted-criminals/{criminal_id}")
 async def get_wanted_criminal_by_id(criminal_id: int):
