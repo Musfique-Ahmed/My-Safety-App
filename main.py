@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 import hashlib
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Mapping
 import json
 import os
 import uuid
@@ -136,7 +136,6 @@ class EmergencyAlert(BaseModel):
     severity: str = "High"
 
 class CriminalSighting(BaseModel):
-    criminal_id: int
     last_seen_time: str
     last_seen_location: str
     still_with_finder: bool = False
@@ -724,45 +723,147 @@ async def get_wanted_criminal_by_id(criminal_id: int):
             
         return {"wanted_criminal": dict(result)}
 
+@app.get("/api/wanted-criminals/{criminal_id}/sightings")
+async def list_wanted_criminal_sightings(criminal_id: int):
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT sighting_id,
+                       criminal_id,
+                       last_seen_time,
+                       last_seen_location,
+                       still_with_finder,
+                       reporter_contact,
+                       created_at
+                FROM criminal_sightings
+                WHERE criminal_id = :criminal_id
+                ORDER BY COALESCE(last_seen_time, created_at) DESC, sighting_id DESC
+                """
+            ),
+            {"criminal_id": criminal_id}
+        ).mappings().fetchall()
+
+    def _serialize(row: Mapping[str, Any]) -> Dict[str, Any]:
+        last_seen_time = row.get("last_seen_time")
+        created_at = row.get("created_at")
+        finder_value = row.get("still_with_finder")
+        if isinstance(finder_value, str):
+            finder_normalized = finder_value.strip().lower()
+            still_with_finder = finder_normalized in {"1", "true", "yes", "y"}
+        else:
+            still_with_finder = bool(finder_value)
+        return {
+            "sighting_id": row.get("sighting_id"),
+            "criminal_id": row.get("criminal_id"),
+            "last_seen_time": last_seen_time.isoformat() if isinstance(last_seen_time, datetime) else last_seen_time,
+            "last_seen_location": row.get("last_seen_location"),
+            "still_with_finder": still_with_finder,
+            "reporter_contact": row.get("reporter_contact"),
+            "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
+        }
+
+    return {"sightings": [_serialize(row) for row in rows]}
+
 @app.post("/api/wanted-criminals/{criminal_id}/sighting")
 async def report_criminal_sighting(criminal_id: int, sighting: CriminalSighting):
     """Report a sighting of a wanted criminal"""
-    with engine.connect() as conn:
+
+    def _parse_last_seen(value: Optional[str]) -> datetime:
+        if not value:
+            return datetime.utcnow()
         try:
-            # Insert sighting report
-            conn.execute(
-                text("""
-                    INSERT INTO criminal_sightings (criminal_id, last_seen_time, last_seen_location, 
-                                                   still_with_finder, reporter_contact, created_at)
-                    VALUES (:criminal_id, :last_seen_time, :last_seen_location, 
-                            :still_with_finder, :reporter_contact, :created_at)
-                """),
-                {
-                    "criminal_id": criminal_id,
-                    "last_seen_time": sighting.last_seen_time,
-                    "last_seen_location": sighting.last_seen_location,
-                    "still_with_finder": sighting.still_with_finder,
-                    "reporter_contact": sighting.reporter_contact,
-                    "created_at": datetime.utcnow()
-                }
-            )
-            conn.commit()
-            
-            # In production, this would trigger real police notifications
-            print(f"🚓 CRIMINAL SIGHTING REPORTED: Criminal ID {criminal_id} at {sighting.last_seen_location}")
-            
-            return {
-                "message": "Criminal sighting reported successfully",
-                "status": "Police have been notified"
+            return datetime.fromisoformat(value)
+        except ValueError:
+            # Try without the "T" separator as a fallback (e.g. "2025-10-18 12:30")
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M")
+            except ValueError:
+                try:
+                    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    raise HTTPException(status_code=422, detail="Invalid last_seen_time format")
+
+    last_seen_dt = _parse_last_seen(sighting.last_seen_time)
+    location_text = (sighting.last_seen_location or "").strip()
+    with_finder_flag = "Yes" if sighting.still_with_finder else "No"
+
+    with engine.begin() as conn:
+        # Insert detailed sighting log (auditing/history)
+        conn.execute(
+            text(
+                """
+                INSERT INTO criminal_sightings (
+                    criminal_id,
+                    last_seen_time,
+                    last_seen_location,
+                    still_with_finder,
+                    reporter_contact,
+                    created_at
+                )
+                VALUES (
+                    :criminal_id,
+                    :last_seen_time,
+                    :last_seen_location,
+                    :still_with_finder,
+                    :reporter_contact,
+                    :created_at
+                )
+                """
+            ),
+            {
+                "criminal_id": criminal_id,
+                "last_seen_time": last_seen_dt,
+                "last_seen_location": location_text,
+                "still_with_finder": sighting.still_with_finder,
+                "reporter_contact": sighting.reporter_contact,
+                "created_at": datetime.utcnow()
             }
-        except Exception as e:
-            conn.rollback()
-            print(f"Error reporting sighting: {e}")
-            # Still return success for demo purposes
-            return {
-                "message": "Criminal sighting reported successfully",
-                "status": "Police have been notified"
+        )
+
+        # Update the live wanted-criminal record
+        update_result = conn.execute(
+            text(
+                """
+                UPDATE wanted_criminal
+                SET
+                    last_seen_reported_at = :last_seen_reported_at,
+                    last_seen_reported_location = :last_seen_reported_location,
+                    last_seen_with_finder = :last_seen_with_finder,
+                    status = :status,
+                    updated_at = :updated_at
+                WHERE criminal_id = :criminal_id
+                """
+            ),
+            {
+                "last_seen_reported_at": last_seen_dt,
+                "last_seen_reported_location": location_text or None,
+                "last_seen_with_finder": with_finder_flag,
+                "status": "Seen",
+                "updated_at": datetime.utcnow(),
+                "criminal_id": criminal_id
             }
+        )
+
+        if update_result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Wanted criminal not found")
+
+        updated_record = conn.execute(
+            text("SELECT * FROM wanted_criminal WHERE criminal_id = :criminal_id"),
+            {"criminal_id": criminal_id}
+        ).mappings().fetchone()
+
+    # In production, this would trigger alerts to police task forces
+    print(
+        "🚓 CRIMINAL SIGHTING REPORTED:",
+        f"Criminal ID {criminal_id} at {location_text or 'unspecified location'}"
+    )
+
+    return {
+        "message": "Criminal sighting reported successfully",
+        "status": "Seen",
+        "wanted_criminal": dict(updated_record) if updated_record else None
+    }
 
 # ==================== CHAT/MESSAGING ENDPOINTS ====================
 
@@ -1554,15 +1655,17 @@ async def create_wanted_criminal(criminal: WantedCriminalCreate):
         try:
             result = conn.execute(
                 text("""
-                    INSERT INTO wanted_criminal (name, alias, age_range, gender, description, height, 
-                                               weight, hair_color, eye_color, distinguishing_marks, 
-                                               crimes_committed, reward_amount, danger_level, 
-                                               last_known_location, photo_url, wanted_since, added_by, 
-                                               status, created_at)
-                    VALUES (:name, :alias, :age_range, :gender, :description, :height, :weight, 
-                            :hair_color, :eye_color, :distinguishing_marks, :crimes_committed, 
-                            :reward_amount, :danger_level, :last_known_location, :photo_url, 
-                            :wanted_since, :added_by, :status, :created_at)
+            INSERT INTO wanted_criminal (name, alias, age_range, gender, description, height, 
+                           weight, hair_color, eye_color, distinguishing_marks, 
+                           crimes_committed, reward_amount, danger_level, 
+                           last_known_location, last_seen_reported_at, 
+                           last_seen_reported_location, last_seen_with_finder, 
+                           photo_url, wanted_since, added_by, status, created_at)
+            VALUES (:name, :alias, :age_range, :gender, :description, :height, :weight, 
+                :hair_color, :eye_color, :distinguishing_marks, :crimes_committed, 
+                :reward_amount, :danger_level, :last_known_location, :last_seen_reported_at,
+                :last_seen_reported_location, :last_seen_with_finder, :photo_url, 
+                :wanted_since, :added_by, :status, :created_at)
                 """),
                 {
                     "name": criminal.name,
@@ -1579,10 +1682,13 @@ async def create_wanted_criminal(criminal: WantedCriminalCreate):
                     "reward_amount": criminal.reward_amount,
                     "danger_level": criminal.danger_level,
                     "last_known_location": criminal.last_known_location,
+                    "last_seen_reported_at": None,
+                    "last_seen_reported_location": None,
+                    "last_seen_with_finder": 'No',
                     "photo_url": criminal.photo_url,
                     "wanted_since": datetime.utcnow().date(),
                     "added_by": criminal.added_by,
-                    "status": "Active",
+                    "status": "Unseen",
                     "created_at": datetime.utcnow()
                 }
             )
@@ -1645,23 +1751,27 @@ async def update_wanted_criminal(criminal_id: int, criminal: WantedCriminalCreat
 @app.delete("/api/admin/wanted-criminals/{criminal_id}")
 async def delete_wanted_criminal(criminal_id: int):
     """Admin endpoint to remove wanted criminal"""
-    with engine.connect() as conn:
-        try:
-            result = conn.execute(
-                text("UPDATE wanted_criminal SET status = 'Captured', updated_at = :updated_at WHERE criminal_id = :criminal_id"),
-                {"criminal_id": criminal_id, "updated_at": datetime.utcnow()}
+    try:
+        with engine.begin() as conn:
+            # Clear dependent sighting history so FK constraints allow removal
+            conn.execute(
+                text("DELETE FROM criminal_sightings WHERE criminal_id = :criminal_id"),
+                {"criminal_id": criminal_id}
             )
-            
+
+            result = conn.execute(
+                text("DELETE FROM wanted_criminal WHERE criminal_id = :criminal_id"),
+                {"criminal_id": criminal_id}
+            )
+
             if result.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Wanted criminal not found")
-                
-            conn.commit()
-            return {"message": "Wanted criminal marked as captured"}
-        except HTTPException:
-            raise
-        except Exception as e:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to update criminal status: {str(e)}")
+
+        return {"message": "Wanted criminal removed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to remove criminal: {str(e)}")
 
 # Add these endpoints for police station management
 

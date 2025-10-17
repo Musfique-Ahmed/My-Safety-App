@@ -327,6 +327,9 @@
       min-width: 80px; /* Ensures all badges have a minimum width */
       text-align: center;
     }
+    .status-badge.status-clickable {
+      cursor: pointer;
+    }
     .status-pending {
       background: var(--accent-gray);
       color: white;
@@ -383,6 +386,30 @@
     .danger-unknown {
       background: rgba(107, 114, 128, 0.2);
       color: var(--accent-gray);
+    }
+    .sightings-history {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .sightings-history li {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.9rem;
+    }
+    .sightings-history .sighting-meta {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
     }
     .action-btn {
       background: transparent;
@@ -941,8 +968,9 @@
               <input type="text" class="form-input" name="last_known_location">
             </div>
             <div class="form-group">
-              <label class="form-label">Photo URL</label>
-              <input type="url" class="form-input" name="photo_url">
+              <label class="form-label">Photo</label>
+              <input type="file" class="form-input" name="photo_file" accept="image/*">
+              <span style="color: var(--text-secondary); font-size: 0.8rem;">Accepted formats: JPG, PNG (max 5 MB)</span>
             </div>
           </div>
           
@@ -1369,8 +1397,9 @@
       return String(value);
     }
 
-    const adminUsersCache = new Map();
-    const wantedCriminalCache = new Map();
+  const adminUsersCache = new Map();
+  const wantedCriminalCache = new Map();
+  const policeStationCache = new Map();
     const ROLE_ACTIONS = [
       { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
       { value: 'Admin', label: 'Make Admin', className: 'btn btn-primary' },
@@ -1379,7 +1408,10 @@
       { value: 'User', label: 'Demote to User', className: 'btn btn-danger' }
     ];
     const chartInstances = { role: null, status: null };
-    const CHART_COLOR_PALETTE = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#6366f1', '#14b8a6', '#ec4899'];
+  const CHART_COLOR_PALETTE = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#6366f1', '#14b8a6', '#ec4899'];
+  const CURRENT_ADMIN_ID = Number(window.currentAdminId || window.ADMIN_ID || 1);
+    const addCriminalFormContainer = document.getElementById('add-criminal-form');
+    const criminalForm = document.getElementById('criminal-form');
 
   function closeModal(event) {
     if (event && event.currentTarget === modalOverlay && event.target !== modalOverlay) {
@@ -1397,6 +1429,29 @@
         chartInstances[key] = null;
       }
     });
+  }
+
+  function showAddCriminalForm() {
+    if (!addCriminalFormContainer) {
+      showAlert('Add criminal form is unavailable right now.');
+      return;
+    }
+    addCriminalFormContainer.style.display = 'block';
+    const primaryField = addCriminalFormContainer.querySelector('input[name="name"]');
+    if (primaryField) {
+      primaryField.focus();
+    }
+    addCriminalFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideAddCriminalForm() {
+    if (!addCriminalFormContainer) {
+      return;
+    }
+    addCriminalFormContainer.style.display = 'none';
+    if (criminalForm) {
+      criminalForm.reset();
+    }
   }
 
     /**
@@ -1531,6 +1586,20 @@
       return `${API_BASE}${path}`;
     }
 
+    function escapeHtml(value) {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      };
+      return value.toString().replace(/[&<>"']/g, (char) => map[char] || char);
+    }
+
     function normalizeStatus(status) {
       const raw = (status || 'Pending').toString().trim();
       const normalized = raw.toLowerCase().replace(/_/g, ' ');
@@ -1542,7 +1611,10 @@
         'case closed': 'status-case-closed',
         'solved': 'status-resolved',
         'resolved': 'status-resolved',
-        'verified': 'status-verified'
+        'verified': 'status-verified',
+        'active': 'status-verified',
+        'seen': 'status-verified',
+        'unseen': 'status-reported'
       };
       const className = classMap[normalized] || 'status-pending';
       const display = raw.replace(/_/g, ' ');
@@ -1654,6 +1726,137 @@
       return 'BDT 0';
     }
 
+    if (criminalForm) {
+      criminalForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const submitButton = criminalForm.querySelector('button[type="submit"]');
+        const originalLabel = submitButton ? submitButton.innerHTML : '';
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<span>⏳</span> Saving...';
+        }
+
+        const formData = new FormData(criminalForm);
+        const sanitize = (value) => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          const trimmed = value.toString().trim();
+          return trimmed.length ? trimmed : null;
+        };
+        const parseReward = (value) => {
+          const numeric = Number(value);
+          return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
+        };
+        const crimesList = (formData.get('crimes_committed') ?? '')
+          .toString()
+          .split(/[\n,]+/)
+          .map(item => item.trim())
+          .filter(Boolean);
+
+        const basePayload = {
+          name: sanitize(formData.get('name')) || '',
+          alias: sanitize(formData.get('alias')),
+          age_range: sanitize(formData.get('age_range')) || '',
+          gender: sanitize(formData.get('gender')) || '',
+          description: sanitize(formData.get('description')) || '',
+          height: sanitize(formData.get('height')),
+          weight: sanitize(formData.get('weight')),
+          hair_color: sanitize(formData.get('hair_color')),
+          eye_color: sanitize(formData.get('eye_color')),
+          distinguishing_marks: sanitize(formData.get('distinguishing_marks')),
+          crimes_committed: crimesList.join(', '),
+          reward_amount: parseReward(formData.get('reward_amount')),
+          danger_level: sanitize(formData.get('danger_level')) || 'Medium',
+          last_known_location: sanitize(formData.get('last_known_location'))
+        };
+
+        const missingFields = [];
+        if (!basePayload.name) missingFields.push('Full Name');
+        if (!basePayload.age_range) missingFields.push('Age Range');
+        if (!basePayload.gender) missingFields.push('Gender');
+        if (!basePayload.description) missingFields.push('Description');
+        if (!basePayload.crimes_committed) missingFields.push('Crimes Committed');
+
+        if (missingFields.length) {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+          showAlert(`Please fill out: ${missingFields.join(', ')}`);
+          return;
+        }
+
+        try {
+          let photoUrl = null;
+          const photoFile = formData.get('photo_file');
+
+          if (photoFile instanceof File && photoFile.size > 0) {
+            if (photoFile.size > 5 * 1024 * 1024) {
+              throw new Error('Image must be 5 MB or less.');
+            }
+
+            const uploadData = new FormData();
+            uploadData.append('file', photoFile);
+
+            const uploadResponse = await fetch(resolveApiUrl('/api/upload'), {
+              method: 'POST',
+              body: uploadData
+            });
+
+            if (!uploadResponse.ok) {
+              const errorBody = await uploadResponse.json().catch(() => ({}));
+              const detail = errorBody.detail || errorBody.message || `Upload failed with status ${uploadResponse.status}`;
+              throw new Error(detail);
+            }
+
+            const uploadPayload = await uploadResponse.json().catch(() => ({}));
+            photoUrl = uploadPayload.file_url || uploadPayload.url || null;
+
+            if (!photoUrl) {
+              throw new Error('Upload did not return a file URL.');
+            }
+          }
+
+          const payload = {
+            ...basePayload,
+            photo_url: photoUrl,
+            added_by: CURRENT_ADMIN_ID
+          };
+
+          const response = await fetch(resolveApiUrl('/api/admin/wanted-criminals'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
+            throw new Error(detail);
+          }
+
+          await response.json().catch(() => ({}));
+
+          showAlert('Wanted criminal added successfully.');
+          criminalForm.reset();
+          hideAddCriminalForm();
+          await loadWantedCriminals();
+        } catch (error) {
+          console.error('Failed to add wanted criminal:', error);
+          showAlert(`Unable to save wanted criminal: ${error.message}`);
+        } finally {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+        }
+      });
+    }
+
     function formatDangerLevel(level) {
       const raw = (level || 'Unknown').toString().trim();
       const normalized = raw.toLowerCase();
@@ -1742,7 +1945,7 @@
           <td title="${criminal.crimes_committed || crimesSummary}">${crimesSummary}</td>
           <td><span class="danger-badge ${dangerInfo.className}">${dangerInfo.label}</span></td>
           <td>${rewardDisplay}</td>
-          <td><span class="status-badge ${statusInfo.className}">${statusInfo.display}</span></td>
+          <td><span class="status-badge ${statusInfo.className} status-clickable" data-criminal-id="${validId}">${statusInfo.display}</span></td>
           <td>
             ${validId > 0 ? `
               <button class="action-btn" onclick="viewWantedCriminal(${validId})">
@@ -1760,6 +1963,92 @@
       });
     }
 
+    function renderPoliceStationRows(stations, tbody) {
+      const dataset = Array.isArray(stations) ? stations : [];
+
+      if (!dataset.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No police stations found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      dataset.forEach(record => {
+        const stationId = Number(record.station_id ?? record.id);
+        const displayId = Number.isFinite(stationId) ? `PS-${String(stationId).padStart(3, '0')}` : 'N/A';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${escapeHtml(displayId)}</td>
+          <td>${escapeHtml(record.station_name || 'Unknown')}</td>
+          <td>${escapeHtml(record.station_code || '—')}</td>
+          <td title="${escapeHtml(record.address || 'N/A')}">${escapeHtml((record.address || '').slice(0, 60) || 'N/A')}</td>
+          <td>${escapeHtml(record.phone || record.email || 'N/A')}</td>
+          <td title="${escapeHtml(record.jurisdiction_area || 'N/A')}">${escapeHtml((record.jurisdiction_area || '').slice(0, 60) || 'N/A')}</td>
+          <td>
+            ${Number.isFinite(stationId)
+              ? `<button class="action-btn" data-action="view-station" data-station-id="${stationId}"><span>👁️</span>View</button>`
+              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function viewPoliceStation(stationId) {
+      const numericId = Number(stationId);
+      if (!Number.isFinite(numericId) || !policeStationCache.has(numericId)) {
+        showAlert('Station details are not available right now.');
+        return;
+      }
+
+      const record = policeStationCache.get(numericId);
+      const displayId = `PS-${String(numericId).padStart(3, '0')}`;
+      const details = [
+        `Station: ${displayId}`,
+        `Name: ${record.station_name || 'Unknown'}`,
+        `Code: ${record.station_code || '—'}`,
+        `Phone: ${record.phone || 'N/A'}`,
+        `Email: ${record.email || 'N/A'}`,
+        `Officer in Charge: ${record.officer_in_charge || 'N/A'}`,
+        `Address: ${record.address || 'N/A'}`,
+        `Jurisdiction: ${record.jurisdiction_area || 'N/A'}`,
+        `Coordinates: ${record.latitude ?? '—'}, ${record.longitude ?? '—'}`,
+        `Created At: ${formatDateTimeDisplay(record.created_at)}`,
+        `Last Updated: ${formatDateTimeDisplay(record.updated_at || record.created_at)}`
+      ];
+
+      showAlert(details.join('\n'));
+    }
+
+    async function getWantedCriminalRecord(criminalId, options = {}) {
+      const { forceRefresh = false } = options;
+      const numericId = Number(criminalId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        return null;
+      }
+
+      if (!forceRefresh && wantedCriminalCache.has(numericId)) {
+        return wantedCriminalCache.get(numericId);
+      }
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${numericId}`), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const payload = await response.json().catch(() => ({}));
+        const record = payload.wanted_criminal || payload;
+        if (record) {
+          wantedCriminalCache.set(numericId, record);
+          return record;
+        }
+        return null;
+      } catch (error) {
+        console.error('Error fetching wanted criminal:', error);
+        throw error instanceof Error ? error : new Error('Failed to load wanted criminal.');
+      }
+    }
+
     async function viewWantedCriminal(criminalId) {
       const numericId = Number(criminalId);
       if (!Number.isFinite(numericId) || numericId <= 0) {
@@ -1767,24 +2056,12 @@
         return;
       }
 
-      let record = wantedCriminalCache.get(numericId);
-
-      if (!record) {
-        try {
-          const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${numericId}`), { cache: 'no-store' });
-          if (!response.ok) {
-            throw new Error(`Request failed with status ${response.status}`);
-          }
-          const payload = await response.json().catch(() => ({}));
-          record = payload.wanted_criminal || payload;
-          if (record) {
-            wantedCriminalCache.set(numericId, record);
-          }
-        } catch (error) {
-          console.error('Error loading wanted criminal details:', error);
-          showAlert('Unable to fetch criminal details at this time.');
-          return;
-        }
+      let record;
+      try {
+        record = await getWantedCriminalRecord(numericId);
+      } catch (error) {
+        showAlert('Unable to fetch criminal details at this time.');
+        return;
       }
 
       if (!record) {
@@ -1800,6 +2077,9 @@
         ? record.crimes_committed.join(', ')
         : (record.crimes_committed || 'N/A');
       const locationDetail = record.last_known_location || 'Unknown';
+      const lastReportedLocation = record.last_seen_reported_location || locationDetail;
+      const lastReportedAt = formatDateTimeDisplay(record.last_seen_reported_at);
+      const lastReportedFinder = (record.last_seen_with_finder || 'No').toString();
       const wantedSinceDisplay = formatDateTimeDisplay(record.wanted_since);
       const captureDateDisplay = formatDateTimeDisplay(record.capture_date);
       const updatedDisplay = formatDateTimeDisplay(record.updated_at || record.created_at);
@@ -1818,6 +2098,9 @@
         `Weight: ${record.weight || 'N/A'}`,
         `Distinguishing Marks: ${record.distinguishing_marks || 'N/A'}`,
         `Last Known Location: ${locationDetail}`,
+        `Last Reported Location: ${lastReportedLocation}`,
+        `Last Reported At: ${lastReportedAt}`,
+        `With Finder: ${lastReportedFinder}`,
         `Wanted Since: ${wantedSinceDisplay}`,
         `Capture Date: ${captureDateDisplay}`,
         `Reported By: ${record.added_by || 'N/A'}`,
@@ -1831,14 +2114,197 @@
       showAlert(details.join('\n'));
     }
 
-    function openWantedCriminalActions(criminalId) {
+    async function openWantedCriminalActions(criminalId) {
       const numericId = Number(criminalId);
       if (!Number.isFinite(numericId) || numericId <= 0) {
         showAlert('No management actions available.');
         return;
       }
 
-      showAlert(`Management tools for WNT-${String(numericId).padStart(3, '0')} will be available soon.`);
+      let record;
+      try {
+        record = await getWantedCriminalRecord(numericId);
+      } catch (error) {
+        showAlert('Unable to load management tools right now.');
+        return;
+      }
+
+      if (!record) {
+        showAlert('Criminal record not found.');
+        return;
+      }
+
+      const displayId = `WNT-${String(numericId).padStart(3, '0')}`;
+      const statusInfo = normalizeStatus(record.status);
+      const dangerInfo = formatDangerLevel(record.danger_level);
+
+      modalMessage.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          <div>
+            <strong>${escapeHtml(displayId)} · ${escapeHtml(record.name || 'Unknown')}</strong>
+            ${record.alias ? `<div style="color: var(--text-secondary); font-size: 0.88rem;">Alias: ${escapeHtml(record.alias)}</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--text-secondary);">
+            <div>Status: <span class="status-badge ${statusInfo.className}" style="font-size:0.7rem;">${escapeHtml(statusInfo.display)}</span></div>
+            <div>Danger Level: <span class="danger-badge ${dangerInfo.className}" style="font-size:0.7rem;">${escapeHtml(dangerInfo.label)}</span></div>
+          </div>
+          <p style="margin:0;font-size:0.9rem;color:var(--text-secondary);">
+            Remove this person from the active wanted list once they have been apprehended.
+          </p>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.add('stacked');
+
+      const markButton = document.createElement('button');
+      markButton.className = 'btn btn-danger';
+      markButton.textContent = 'Remove from Wanted List';
+      markButton.onclick = async () => {
+        const originalLabel = markButton.textContent;
+        markButton.disabled = true;
+        markButton.textContent = 'Removing...';
+        try {
+          await removeWantedCriminal(numericId);
+          closeModal();
+          showAlert(`${displayId} removed from the wanted list.`);
+        } catch (error) {
+          console.error('Failed to remove wanted criminal:', error);
+          markButton.disabled = false;
+          markButton.textContent = originalLabel;
+          closeModal();
+          showAlert(`Unable to update record: ${error.message}`);
+        }
+      };
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.onclick = () => closeModal();
+
+      modalButtons.appendChild(markButton);
+      modalButtons.appendChild(cancelButton);
+      modalOverlay.classList.add('show');
+    }
+
+    async function fetchCriminalSightings(criminalId) {
+      const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${criminalId}/sightings`), { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const payload = await response.json().catch(() => ({}));
+      const records = Array.isArray(payload) ? payload : (payload.sightings || []);
+      return records.map(item => ({
+        sighting_id: item.sighting_id,
+        criminal_id: item.criminal_id,
+        last_seen_time: item.last_seen_time || null,
+        last_seen_location: item.last_seen_location || null,
+        still_with_finder: Boolean(item.still_with_finder),
+        reporter_contact: item.reporter_contact || null,
+        created_at: item.created_at || null
+      }));
+    }
+
+    async function showSightingHistory(criminalId) {
+      const numericId = Number(criminalId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('No sighting data available for this record.');
+        return;
+      }
+
+      let baseRecord = null;
+      try {
+        baseRecord = await getWantedCriminalRecord(numericId);
+      } catch (error) {
+        console.warn('Unable to resolve base record for sighting history:', error);
+      }
+
+      let sightings;
+      try {
+        sightings = await fetchCriminalSightings(numericId);
+      } catch (error) {
+        console.error('Failed to load sighting history:', error);
+        showAlert('Unable to load sighting history right now.');
+        return;
+      }
+
+      const displayId = `WNT-${String(numericId).padStart(3, '0')}`;
+      const headerName = baseRecord ? (baseRecord.name || 'Unknown') : 'Unknown';
+
+      const historyMarkup = sightings.length
+        ? sightings.map(entry => {
+            const reportedAt = formatDateTimeDisplay(entry.last_seen_time || entry.created_at);
+            const loggedAt = formatDateTimeDisplay(entry.created_at);
+            const locationText = escapeHtml(entry.last_seen_location || 'Unknown');
+            const finderText = entry.still_with_finder ? 'Yes' : 'No';
+            const contactText = entry.reporter_contact ? `<div class="sighting-meta">Contact: ${escapeHtml(entry.reporter_contact)}</div>` : '';
+            const loggedMeta = loggedAt && loggedAt !== reportedAt
+              ? ` · Logged: ${loggedAt}`
+              : '';
+            return `
+              <li>
+                <div><strong>${escapeHtml(reportedAt)}</strong></div>
+                <div>${locationText}</div>
+                <div class="sighting-meta">With finder: ${finderText}${loggedMeta}</div>
+                ${contactText}
+              </li>
+            `;
+          }).join('')
+        : '<li>No sightings have been reported yet.</li>';
+
+      modalMessage.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+          <div>
+            <strong>${escapeHtml(displayId)} sighting history</strong>
+            <div style="color: var(--text-secondary); font-size: 0.88rem;">${escapeHtml(headerName)}</div>
+          </div>
+          <p style="margin:0;color:var(--text-secondary);font-size:0.85rem;">
+            Every submitted last seen report appears below. The newest entries show first.
+          </p>
+          <ul class="sightings-history">
+            ${historyMarkup}
+          </ul>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'btn btn-primary';
+      closeButton.textContent = 'Close';
+      closeButton.onclick = () => closeModal();
+
+      modalButtons.appendChild(closeButton);
+      modalOverlay.classList.add('show');
+    }
+
+    async function removeWantedCriminal(criminalId) {
+      const numericId = Number(criminalId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        throw new Error('Invalid criminal reference.');
+      }
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/admin/wanted-criminals/${numericId}`), {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
+          throw new Error(detail);
+        }
+
+        wantedCriminalCache.delete(numericId);
+        await loadWantedCriminals();
+      } catch (error) {
+        console.error('Failed to remove wanted criminal:', error);
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Failed to remove wanted criminal.');
+      }
     }
 
     function generateChartColors(count) {
@@ -1949,6 +2415,8 @@
         loadUsers();
       } else if (tabName === 'wanted-criminals') {
         loadWantedCriminals();
+      } else if (tabName === 'police-stations') {
+        loadPoliceStations();
       } else if (tabName === 'verify-reports') {
         loadComplaints();
       } else if (tabName === 'case-management') {
@@ -2378,14 +2846,21 @@
           : (Array.isArray(payload.wanted_criminals) ? payload.wanted_criminals : []);
 
         wantedCriminalCache.clear();
+        const activeCriminals = [];
+
         criminals.forEach(record => {
           const idValue = Number(record.criminal_id ?? record.id);
           if (Number.isFinite(idValue)) {
             wantedCriminalCache.set(idValue, record);
           }
+
+          const statusRaw = (record.status || '').toString().trim().toLowerCase();
+          if (statusRaw !== 'captured') {
+            activeCriminals.push(record);
+          }
         });
 
-        renderWantedCriminalRows(criminals, tbody);
+        renderWantedCriminalRows(activeCriminals, tbody);
       } catch (error) {
         console.error('Error loading criminals:', error);
         tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load wanted criminals right now.</td></tr>';
@@ -2394,19 +2869,36 @@
 
     // Load police stations from database
     async function loadPoliceStations() {
+      const tbody = document.getElementById('stations-table');
+      if (!tbody) {
+        return;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading stations…</td></tr>';
+
       try {
-        const response = await fetch('/api/admin/police-stations');
-        const data = await response.json();
-        
-        if (data.success) {
-          displayPoliceStations(data.stations);
-        } else {
-          console.error('Failed to load stations:', data.error);
-          document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
+        const response = await fetch(resolveApiUrl('/api/admin/police-stations'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const records = Array.isArray(payload.police_stations)
+          ? payload.police_stations
+          : (Array.isArray(payload) ? payload : []);
+
+        policeStationCache.clear();
+        records.forEach(record => {
+          const stationId = Number(record.station_id ?? record.id);
+          if (Number.isFinite(stationId)) {
+            policeStationCache.set(stationId, record);
+          }
+        });
+
+        renderPoliceStationRows(records, tbody);
       } catch (error) {
         console.error('Error loading stations:', error);
-        document.getElementById('police-stations-container').innerHTML = '<p>Error loading stations</p>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load police stations right now.</td></tr>';
       }
     }
 
@@ -2455,21 +2947,11 @@
       renderUserRows(users, tbody);
     }
     function displayPoliceStations(stations) {
-      const container = document.getElementById('police-stations-container');
-      
-      const stationsHtml = stations.map(station => `
-        <div class="data-card">
-          <h4>${station.station_name}</h4>
-          <p><strong>Code:</strong> ${station.station_code}</p>
-          <p><strong>Address:</strong> ${station.address}</p>
-          <p><strong>Phone:</strong> ${station.phone}</p>
-          <p><strong>Email:</strong> ${station.email}</p>
-          <p><strong>Officer in Charge:</strong> ${station.officer_in_charge || 'N/A'}</p>
-          <p><strong>Jurisdiction:</strong> ${station.jurisdiction_area}</p>
-        </div>
-      `).join('');
-      
-      container.innerHTML = stationsHtml;
+      const tbody = document.getElementById('stations-table');
+      if (!tbody) {
+        return;
+      }
+      renderPoliceStationRows(stations, tbody);
     }
 
     function displayMissingPersons(persons) {
@@ -2669,6 +3151,29 @@
         showAlert('Unable to load user statistics right now. Please try again later.');
       }
     }
+
+    document.addEventListener('click', event => {
+      const badge = event.target.closest('.status-clickable');
+      if (badge) {
+        event.preventDefault();
+        const criminalId = Number(badge.dataset.criminalId);
+        if (Number.isFinite(criminalId) && criminalId > 0) {
+          showSightingHistory(criminalId);
+        }
+        return;
+      }
+
+      const stationBtn = event.target.closest('[data-action="view-station"]');
+      if (stationBtn) {
+        event.preventDefault();
+        const stationId = Number(stationBtn.dataset.stationId);
+        if (Number.isFinite(stationId) && stationId > 0) {
+          viewPoliceStation(stationId);
+        } else {
+          showAlert('Station details are not available for this entry.');
+        }
+      }
+    });
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => loadCrimesOverview());

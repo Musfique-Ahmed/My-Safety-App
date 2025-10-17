@@ -221,24 +221,25 @@ function normalizeRow(row) {
     return match ? Number(match[1]) : null;
   };
 
-  const lastSeenIso = row.wanted_since
-    ? new Date(row.wanted_since).toISOString()
-    : row.created_at
-      ? new Date(row.created_at).toISOString()
-      : null;
+  const lastSeenSource = row.last_seen_reported_at || row.wanted_since || row.created_at;
+  const lastSeenIso = lastSeenSource ? new Date(lastSeenSource).toISOString() : null;
+  const lastSeenLocation = row.last_seen_reported_location || row.last_known_location || "Unknown";
+  const withFinder = row.last_seen_with_finder || "No";
 
   return {
     id: row.criminal_id ?? row.id ?? null,
     name: row.name ?? "Unknown",
     photo_url: resolvePhoto(row.photo_url),
-    last_seen_location: row.last_known_location ?? "Unknown",
+    last_seen_location: lastSeenLocation,
     last_seen_time: lastSeenIso,
     crimes,
     reward: Number(row.reward_amount ?? 0),
     age: extractNumber(row.age_range),
     height_cm: extractNumber(row.height),
     complexion: row.hair_color ?? "",
-    note: [row.description ?? "", row.distinguishing_marks ?? ""].filter(Boolean).join(" ")
+    note: [row.description ?? "", row.distinguishing_marks ?? ""].filter(Boolean).join(" "),
+    status: row.status || "Unseen",
+    with_finder: withFinder
   };
 }
 
@@ -282,6 +283,20 @@ function card(item){
   const rewardText = Number.isFinite(item.reward) ? item.reward.toLocaleString() : "0";
   const ageText = item.age ? `${item.age} yrs` : "N/A";
   const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
+  const statusText = (item.status || "Unseen").toString();
+  const normalizedStatus = statusText.trim().toLowerCase();
+
+  let badgeClass = "bg-red-100 text-red-700";
+  let badgeLabel = "Unseen";
+  if (normalizedStatus === "seen") {
+    badgeClass = "bg-emerald-100 text-emerald-700";
+    badgeLabel = "Seen";
+  } else if (normalizedStatus === "captured") {
+    badgeClass = "bg-gray-200 text-gray-600";
+    badgeLabel = "Captured";
+  } else if (normalizedStatus) {
+    badgeLabel = statusText.replace(/_/g, " ");
+  }
 
   el.className = "rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
   el.innerHTML = `
@@ -289,7 +304,7 @@ function card(item){
     <div class="p-4">
       <div class="flex justify-between items-center mb-2">
         <div class="font-semibold">${item.name}</div>
-        <span class="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-full">Wanted</span>
+        <span class="px-2 py-0.5 text-xs ${badgeClass} rounded-full">${badgeLabel}</span>
       </div>
       <div class="text-sm text-gray-500 dark:text-gray-400">Crimes: ${crimesText}</div>
       <div class="text-sm text-gray-500 dark:text-gray-400">Reward: ৳${rewardText}</div>
@@ -310,6 +325,8 @@ function openModal(item){
   const ageText = item.age ? `${item.age} yrs` : "N/A";
   const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
   const complexionText = item.complexion || "N/A";
+  const withFinderText = item.with_finder === "Yes" ? "Yes" : "No";
+  const statusText = (item.status || "Unseen").toString();
 
   $("#modalTitle").textContent = item.name + " — Details";
   $("#modalBody").innerHTML = `
@@ -322,6 +339,8 @@ function openModal(item){
         <p><b>Age:</b> ${ageText}</p>
         <p><b>Height:</b> ${heightText}</p>
         <p><b>Complexion:</b> ${complexionText}</p>
+        <p><b>Status:</b> ${statusText}</p>
+        <p><b>With Finder on Last Report:</b> ${withFinderText}</p>
         <p class="text-gray-500 dark:text-gray-400">${item.note || ""}</p>
         <div>
           <button id="seenBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">I have seen this person</button>
@@ -346,20 +365,78 @@ function openModal(item){
   $("#backdrop").classList.add("flex");
   $("#seenBtn").onclick = ()=> $("#seenWrap").classList.toggle("hidden");
   $("#geoSeen").onclick = ()=> fillWithGeo($("#seen_location"));
-  $("#submitSeen").onclick = ()=>{
+  $("#submitSeen").onclick = async ()=>{
+    const submitBtn = $("#submitSeen");
+    const lastSeenTime = $("#seen_time").value;
+    const lastSeenLocation = $("#seen_location").value.trim();
+    const stillWithFinder = $("#still_with_finder").checked;
+
+    if (!lastSeenTime) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Missing Information',
+        text: 'Please provide when you last saw this person.',
+        confirmButtonColor: '#F59E0B'
+      });
+      return;
+    }
+
+    if (!lastSeenLocation) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Missing Location',
+        text: 'Please provide the last seen location or use your current position.',
+        confirmButtonColor: '#F59E0B'
+      });
+      return;
+    }
+
     const payload = {
-      criminal_id: item.id,
-      last_seen_time: $("#seen_time").value,
-      last_seen_location: $("#seen_location").value,
-      still_with_finder: $("#still_with_finder").checked
+      last_seen_time: lastSeenTime,
+      last_seen_location: lastSeenLocation,
+      still_with_finder: stillWithFinder,
+      reporter_contact: null
     };
-    console.info('Criminal sighting payload', payload);
-    Swal.fire({
-      icon: 'success',
-      title: 'Notification Sent',
-      text: 'Thanks for reporting. Police have been notified of the sighting.',
-      confirmButtonColor: '#3B82F6'
-    }).then(() => closeModal());
+
+    try {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+
+      const response = await fetch(`${API_BASE || ''}/api/wanted-criminals/${item.id}/sighting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
+        throw new Error(detail);
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Notification Sent',
+        text: 'Thanks for reporting. Police have been notified of the sighting.',
+        confirmButtonColor: '#3B82F6'
+      });
+
+      closeModal();
+      await loadWantedCriminals();
+    } catch (error) {
+      console.error('Failed to submit sighting:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Submission Failed',
+        text: error.message || 'Unable to submit the sighting right now.',
+        confirmButtonColor: '#EF4444'
+      });
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Notification';
+    }
   };
 }
 
