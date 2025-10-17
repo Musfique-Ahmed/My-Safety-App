@@ -1412,6 +1412,8 @@
   const CURRENT_ADMIN_ID = Number(window.currentAdminId || window.ADMIN_ID || 1);
     const addCriminalFormContainer = document.getElementById('add-criminal-form');
     const criminalForm = document.getElementById('criminal-form');
+  const addStationFormContainer = document.getElementById('add-station-form');
+  const stationForm = document.getElementById('station-form');
 
   function closeModal(event) {
     if (event && event.currentTarget === modalOverlay && event.target !== modalOverlay) {
@@ -1451,6 +1453,29 @@
     addCriminalFormContainer.style.display = 'none';
     if (criminalForm) {
       criminalForm.reset();
+    }
+  }
+
+  function showAddStationForm() {
+    if (!addStationFormContainer) {
+      showAlert('Add police station form is unavailable right now.');
+      return;
+    }
+    addStationFormContainer.style.display = 'block';
+    const primaryField = addStationFormContainer.querySelector('input[name="station_name"]');
+    if (primaryField) {
+      primaryField.focus();
+    }
+    addStationFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideAddStationForm() {
+    if (!addStationFormContainer) {
+      return;
+    }
+    addStationFormContainer.style.display = 'none';
+    if (stationForm) {
+      stationForm.reset();
     }
   }
 
@@ -1848,6 +1873,84 @@
         } catch (error) {
           console.error('Failed to add wanted criminal:', error);
           showAlert(`Unable to save wanted criminal: ${error.message}`);
+        } finally {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+        }
+      });
+    }
+
+    if (stationForm) {
+      stationForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const submitButton = stationForm.querySelector('button[type="submit"]');
+        const originalLabel = submitButton ? submitButton.innerHTML : '';
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<span>⏳</span> Saving...';
+        }
+
+        const formData = new FormData(stationForm);
+        const sanitize = (value) => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          const trimmed = value.toString().trim();
+          return trimmed.length ? trimmed : null;
+        };
+        const parseCoordinate = (value) => {
+          const numeric = Number(value);
+          return Number.isFinite(numeric) ? numeric : null;
+        };
+
+        const payload = {
+          station_name: sanitize(formData.get('station_name')) || '',
+          station_code: sanitize(formData.get('station_code')) || '',
+          address: sanitize(formData.get('address')),
+          phone: sanitize(formData.get('phone')),
+          email: sanitize(formData.get('email')),
+          latitude: parseCoordinate(formData.get('latitude')),
+          longitude: parseCoordinate(formData.get('longitude')),
+          jurisdiction_area: sanitize(formData.get('jurisdiction_area'))
+        };
+
+        const missing = [];
+        if (!payload.station_name) missing.push('Station Name');
+        if (!payload.station_code) missing.push('Station Code');
+
+        if (missing.length) {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+          showAlert(`Please complete: ${missing.join(', ')}`);
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveApiUrl('/api/admin/police-stations'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
+            throw new Error(detail);
+          }
+
+          showAlert('Police station added successfully.');
+          hideAddStationForm();
+          await loadPoliceStations();
+        } catch (error) {
+          console.error('Failed to add police station:', error);
+          showAlert(error.message || 'Unable to add police station right now.');
         } finally {
           if (submitButton) {
             submitButton.disabled = false;
