@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import logging
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 import hashlib
@@ -98,6 +98,17 @@ class CrimeData(BaseModel):
     incident_date: Optional[str] = None
     evidence_files: Optional[List[dict]] = None
 
+class AdminCrimeCreate(BaseModel):
+    crime_type: str
+    status: str
+    city: str
+    area_name: str
+    description: str
+    incident_time: Optional[str] = None
+    priority: Optional[str] = "medium"
+    location_details: Optional[str] = None
+    reporter_id: Optional[int] = None
+
 class MissingPersonData(BaseModel):
     name: str
     age: int
@@ -180,6 +191,23 @@ class PoliceStationCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     jurisdiction_area: Optional[str] = None
+    officer_in_charge: Optional[str] = None
+
+    @validator("latitude")
+    def validate_latitude(cls, value):
+        if value is None:
+            return value
+        if not (-90.0 <= value <= 90.0):
+            raise ValueError("Latitude must be between -90 and 90 degrees")
+        return value
+
+    @validator("longitude")
+    def validate_longitude(cls, value):
+        if value is None:
+            return value
+        if not (-180.0 <= value <= 180.0):
+            raise ValueError("Longitude must be between -180 and 180 degrees")
+        return value
 
 def hash_password(password: str):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -600,7 +628,7 @@ async def get_missing_persons():
     try:
         with engine.connect() as conn:
             rows = [dict(row) for row in conn.execute(query).mappings()]
-        return rows
+        return {"missing_persons": rows}
     except Exception:
         logging.exception("Failed to fetch missing persons")
         raise HTTPException(status_code=500, detail="Failed to fetch missing persons")
@@ -1791,33 +1819,89 @@ async def get_all_police_stations():
 @app.post("/api/admin/police-stations")
 async def create_police_station(station: PoliceStationCreate):
     """Admin endpoint to add new police station"""
-    with engine.connect() as conn:
-        try:
+
+    def _sanitize_text(value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    sanitized_name = _sanitize_text(station.station_name)
+    sanitized_code = _sanitize_text(station.station_code)
+
+    payload = {
+        "station_name": sanitized_name,
+        "station_code": sanitized_code,
+        "address": _sanitize_text(station.address),
+        "phone": _sanitize_text(station.phone),
+        "email": _sanitize_text(station.email),
+        "latitude": station.latitude,
+        "longitude": station.longitude,
+        "jurisdiction_area": _sanitize_text(station.jurisdiction_area),
+        "officer_in_charge": _sanitize_text(station.officer_in_charge)
+    }
+
+    if not sanitized_name:
+        raise HTTPException(status_code=422, detail="Station name is required")
+    if not sanitized_code:
+        raise HTTPException(status_code=422, detail="Station code is required")
+
+    try:
+        with engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT station_id FROM police_station WHERE station_code = :station_code LIMIT 1"),
+                {"station_code": payload["station_code"]}
+            ).fetchone()
+            if existing:
+                raise HTTPException(status_code=409, detail="Station code already exists. Please use a unique code.")
+
             result = conn.execute(
-                text("""
-                    INSERT INTO police_station (station_name, station_code, address, phone, email, 
-                                              latitude, longitude, jurisdiction_area, created_at)
-                    VALUES (:station_name, :station_code, :address, :phone, :email, 
-                            :latitude, :longitude, :jurisdiction_area, :created_at)
-                """),
+                text(
+                    """
+                    INSERT INTO police_station (
+                        station_name,
+                        station_code,
+                        address,
+                        phone,
+                        email,
+                        latitude,
+                        longitude,
+                        jurisdiction_area,
+                        officer_in_charge,
+                        created_at
+                    )
+                    VALUES (
+                        :station_name,
+                        :station_code,
+                        :address,
+                        :phone,
+                        :email,
+                        :latitude,
+                        :longitude,
+                        :jurisdiction_area,
+                        :officer_in_charge,
+                        :created_at
+                    )
+                    """
+                ),
                 {
-                    "station_name": station.station_name,
-                    "station_code": station.station_code,
-                    "address": station.address,
-                    "phone": station.phone,
-                    "email": station.email,
-                    "latitude": station.latitude,
-                    "longitude": station.longitude,
-                    "jurisdiction_area": station.jurisdiction_area,
+                    **payload,
                     "created_at": datetime.utcnow()
                 }
             )
-            conn.commit()
+
             station_id = result.lastrowid
-            return {"message": "Police station added successfully", "station_id": station_id}
-        except Exception as e:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to add police station: {str(e)}")
+
+        return {"message": "Police station added successfully", "station_id": station_id}
+    except HTTPException:
+        raise
+    except IntegrityError as err:
+        # Handle race condition duplicates gracefully
+        if "station_code" in str(err.orig).lower():
+            raise HTTPException(status_code=409, detail="Station code already exists. Please use a unique code.")
+        raise HTTPException(status_code=500, detail="Failed to add police station due to database constraint")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add police station: {str(e)}")
 
 @app.put("/api/admin/police-stations/{station_id}")
 async def update_police_station(station_id: int, station: PoliceStationCreate):
@@ -1829,7 +1913,7 @@ async def update_police_station(station_id: int, station: PoliceStationCreate):
                     UPDATE police_station SET 
                     station_name = :station_name, station_code = :station_code, address = :address,
                     phone = :phone, email = :email, latitude = :latitude, longitude = :longitude,
-                    jurisdiction_area = :jurisdiction_area
+                    jurisdiction_area = :jurisdiction_area, officer_in_charge = :officer_in_charge
                     WHERE station_id = :station_id
                 """),
                 {
@@ -1841,7 +1925,8 @@ async def update_police_station(station_id: int, station: PoliceStationCreate):
                     "email": station.email,
                     "latitude": station.latitude,
                     "longitude": station.longitude,
-                    "jurisdiction_area": station.jurisdiction_area
+                    "jurisdiction_area": station.jurisdiction_area,
+                    "officer_in_charge": station.officer_in_charge
                 }
             )
             

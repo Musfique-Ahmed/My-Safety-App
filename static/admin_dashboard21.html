@@ -687,9 +687,20 @@
     font-weight: 600;
   }
 
-  .stats-charts {
+  .stats-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+
+  .stats-metrics-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
   }
 
@@ -746,6 +757,83 @@
     color: var(--text-secondary);
     font-size: 0.95rem;
     padding: 1.5rem 0;
+  }
+
+  .modal-content.modal-wide {
+    max-width: 860px;
+    width: 90%;
+  }
+
+  .missing-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .missing-modal .missing-header h3 {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 600;
+  }
+
+  .missing-modal .missing-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .missing-modal .missing-body {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+
+  .missing-modal .missing-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .missing-modal .missing-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .missing-photo-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+  }
+
+  .missing-photo-card img {
+    width: 100%;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .missing-photo-card.missing-photo-placeholder {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .stats-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .missing-modal .missing-body {
+      grid-template-columns: 1fr;
+    }
   }
 
     /* Adjust button styles for modal */
@@ -1056,6 +1144,10 @@
               <input type="email" class="form-input" name="email">
             </div>
             <div class="form-group">
+              <label class="form-label">Officer in Charge</label>
+              <input type="text" class="form-input" name="officer_in_charge">
+            </div>
+            <div class="form-group">
               <label class="form-label">Latitude</label>
               <input type="number" step="any" class="form-input" name="latitude">
             </div>
@@ -1104,6 +1196,7 @@
               <th>Gender</th>
               <th>Last Seen Location</th>
               <th>Last Seen Date</th>
+                <th>Officer</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -1181,7 +1274,6 @@
                 <option value="low">Low</option>
                 <option value="medium" selected>Medium</option>
                 <option value="high">High</option>
-                <option value="critical">Critical</option>
               </select>
             </div>
           </div>
@@ -1376,6 +1468,7 @@
     const modalOverlay = document.getElementById('custom-modal-overlay');
     const modalMessage = document.getElementById('modal-message');
     const modalButtons = document.getElementById('modal-buttons');
+  const modalContainer = modalOverlay.querySelector('.modal-content');
     function coerceModalMessage(value) {
       if (value === null || value === undefined) {
         return '';
@@ -1400,6 +1493,7 @@
   const adminUsersCache = new Map();
   const wantedCriminalCache = new Map();
   const policeStationCache = new Map();
+  const missingPersonsCache = new Map();
     const ROLE_ACTIONS = [
       { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
       { value: 'Admin', label: 'Make Admin', className: 'btn btn-primary' },
@@ -1420,6 +1514,7 @@
       return;
     }
     modalButtons.classList.remove('stacked');
+    modalContainer.classList.remove('modal-wide');
     modalOverlay.classList.remove('show');
     Object.keys(chartInstances).forEach(key => {
       if (chartInstances[key]) {
@@ -1484,6 +1579,7 @@
      * @param {string} message - The message to display.
      */
   function showAlert(message) {
+    modalContainer.classList.remove('modal-wide');
     modalMessage.textContent = coerceModalMessage(message);
         modalButtons.innerHTML = ''; // Clear previous buttons
     modalButtons.classList.remove('stacked');
@@ -1503,6 +1599,7 @@
      * @param {function(boolean): void} callback - The function to call with the result (true for yes, false for no).
      */
   function showConfirm(message, callback) {
+    modalContainer.classList.remove('modal-wide');
     modalMessage.textContent = coerceModalMessage(message);
         modalButtons.innerHTML = '';
     modalButtons.classList.remove('stacked');
@@ -1751,6 +1848,59 @@
       return 'BDT 0';
     }
 
+    function formatDateOnly(value) {
+      if (!value) {
+        return 'N/A';
+      }
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+        const [year, month, day] = value.trim().split('-').map(Number);
+        if ([year, month, day].every(num => Number.isFinite(num))) {
+          const dt = new Date(Date.UTC(year, month - 1, day));
+          return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+      }
+      return formatDateTimeDisplay(value);
+    }
+
+    function formatTimeDisplay(value) {
+      if (!value) {
+        return 'N/A';
+      }
+      if (typeof value === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(value.trim())) {
+        const [hour, minute, second = '00'] = value.trim().split(':');
+        const dt = new Date();
+        dt.setHours(Number(hour), Number(minute), Number(second), 0);
+        if (!Number.isNaN(dt.getTime())) {
+          return dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        }
+      }
+      return value;
+    }
+
+    function formatGenderLabel(value) {
+      if (!value) {
+        return 'Unknown';
+      }
+      const normalized = value.toString().trim().toUpperCase();
+      const labelMap = {
+        'M': 'Male',
+        'F': 'Female',
+        'O': 'Other'
+      };
+      return labelMap[normalized] || value;
+    }
+
+    function formatAgeDisplay(value) {
+      if (value === null || value === undefined || value === '') {
+        return 'Unknown';
+      }
+      const numeric = Number(value);
+      if (Number.isFinite(numeric) && numeric >= 0) {
+        return numeric.toString();
+      }
+      return value;
+    }
+
     if (criminalForm) {
       criminalForm.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -1912,6 +2062,7 @@
           address: sanitize(formData.get('address')),
           phone: sanitize(formData.get('phone')),
           email: sanitize(formData.get('email')),
+          officer_in_charge: sanitize(formData.get('officer_in_charge')),
           latitude: parseCoordinate(formData.get('latitude')),
           longitude: parseCoordinate(formData.get('longitude')),
           jurisdiction_area: sanitize(formData.get('jurisdiction_area'))
@@ -1921,12 +2072,27 @@
         if (!payload.station_name) missing.push('Station Name');
         if (!payload.station_code) missing.push('Station Code');
 
-        if (missing.length) {
+        const rangeErrors = [];
+        if (payload.latitude !== null && (payload.latitude < -90 || payload.latitude > 90)) {
+          rangeErrors.push('Latitude must be between -90 and 90 degrees');
+        }
+        if (payload.longitude !== null && (payload.longitude < -180 || payload.longitude > 180)) {
+          rangeErrors.push('Longitude must be between -180 and 180 degrees');
+        }
+
+        if (missing.length || rangeErrors.length) {
           if (submitButton) {
             submitButton.disabled = false;
             submitButton.innerHTML = originalLabel;
           }
-          showAlert(`Please complete: ${missing.join(', ')}`);
+          const messageParts = [];
+          if (missing.length) {
+            messageParts.push(`Please complete: ${missing.join(', ')}`);
+          }
+          if (rangeErrors.length) {
+            messageParts.push(rangeErrors.join('\n'));
+          }
+          showAlert(messageParts.join('\n\n'));
           return;
         }
 
@@ -2070,7 +2236,7 @@
       const dataset = Array.isArray(stations) ? stations : [];
 
       if (!dataset.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No police stations found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No police stations found.</td></tr>';
         return;
       }
 
@@ -2086,10 +2252,45 @@
           <td>${escapeHtml(record.station_code || '—')}</td>
           <td title="${escapeHtml(record.address || 'N/A')}">${escapeHtml((record.address || '').slice(0, 60) || 'N/A')}</td>
           <td>${escapeHtml(record.phone || record.email || 'N/A')}</td>
+          <td>${escapeHtml(record.officer_in_charge || 'N/A')}</td>
           <td title="${escapeHtml(record.jurisdiction_area || 'N/A')}">${escapeHtml((record.jurisdiction_area || '').slice(0, 60) || 'N/A')}</td>
           <td>
             ${Number.isFinite(stationId)
               ? `<button class="action-btn" data-action="view-station" data-station-id="${stationId}"><span>👁️</span>View</button>`
+              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderMissingPersonRows(records, tbody) {
+      const dataset = Array.isArray(records) ? records : [];
+
+      if (!dataset.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">No missing person reports found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      dataset.forEach(record => {
+        const missingId = Number(record.missing_id ?? record.id);
+        const displayId = Number.isFinite(missingId) ? `MISS-${String(missingId).padStart(4, '0')}` : 'N/A';
+        const statusInfo = normalizeStatus(record.status || 'Missing');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${escapeHtml(displayId)}</td>
+          <td>${escapeHtml(record.name || 'Unknown')}</td>
+          <td>${escapeHtml(formatAgeDisplay(record.age))}</td>
+          <td>${escapeHtml(formatGenderLabel(record.gender))}</td>
+          <td title="${escapeHtml(record.last_seen_location || 'N/A')}">${escapeHtml((record.last_seen_location || '').slice(0, 60) || 'N/A')}</td>
+          <td>${escapeHtml(formatDateOnly(record.last_seen_date))}</td>
+          <td>${escapeHtml(record.contact_person || 'N/A')}</td>
+          <td><span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span></td>
+          <td>
+            ${Number.isFinite(missingId)
+              ? `<button class="action-btn" data-action="view-missing" data-missing-id="${missingId}"><span>👁️</span>View</button>`
               : '<span style="color: var(--text-secondary);">Unavailable</span>'}
           </td>
         `;
@@ -2121,6 +2322,106 @@
       ];
 
       showAlert(details.join('\n'));
+    }
+
+    function viewMissingPerson(missingId) {
+      const numericId = Number(missingId);
+      if (!Number.isFinite(numericId) || !missingPersonsCache.has(numericId)) {
+        showAlert('Missing person details are unavailable right now.');
+        return;
+      }
+
+      const record = missingPersonsCache.get(numericId);
+      const displayId = `MISS-${String(numericId).padStart(4, '0')}`;
+      const statusInfo = normalizeStatus(record.status || 'Missing');
+      const ageDisplay = formatAgeDisplay(record.age);
+      const lastSeenDate = formatDateOnly(record.last_seen_date);
+      const lastSeenTime = formatTimeDisplay(record.last_seen_time);
+      const lastSeenLocation = record.last_seen_location || 'Unknown';
+      const contactDisplay = [record.contact_person, record.contact_phone].filter(Boolean).join(' · ') || 'N/A';
+
+      const caseSummaryItems = [
+        `<li><strong>Case ID:</strong> ${escapeHtml(displayId)}</li>`,
+        `<li><strong>Status:</strong> <span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span></li>`,
+        `<li><strong>Last Seen:</strong> ${escapeHtml(lastSeenDate)} at ${escapeHtml(lastSeenTime)}</li>`,
+        `<li><strong>Location:</strong> ${escapeHtml(lastSeenLocation)}</li>`,
+        `<li><strong>Contact:</strong> ${escapeHtml(contactDisplay)}</li>`,
+        `<li><strong>Police Case #:</strong> ${escapeHtml(record.police_case_number || 'N/A')}</li>`
+      ].join('');
+
+      const appearanceItems = [
+        record.height ? `<li><strong>Height:</strong> ${escapeHtml(record.height)}</li>` : null,
+        record.weight ? `<li><strong>Weight:</strong> ${escapeHtml(record.weight)}</li>` : null,
+        record.hair_color ? `<li><strong>Hair:</strong> ${escapeHtml(record.hair_color)}</li>` : null,
+        record.eye_color ? `<li><strong>Eyes:</strong> ${escapeHtml(record.eye_color)}</li>` : null,
+        record.distinguishing_marks ? `<li><strong>Marks:</strong> ${escapeHtml(record.distinguishing_marks)}</li>` : null,
+        record.clothing_description ? `<li><strong>Clothing:</strong> ${escapeHtml(record.clothing_description)}</li>` : null
+      ].filter(Boolean).join('');
+
+      const demographicsItems = [
+        `<li><strong>Name:</strong> ${escapeHtml(record.name || 'Unknown')}</li>`,
+        `<li><strong>Age:</strong> ${escapeHtml(ageDisplay)}</li>`,
+        `<li><strong>Gender:</strong> ${escapeHtml(formatGenderLabel(record.gender))}</li>`
+      ].join('');
+
+      const demographicsBlock = `
+        <div class="stats-insights">
+          <h4>Demographics</h4>
+          <ul>${demographicsItems}</ul>
+        </div>
+      `;
+
+      const caseSummaryBlock = `
+        <div class="stats-insights">
+          <h4>Case Summary</h4>
+          <ul>${caseSummaryItems}</ul>
+        </div>
+      `;
+
+      const appearanceBlock = appearanceItems
+        ? `<div class="stats-insights"><h4>Appearance</h4><ul>${appearanceItems}</ul></div>`
+        : '';
+
+      const descriptionBlock = record.description
+        ? `<div class="stats-insights missing-description"><h4>Description</h4><p>${escapeHtml(record.description)}</p></div>`
+        : '';
+
+      const photoSection = record.photo_url
+        ? `<div class="missing-photo-card"><img src="${escapeHtml(record.photo_url)}" alt="${escapeHtml(record.name || 'Missing person photo')}" /></div>`
+        : `<div class="missing-photo-card missing-photo-placeholder">No photo available</div>`;
+
+      modalContainer.classList.add('modal-wide');
+
+      modalMessage.innerHTML = `
+        <div class="missing-modal">
+          <div class="missing-header">
+            <h3>${escapeHtml(record.name || 'Unknown')}</h3>
+            <p>Report submitted on ${escapeHtml(formatDateTimeDisplay(record.created_at))}</p>
+          </div>
+          <div class="missing-body">
+            <div class="missing-details">
+              ${demographicsBlock}
+              ${caseSummaryBlock}
+              ${appearanceBlock}
+              ${descriptionBlock}
+            </div>
+            <div class="missing-sidebar">
+              ${photoSection}
+            </div>
+          </div>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'btn btn-primary';
+      closeButton.textContent = 'Close';
+      closeButton.onclick = () => closeModal();
+      modalButtons.appendChild(closeButton);
+
+      modalOverlay.classList.add('show');
     }
 
     async function getWantedCriminalRecord(criminalId, options = {}) {
@@ -2520,6 +2821,8 @@
         loadWantedCriminals();
       } else if (tabName === 'police-stations') {
         loadPoliceStations();
+      } else if (tabName === 'missing-persons') {
+        loadMissingPersons();
       } else if (tabName === 'verify-reports') {
         loadComplaints();
       } else if (tabName === 'case-management') {
@@ -2537,45 +2840,62 @@
       e.preventDefault();
       const formData = new FormData(this);
       const crimeData = Object.fromEntries(formData);
-      
-      // Process the form data to match database schema (omitted for brevity, assume valid)
-      
-      try {
-        // Show loading state
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<span>⏳</span> Adding Crime...';
-        submitBtn.disabled = true;
-        
-        // --- MOCK DATA SIMULATION START ---
-        await new Promise(resolve => setTimeout(resolve, 1500)); 
-        const newCrimeId = crimesData.length + 1;
 
-        // Add to mock data
-        crimesData.push({
-            crime_id: newCrimeId,
-            area_name: crimeData.area_name,
-            city: crimeData.city,
-            status: crimeData.status,
+      const payload = {
+        crime_type: (crimeData.crime_type || '').trim(),
+        status: (crimeData.status || '').trim(),
+        city: (crimeData.city || '').trim(),
+        area_name: (crimeData.area_name || '').trim(),
+        location_details: (crimeData.location_details || '').trim() || null,
+        incident_time: (crimeData.incident_time || '').trim() || null,
+        priority: (crimeData.priority || 'medium').trim(),
+        description: (crimeData.description || '').trim(),
+        reporter_id: Number.isFinite(CURRENT_ADMIN_ID) ? CURRENT_ADMIN_ID : null
+      };
+
+      if (!payload.crime_type || !payload.status || !payload.city || !payload.area_name || !payload.incident_time || !payload.description) {
+        showAlert('Please fill in all required fields before submitting the crime report.');
+        return;
+      }
+
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+
+      try {
+        if (submitBtn) {
+          submitBtn.innerHTML = '<span>⏳</span> Adding Crime...';
+          submitBtn.disabled = true;
+        }
+
+        const response = await fetch(resolveApiUrl('/api/admin/crimes'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
         });
 
-        showAlert(`Crime added successfully!\nCrime ID: CR-${newCrimeId.toString().padStart(3, '0')}`);
-        this.reset();
-        
-        // Refresh the overview table if we're on that tab
-        if (document.getElementById('overview').classList.contains('active')) {
-          loadCrimesOverview();
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const message = result.detail || result.message || 'Failed to add crime report.';
+          throw new Error(message);
         }
-        // --- MOCK DATA SIMULATION END ---
-        
+
+        const newCrimeId = Number(result.crime_id);
+        const crimeCode = Number.isFinite(newCrimeId) ? `CR-${String(newCrimeId).padStart(3, '0')}` : 'New Crime';
+
+        showAlert(`Crime added successfully!\nCrime ID: ${crimeCode}`);
+        this.reset();
+        loadCrimesOverview();
       } catch (error) {
         console.error('Error:', error);
         showAlert(`Error adding crime: ${error.message}`);
       } finally {
-        // Reset button state
-        const submitBtn = this.querySelector('button[type="submit"]');
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+        if (submitBtn) {
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+        }
       }
     });
 
@@ -2977,7 +3297,8 @@
         return;
       }
 
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading stations…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading stations…</td></tr>';
+
 
       try {
         const response = await fetch(resolveApiUrl('/api/admin/police-stations'), { cache: 'no-store' });
@@ -3001,25 +3322,42 @@
         renderPoliceStationRows(records, tbody);
       } catch (error) {
         console.error('Error loading stations:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load police stations right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load police stations right now.</td></tr>';
       }
     }
 
     // Load missing persons from database
     async function loadMissingPersons() {
+      const tbody = document.getElementById('missing-persons-table');
+      if (!tbody) {
+        return;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">Loading missing person reports…</td></tr>';
+
       try {
-        const response = await fetch('/api/admin/missing-persons');
-        const data = await response.json();
-        
-        if (data.success) {
-          displayMissingPersons(data.missing_persons);
-        } else {
-          console.error('Failed to load missing persons:', data.error);
-          document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
+        const response = await fetch(resolveApiUrl('/api/missing-persons'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const records = Array.isArray(payload.missing_persons)
+          ? payload.missing_persons
+          : (Array.isArray(payload) ? payload : []);
+
+        missingPersonsCache.clear();
+        records.forEach(record => {
+          const missingId = Number(record.missing_id ?? record.id);
+          if (Number.isFinite(missingId)) {
+            missingPersonsCache.set(missingId, record);
+          }
+        });
+
+        renderMissingPersonRows(records, tbody);
       } catch (error) {
         console.error('Error loading missing persons:', error);
-        document.getElementById('missing-persons-container').innerHTML = '<p>Error loading missing persons</p>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--accent-red);">Unable to load missing person reports right now.</td></tr>';
       }
     }
 
@@ -3058,22 +3396,11 @@
     }
 
     function displayMissingPersons(persons) {
-      const container = document.getElementById('missing-persons-container');
-      
-      const personsHtml = persons.map(person => `
-        <div class="data-card">
-          <h4>${person.name}</h4>
-          <p><strong>Age:</strong> ${person.age}</p>
-          <p><strong>Gender:</strong> ${person.gender}</p>
-          <p><strong>Status:</strong> <span class="status ${person.status.toLowerCase()}">${person.status}</span></p>
-          <p><strong>Last Seen:</strong> ${person.last_seen_location}</p>
-          <p><strong>Date:</strong> ${new Date(person.last_seen_date).toLocaleDateString()}</p>
-          <p><strong>Contact:</strong> ${person.contact_person} (${person.contact_phone})</p>
-          <p><strong>Description:</strong> ${person.description}</p>
-        </div>
-      `).join('');
-      
-      container.innerHTML = personsHtml;
+      const tbody = document.getElementById('missing-persons-table');
+      if (!tbody) {
+        return;
+      }
+      renderMissingPersonRows(persons, tbody);
     }
 
     function displayAnalytics(analytics) {
@@ -3158,27 +3485,41 @@
         roleDistribution.length ? `Role diversity: <strong>${formatNumberDisplay(roleDistribution.length)}</strong> roles in use` : null
       ].filter(Boolean);
 
+      const insightsBlock = insights.length ? `
+        <div class="stats-insights">
+          <h4>Quick Insights</h4>
+          <ul>
+            ${insights.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      modalContainer.classList.add('modal-wide');
+
       modalMessage.innerHTML = `
         <div class="stats-modal">
           <div class="stats-header">
             <h3>User Statistics</h3>
             <p>Live snapshot of account distribution and onboarding momentum.</p>
           </div>
-          <div class="stats-metrics">
-            ${metrics.map(metric => `
-              <div class="stats-metric">
-                <span class="metric-label">${metric.label}</span>
-                <span class="metric-value">${metric.prefix || ''}${formatNumberDisplay(metric.value ?? 0)}</span>
+          <div class="stats-layout">
+            <div class="stats-metrics-card">
+              <div class="stats-metrics">
+                ${metrics.map(metric => `
+                  <div class="stats-metric">
+                    <span class="metric-label">${metric.label}</span>
+                    <span class="metric-value">${metric.prefix || ''}${formatNumberDisplay(metric.value ?? 0)}</span>
+                  </div>
+                `).join('')}
               </div>
-            `).join('')}
-          </div>
-          <div class="stats-charts">
+            </div>
             <div class="stats-chart">
               <h4>Role Distribution</h4>
               ${hasRoleData && chartLibraryLoaded
                 ? '<div class="chart-wrapper"><canvas id="role-distribution-chart"></canvas></div>'
                 : `<div class="stats-empty-state">${roleEmptyMessage}</div>`}
             </div>
+            ${insightsBlock}
             <div class="stats-chart">
               <h4>Status Distribution</h4>
               ${hasStatusData && chartLibraryLoaded
@@ -3186,14 +3527,6 @@
                 : `<div class="stats-empty-state">${statusEmptyMessage}</div>`}
             </div>
           </div>
-          ${insights.length ? `
-            <div class="stats-insights">
-              <h4>Quick Insights</h4>
-              <ul>
-                ${insights.map(item => `<li>${item}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
         </div>
       `;
 
@@ -3275,6 +3608,19 @@
         } else {
           showAlert('Station details are not available for this entry.');
         }
+        return;
+      }
+
+      const missingBtn = event.target.closest('[data-action="view-missing"]');
+      if (missingBtn) {
+        event.preventDefault();
+        const missingId = Number(missingBtn.dataset.missingId);
+        if (Number.isFinite(missingId) && missingId > 0) {
+          viewMissingPerson(missingId);
+        } else {
+          showAlert('Missing person details are not available for this entry.');
+        }
+        return;
       }
     });
 
