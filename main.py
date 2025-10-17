@@ -452,6 +452,131 @@ async def submit_crime_report(crime_data: CrimeData):
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to submit crime report: {str(e)}")
 
+@app.post("/api/admin/crimes")
+async def create_admin_crime(payload: AdminCrimeCreate):
+    """Allow administrators to log a new crime directly from the dashboard."""
+
+    status_map = {
+        "reported": "Reported",
+        "pending": "Pending",
+        "under_investigation": "Under Investigation",
+        "under investigation": "Under Investigation",
+        "in_progress": "In Progress",
+        "in progress": "In Progress",
+        "resolved": "Resolved",
+        "case_closed": "Case Closed",
+        "case closed": "Case Closed",
+    }
+
+    priority_map = {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+    }
+
+    normalized_status_key = (payload.status or "").strip().lower().replace("-", "_")
+    status_value = status_map.get(normalized_status_key, (payload.status or "Pending").strip().title() or "Pending")
+
+    normalized_priority_key = (payload.priority or "medium").strip().lower()
+    priority_value = priority_map.get(normalized_priority_key, "Medium")
+
+    incident_dt: Optional[datetime] = None
+    if payload.incident_time:
+        candidate = payload.incident_time.strip()
+        try:
+            incident_dt = datetime.fromisoformat(candidate)
+        except ValueError:
+            try:
+                incident_dt = datetime.fromisoformat(candidate.replace(" ", "T"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="incident_time must be an ISO 8601 datetime string (e.g., 2025-10-18T15:30)") from exc
+
+    location_payload = {
+        "city": (payload.city or "").strip(),
+        "area_name": (payload.area_name or "").strip(),
+    }
+    if payload.location_details:
+        location_payload["details"] = payload.location_details.strip()
+
+    crime_payload = {
+        "type": (payload.crime_type or "").strip(),
+        "description": (payload.description or "").strip(),
+        "status": status_value,
+        "priority_level": priority_value,
+        "source": "admin-dashboard",
+    }
+
+    created_at = datetime.utcnow()
+
+    with engine.connect() as conn:
+        reporter_id_val: Optional[int] = None
+        if payload.reporter_id is not None:
+            reporter_row = conn.execute(
+                text("SELECT user_id FROM appuser WHERE user_id = :uid"),
+                {"uid": payload.reporter_id}
+            ).fetchone()
+            if reporter_row:
+                reporter_id_val = payload.reporter_id
+
+        try:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO crime (
+                        reporter_id,
+                        incident_date,
+                        location_data,
+                        crime_data,
+                        victim_data,
+                        criminal_data,
+                        weapon_data,
+                        witness_data,
+                        evidence_files,
+                        witness_info,
+                        status,
+                        priority_level,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :reporter_id,
+                        :incident_date,
+                        :location_data,
+                        :crime_data,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        :status,
+                        :priority_level,
+                        :created_at,
+                        :updated_at
+                    )
+                    """
+                ),
+                {
+                    "reporter_id": reporter_id_val,
+                    "incident_date": incident_dt,
+                    "location_data": json.dumps(location_payload),
+                    "crime_data": json.dumps(crime_payload),
+                    "status": status_value,
+                    "priority_level": priority_value,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                }
+            )
+            conn.commit()
+            crime_id = result.lastrowid
+            return {"message": "Crime report created", "crime_id": crime_id}
+        except IntegrityError as ie:
+            conn.rollback()
+            raise HTTPException(status_code=400, detail=f"Failed to create crime record: {ie}") from ie
+        except Exception as exc:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create crime record: {exc}") from exc
+
 @app.get("/api/crimes")
 async def get_all_crimes(
     status: Optional[str] = Query(None, description="Filter by status"),
