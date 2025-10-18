@@ -125,6 +125,26 @@ class MissingPersonData(BaseModel):
     contact_info: str
     photo_url: Optional[str] = None
 
+class MissingPersonFinderUpdate(BaseModel):
+    finding_location: str
+    finder_name: str
+    finder_phone: str
+    finder_email: Optional[str] = None
+    still_with_finder: Optional[bool] = False
+
+    @validator("finding_location", "finder_name", "finder_phone")
+    def validate_non_empty(cls, value: str) -> str:
+        if not value or not str(value).strip():
+            raise ValueError("Field cannot be empty")
+        return str(value).strip()
+
+    @validator("finder_email")
+    def validate_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
 class ComplaintVerification(BaseModel):
     complaint_id: int
     status: str
@@ -815,11 +835,13 @@ async def submit_missing_person(payload: Dict[str, Any] = Body(...)):
 @app.get("/api/missing-persons")
 async def get_missing_persons():
     query = text("""
-        SELECT missing_id, reporter_id, name, age, gender, description,
-               last_seen_location, last_seen_date, last_seen_time, height,
-               weight, hair_color, eye_color, distinguishing_marks,
-               clothing_description, contact_person, contact_phone,
-               photo_url, status, police_case_number, created_at, updated_at
+     SELECT missing_id, reporter_id, name, age, gender, description,
+         last_seen_location, last_seen_date, last_seen_time, height,
+         weight, hair_color, eye_color, distinguishing_marks,
+         clothing_description, contact_person, contact_phone,
+               photo_url, status, police_case_number,
+               finding_location, finder_name, finder_phone, finder_email,
+         still_with_finder, created_at, updated_at
         FROM missing_person
         ORDER BY COALESCE(updated_at, created_at) DESC
     """)
@@ -843,6 +865,74 @@ async def get_missing_person_by_id(missing_id: int):
             raise HTTPException(status_code=404, detail="Missing person not found")
             
         return {"missing_person": dict(result)}
+
+
+@app.put("/api/missing-persons/{missing_id}/found")
+async def update_missing_person_finder(missing_id: int, payload: MissingPersonFinderUpdate):
+    normalized_status = "Found" if payload.still_with_finder else "Missing"
+    still_with_value = "Yes" if payload.still_with_finder else "No"
+    timestamp = datetime.utcnow()
+
+    update_sql = text(
+        """
+        UPDATE missing_person
+        SET finding_location = :finding_location,
+            finder_name = :finder_name,
+            finder_phone = :finder_phone,
+            finder_email = :finder_email,
+            still_with_finder = :still_with_finder,
+            status = :status,
+            updated_at = :updated_at
+        WHERE missing_id = :missing_id
+        """
+    )
+
+    with engine.begin() as conn:
+        result = conn.execute(update_sql, {
+            "finding_location": payload.finding_location,
+            "finder_name": payload.finder_name,
+            "finder_phone": payload.finder_phone,
+            "finder_email": payload.finder_email,
+            "still_with_finder": still_with_value,
+            "status": normalized_status,
+            "updated_at": timestamp,
+            "missing_id": missing_id,
+        })
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Missing person not found")
+
+        refreshed = conn.execute(
+            text(
+                """
+                SELECT missing_id, reporter_id, name, age, gender, description,
+                       last_seen_location, last_seen_date, last_seen_time, height,
+                       weight, hair_color, eye_color, distinguishing_marks,
+                       clothing_description, contact_person, contact_phone,
+                       photo_url, status, police_case_number,
+                       finding_location, finder_name, finder_phone, finder_email,
+                       still_with_finder, created_at, updated_at
+                FROM missing_person
+                WHERE missing_id = :missing_id
+                """
+            ),
+            {"missing_id": missing_id}
+        ).mappings().fetchone()
+
+    return {"missing_person": dict(refreshed)}
+
+
+@app.delete("/api/missing-persons/{missing_id}")
+async def delete_missing_person_record(missing_id: int):
+    delete_sql = text("DELETE FROM missing_person WHERE missing_id = :missing_id")
+
+    with engine.begin() as conn:
+        result = conn.execute(delete_sql, {"missing_id": missing_id})
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Missing person not found")
+
+    return {"message": "Missing person report deleted"}
 
 # ==================== WANTED CRIMINALS ENDPOINTS ====================
 

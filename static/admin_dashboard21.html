@@ -772,14 +772,14 @@
   }
 
   .modal-content.modal-wide {
-    max-width: 860px;
-    width: 90%;
+    max-width: 1040px;
+    width: 95%;
   }
 
   .missing-modal {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
   .missing-modal .missing-header h3 {
@@ -796,15 +796,23 @@
 
   .missing-modal .missing-body {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
-    gap: 1.25rem;
-    align-items: flex-start;
+    grid-template-columns: minmax(0, 1.75fr) minmax(240px, 1fr);
+    gap: 1rem;
+    align-items: stretch;
   }
 
   .missing-modal .missing-details {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.85rem;
+  }
+
+  .missing-modal .missing-details .stats-insights {
+    height: 100%;
+  }
+
+  .missing-modal .missing-details .missing-description {
+    grid-column: 1 / -1;
   }
 
   .missing-modal .missing-sidebar {
@@ -1208,7 +1216,7 @@
               <th>Gender</th>
               <th>Last Seen Location</th>
               <th>Last Seen Date</th>
-                <th>Officer</th>
+                <th>Reporter Info</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -1840,7 +1848,9 @@
         'verified': 'status-verified',
         'active': 'status-verified',
         'seen': 'status-verified',
-        'unseen': 'status-reported'
+        'unseen': 'status-reported',
+        'found': 'status-verified',
+        'missing': 'status-reported'
       };
       const className = classMap[normalized] || 'status-pending';
       const display = raw.replace(/_/g, ' ');
@@ -2382,6 +2392,14 @@
         const missingId = Number(record.missing_id ?? record.id);
         const displayId = Number.isFinite(missingId) ? `MISS-${String(missingId).padStart(4, '0')}` : 'N/A';
         const statusInfo = normalizeStatus(record.status || 'Missing');
+        const hasFinderReport = Number.isFinite(missingId) && (record.status || '').toLowerCase() === 'found' && (
+          record.finding_location || record.finder_name || record.finder_phone || record.finder_email || (
+            record.still_with_finder !== undefined && record.still_with_finder !== null && record.still_with_finder !== ''
+          )
+        );
+        const statusBadge = hasFinderReport
+          ? `<button class="status-badge ${statusInfo.className} status-clickable" data-missing-id="${missingId}">${escapeHtml(statusInfo.display)}</button>`
+          : `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${escapeHtml(displayId)}</td>
@@ -2391,7 +2409,7 @@
           <td title="${escapeHtml(record.last_seen_location || 'N/A')}">${escapeHtml((record.last_seen_location || '').slice(0, 60) || 'N/A')}</td>
           <td>${escapeHtml(formatDateOnly(record.last_seen_date))}</td>
           <td>${escapeHtml(record.contact_person || 'N/A')}</td>
-          <td><span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span></td>
+          <td>${statusBadge}</td>
           <td>
             ${Number.isFinite(missingId)
               ? `<button class="action-btn" data-action="view-missing" data-missing-id="${missingId}"><span>👁️</span>View</button>`
@@ -2453,6 +2471,23 @@
         `<li><strong>Police Case #:</strong> ${escapeHtml(record.police_case_number || 'N/A')}</li>`
       ].join('');
 
+      let finderStatusRaw = '';
+      if (record.still_with_finder !== undefined && record.still_with_finder !== null) {
+        if (typeof record.still_with_finder === 'string') {
+          finderStatusRaw = record.still_with_finder;
+        } else {
+          finderStatusRaw = record.still_with_finder ? 'Yes' : 'No';
+        }
+      }
+      const finderItems = [
+        record.finding_location ? `<li><strong>Finding Location:</strong> ${escapeHtml(record.finding_location)}</li>` : null,
+        record.finder_name ? `<li><strong>Finder Name:</strong> ${escapeHtml(record.finder_name)}</li>` : null,
+        record.finder_phone ? `<li><strong>Finder Phone:</strong> ${escapeHtml(record.finder_phone)}</li>` : null,
+        record.finder_email ? `<li><strong>Finder Email:</strong> ${escapeHtml(record.finder_email)}</li>` : null,
+        finderStatusRaw ? `<li><strong>Still With Finder:</strong> ${escapeHtml(finderStatusRaw)}</li>` : null,
+        record.updated_at ? `<li><strong>Last Updated:</strong> ${escapeHtml(formatDateTimeDisplay(record.updated_at))}</li>` : null
+      ].filter(Boolean).join('');
+
       const appearanceItems = [
         record.height ? `<li><strong>Height:</strong> ${escapeHtml(record.height)}</li>` : null,
         record.weight ? `<li><strong>Weight:</strong> ${escapeHtml(record.weight)}</li>` : null,
@@ -2490,6 +2525,10 @@
         ? `<div class="stats-insights missing-description"><h4>Description</h4><p>${escapeHtml(record.description)}</p></div>`
         : '';
 
+      const finderBlock = finderItems
+        ? `<div class="stats-insights"><h4>Finder Report</h4><ul>${finderItems}</ul></div>`
+        : '';
+
       const photoSection = record.photo_url
         ? `<div class="missing-photo-card"><img src="${escapeHtml(record.photo_url)}" alt="${escapeHtml(record.name || 'Missing person photo')}" /></div>`
         : `<div class="missing-photo-card missing-photo-placeholder">No photo available</div>`;
@@ -2506,6 +2545,7 @@
             <div class="missing-details">
               ${demographicsBlock}
               ${caseSummaryBlock}
+              ${finderBlock}
               ${appearanceBlock}
               ${descriptionBlock}
             </div>
@@ -2523,8 +2563,117 @@
       closeButton.className = 'btn btn-primary';
       closeButton.textContent = 'Close';
       closeButton.onclick = () => closeModal();
+      const removeButton = document.createElement('button');
+      removeButton.className = 'btn btn-danger';
+      removeButton.textContent = 'Remove Report';
+      removeButton.onclick = () => {
+        closeModal();
+        showConfirm(`Remove ${escapeHtml(record.name || displayId)} from missing persons?`, async (confirmed) => {
+          if (!confirmed) {
+            viewMissingPerson(numericId);
+            return;
+          }
+          await deleteMissingPerson(numericId);
+        });
+      };
+      modalButtons.appendChild(removeButton);
       modalButtons.appendChild(closeButton);
 
+      modalOverlay.classList.add('show');
+    }
+
+    async function deleteMissingPerson(missingId) {
+      const numericId = Number(missingId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid missing person reference.');
+        return;
+      }
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/missing-persons/${numericId}`), {
+          method: 'DELETE'
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const message = payload.detail || payload.message || `Failed to remove record (status ${response.status}).`;
+          throw new Error(message);
+        }
+
+        missingPersonsCache.delete(numericId);
+        await loadMissingPersons();
+        showAlert('Missing person report removed successfully.');
+      } catch (error) {
+        console.error('Failed to delete missing person:', error);
+        showAlert(`Unable to remove report: ${error.message || 'Unknown error'}`);
+      }
+    }
+
+    function showMissingPersonFinder(missingId) {
+      const numericId = Number(missingId);
+      if (!Number.isFinite(numericId) || !missingPersonsCache.has(numericId)) {
+        showAlert('Finder report is not available for this case.');
+        return;
+      }
+
+      const record = missingPersonsCache.get(numericId);
+      const caseLabel = `MISS-${String(numericId).padStart(4, '0')}`;
+      let stillWithFinder = '';
+      if (record.still_with_finder !== undefined && record.still_with_finder !== null) {
+        if (typeof record.still_with_finder === 'string') {
+          stillWithFinder = record.still_with_finder;
+        } else {
+          stillWithFinder = record.still_with_finder ? 'Yes' : 'No';
+        }
+      }
+
+      const finderEntries = [
+        record.finding_location ? `<li><strong>Finding Location:</strong> ${escapeHtml(record.finding_location)}</li>` : null,
+        record.finder_name ? `<li><strong>Finder Name:</strong> ${escapeHtml(record.finder_name)}</li>` : null,
+        record.finder_phone ? `<li><strong>Finder Phone:</strong> ${escapeHtml(record.finder_phone)}</li>` : null,
+        record.finder_email ? `<li><strong>Finder Email:</strong> ${escapeHtml(record.finder_email)}</li>` : null,
+        stillWithFinder ? `<li><strong>Still With Finder:</strong> ${escapeHtml(stillWithFinder)}</li>` : null,
+        record.updated_at ? `<li><strong>Last Updated:</strong> ${escapeHtml(formatDateTimeDisplay(record.updated_at))}</li>` : null
+      ].filter(Boolean);
+
+      if (!finderEntries.length) {
+        showAlert('Finder details have not been recorded yet.');
+        return;
+      }
+
+      modalContainer.classList.remove('modal-wide');
+      modalMessage.innerHTML = `
+        <div class="stats-modal">
+          <div class="stats-header">
+            <h3>Finder Report</h3>
+            <p>${escapeHtml(record.name || 'Unknown person')} · Case ${escapeHtml(caseLabel)}</p>
+          </div>
+          <div class="stats-insights">
+            <h4>Details</h4>
+            <ul>${finderEntries.join('')}</ul>
+          </div>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+
+      const viewButton = document.createElement('button');
+      viewButton.className = 'btn btn-secondary';
+      viewButton.textContent = 'View Full Report';
+      viewButton.onclick = () => {
+        closeModal();
+        viewMissingPerson(numericId);
+      };
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'btn btn-primary';
+      closeButton.textContent = 'Close';
+      closeButton.onclick = () => closeModal();
+
+      modalButtons.appendChild(viewButton);
+      modalButtons.appendChild(closeButton);
       modalOverlay.classList.add('show');
     }
 
@@ -3829,6 +3978,11 @@
       const badge = event.target.closest('.status-clickable');
       if (badge) {
         event.preventDefault();
+        const missingId = Number(badge.dataset.missingId);
+        if (Number.isFinite(missingId) && missingId > 0) {
+          showMissingPersonFinder(missingId);
+          return;
+        }
         const criminalId = Number(badge.dataset.criminalId);
         if (Number.isFinite(criminalId) && criminalId > 0) {
           showSightingHistory(criminalId);

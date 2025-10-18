@@ -221,6 +221,19 @@ const normalizeRow = (row) => {
     ? parseFloat(String(row.weight).replace(/[^\d.]/g, "")) || null
     : null;
 
+  const stillWithFinderValue = (() => {
+    const source = row.still_with_finder;
+    if (source === null || source === undefined) return false;
+    if (typeof source === "string") {
+      const normalized = source.trim().toLowerCase();
+      return normalized === "yes" || normalized === "true" || normalized === "1";
+    }
+    if (typeof source === "number") {
+      return source === 1;
+    }
+    return Boolean(source);
+  })();
+
   return {
     id: row.missing_id,
     name: row.name || "Unknown",
@@ -230,7 +243,12 @@ const normalizeRow = (row) => {
     last_seen_location: row.last_seen_location || "Unknown",
     last_seen_time: iso,
     description: row.clothing_description || row.description || "",
-    still_with_finder: (row.status || "").toLowerCase() === "found",
+    finding_location: row.finding_location || null,
+    finder_name: row.finder_name || null,
+    finder_phone: row.finder_phone || null,
+    finder_email: row.finder_email || null,
+    status: row.status || "Missing",
+    still_with_finder: stillWithFinderValue,
     age: row.age ?? null,
     weight_kg: weight,
     hair_color: row.hair_color || "—"
@@ -264,17 +282,25 @@ const card = (item) => {
   const el = document.createElement("div");
   el.className =
     "rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
+  const statusLower = (item.status || "").toLowerCase();
+  const statusClass = statusLower === "found"
+    ? "bg-green-100 text-green-700"
+    : statusLower === "missing"
+      ? "bg-yellow-100 text-yellow-700"
+      : "bg-gray-200 text-gray-700";
+  const finderBadgeText = item.still_with_finder ? "With finder" : "Not with finder";
   el.innerHTML = `
     <img src="${item.photo_url}" alt="${item.name}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name)}/600/400'">
     <div class="p-4">
       <div class="flex justify-between items-center mb-2">
         <div class="font-semibold">${item.name} <span class="text-sm text-gray-500">(${item.nickname || "—"})</span></div>
-        <span class="px-2 py-0.5 text-xs ${item.still_with_finder ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"} rounded-full">
-          ${item.still_with_finder ? "With finder" : "Unknown"}
+        <span class="px-2 py-0.5 text-xs ${statusClass} rounded-full">
+          ${item.status || "Unknown"}
         </span>
       </div>
       <div class="text-sm text-gray-500 dark:text-gray-400">Hometown: ${item.hometown || "—"}</div>
       <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${item.last_seen_location} · ${fmt(item.last_seen_time)}</div>
+      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Finder status: ${finderBadgeText}</div>
       <div class="mt-2">
         <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
       </div>
@@ -304,13 +330,17 @@ const openModal = (item) => {
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <img src="${item.photo_url}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${item.name}" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name)}/600/400'">
       <div class="md:col-span-2 text-sm space-y-1">
-        <p><b>Nickname:</b> ${item.nickname || "—"}</p>
-        <p><b>Age:</b> ${item.age ?? "—"} yrs | <b>Weight:</b> ${item.weight_kg ?? "—"} kg | <b>Hair:</b> ${item.hair_color || "—"}</p>
-        <p><b>Hometown:</b> ${item.hometown || "—"}</p>
-        <p><b>Last seen:</b> ${item.last_seen_location} at ${fmt(item.last_seen_time)}</p>
-        <p class="text-gray-500 dark:text-gray-400">${item.description || ""}</p>
+        <p><b>Nickname:</b> ${escapeHtml(item.nickname || "—")}</p>
+        <p><b>Age:</b> ${escapeHtml(item.age ?? "—")} yrs | <b>Weight:</b> ${escapeHtml(item.weight_kg ?? "—")} kg | <b>Hair:</b> ${escapeHtml(item.hair_color || "—")}</p>
+        <p><b>Hometown:</b> ${escapeHtml(item.hometown || "—")}</p>
+        <p><b>Status:</b> ${escapeHtml(item.status || "Missing")}</p>
+        <p><b>Last seen:</b> ${escapeHtml(item.last_seen_location)} at ${fmt(item.last_seen_time)}</p>
+        <p><b>Finding location (latest):</b> ${escapeHtml(item.finding_location || "—")}</p>
+        <p><b>Finder:</b> ${escapeHtml(item.finder_name || "—")} (${escapeHtml(item.finder_phone || "—")})</p>
+        ${item.finder_email ? `<p><b>Email:</b> ${escapeHtml(item.finder_email)}</p>` : ""}
+        <p class="text-gray-500 dark:text-gray-400">${escapeHtml(item.description || "")}</p>
         <div>
-          <button id="foundBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Found</button>
+          <button id="foundBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">${item.finding_location || item.finder_name ? "Update Finder Report" : "Report Found"}</button>
         </div>
         <div id="foundForm" class="hidden mt-3 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
           <div class="text-sm text-gray-500 mb-2">Tip: Location works only on https:// or http://localhost</div>
@@ -327,29 +357,73 @@ const openModal = (item) => {
           <label class="block text-sm">Your Email (optional)</label>
           <input id="finderEmail" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Email">
           <div id="stillWrap" class="mt-4">
-            <div id="stillQuestion" class="mb-2 text-sm text-yellow-600 dark:text-yellow-300">
-              Is this person still with you? If yes then click <b>“Still with the finder”</b>.
-            </div>
-            <button id="toggleFinderBtn" class="px-3 py-1 bg-gray-500 text-white rounded">Still with the finder</button>
+            <div id="stillQuestion" class="mb-2 text-sm text-yellow-600 dark:text-yellow-300"></div>
+            <button id="toggleFinderBtn" class="px-3 py-1 rounded text-white"></button>
           </div>
           <button id="submitFound" class="mt-4 px-3 py-1 bg-purple-600 text-white rounded w-full">Submit Report</button>
         </div>
       </div>
     </div>`;
 
-  $("#backdrop").classList.remove("hidden");
-  $("#backdrop").classList.add("flex");
+  const backdrop = $("#backdrop");
+  backdrop.classList.remove("hidden");
+  backdrop.classList.add("flex");
 
-  $("#foundBtn").onclick = () => $("#foundForm").classList.toggle("hidden");
+  const foundForm = $("#foundForm");
+  const foundBtn = $("#foundBtn");
+  const foundLocationInput = $("#foundLocation");
+  const finderNameInput = $("#finderName");
+  const finderPhoneInput = $("#finderPhone");
+  const finderEmailInput = $("#finderEmail");
+  const toggleFinderBtn = $("#toggleFinderBtn");
+  const stillQuestion = $("#stillQuestion");
+
+  let stillWithFinder = Boolean(item.still_with_finder);
+
+  const updateFinderToggleUI = () => {
+    if (stillWithFinder) {
+      toggleFinderBtn.textContent = "Mark as not with finder";
+      toggleFinderBtn.classList.remove("bg-gray-500");
+      toggleFinderBtn.classList.add("bg-green-600");
+      stillQuestion.innerHTML = "Currently marked as <b>with the finder</b>. Click the button to change.";
+    } else {
+      toggleFinderBtn.textContent = "Mark as still with finder";
+      toggleFinderBtn.classList.remove("bg-green-600");
+      toggleFinderBtn.classList.add("bg-gray-500");
+      stillQuestion.innerHTML = "Is this person still with you? Click to mark as still with the finder.";
+    }
+  };
+
+  const showForm = () => {
+    foundForm.classList.remove("hidden");
+  };
+
+  foundLocationInput.value = item.finding_location || "";
+  finderNameInput.value = item.finder_name || "";
+  finderPhoneInput.value = item.finder_phone || "";
+  finderEmailInput.value = item.finder_email || "";
+
+  updateFinderToggleUI();
+
+  if (item.finding_location || item.finder_name || item.finder_phone) {
+    showForm();
+  }
+
+  foundBtn.onclick = () => {
+    if (foundForm.classList.contains("hidden")) {
+      showForm();
+    } else {
+      foundForm.classList.add("hidden");
+    }
+  };
 
   $("#useGps").addEventListener("change", async (e) => {
     const msg = $("#geoMsg");
-    const loc = $("#foundLocation");
     if (e.target.checked) {
       msg.textContent = "Getting your location…";
       try {
         const coords = await getCurrentCoords();
-        loc.value = coords;
+        foundLocationInput.value = coords;
         msg.textContent = "Location filled from GPS.";
       } catch (err) {
         msg.textContent = "Couldn’t get location: " + err.message;
@@ -360,33 +434,18 @@ const openModal = (item) => {
     }
   });
 
-  $("#toggleFinderBtn").onclick = async () => {
-    const result = await Swal.fire({
-      icon: 'question',
-      title: 'Is the person with you?',
-      text: 'Confirm if this missing person is still with you.',
-      showCancelButton: true,
-      confirmButtonText: 'Yes',
-      cancelButtonText: 'No',
-      confirmButtonColor: '#10B981',
-      cancelButtonColor: '#6B7280'
-    });
-    if (!result.isConfirmed) return;
-    item.still_with_finder = !item.still_with_finder;
-    render();
-    await Swal.fire({
-      icon: 'success',
-      title: 'Status Updated',
-      text: 'Marked as still with the finder.',
-      confirmButtonColor: '#10B981'
-    });
-  };
+  toggleFinderBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    stillWithFinder = !stillWithFinder;
+    updateFinderToggleUI();
+  });
 
   $("#submitFound").onclick = async () => {
-    const location = $("#foundLocation").value.trim();
-    const name = $("#finderName").value.trim();
-    const phone = $("#finderPhone").value.trim();
-    const email = $("#finderEmail").value.trim();
+    const location = foundLocationInput.value.trim();
+    const name = finderNameInput.value.trim();
+    const phone = finderPhoneInput.value.trim();
+    const email = finderEmailInput.value.trim();
+
     if (!location) {
       await Swal.fire({
         icon: 'warning',
@@ -405,22 +464,63 @@ const openModal = (item) => {
       });
       return;
     }
-    const payload = {
-      person_id: item.id,
-      found_location: location,
-      finder_name: name,
-      finder_phone: phone,
-      finder_email: email || null,
-      found_time: new Date().toISOString()
-    };
-    console.info('Finder report payload', payload);
-    await Swal.fire({
-      icon: 'success',
-      title: 'Report Submitted',
-      text: 'Thank you for reporting. A team member will reach out if more information is needed.',
-      confirmButtonColor: '#10B981'
-    });
-    closeModal();
+
+    const submitBtn = $("#submitFound");
+    const originalLabel = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting…";
+
+    try {
+      const response = await fetch(`${API_BASE}/api/missing-persons/${item.id}/found`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          finding_location: location,
+          finder_name: name,
+          finder_phone: phone,
+          finder_email: email || null,
+          still_with_finder: stillWithFinder
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload.detail || payload.message || 'Unable to save finder report.';
+        throw new Error(message);
+      }
+
+      const updated = normalizeRow(payload.missing_person);
+      const idx = missingData.findIndex((entry) => entry.id === updated.id);
+      if (idx >= 0) {
+        missingData[idx] = updated;
+      } else {
+        missingData.push(updated);
+      }
+      render();
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Report Submitted',
+        text: 'Finder details saved successfully.',
+        confirmButtonColor: '#10B981'
+      });
+
+      closeModal();
+    } catch (error) {
+      console.error('Failed to submit finder report:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Could not save report',
+        text: error.message || 'An unexpected error occurred.',
+        confirmButtonColor: '#EF4444'
+      });
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalLabel;
+    }
   };
 };
 
