@@ -7,7 +7,7 @@ from pydantic import BaseModel, validator
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 import hashlib
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Any, Mapping
 import json
 import os
@@ -15,8 +15,6 @@ import uuid
 import asyncio
 import mysql.connector
 from mysql.connector import Error
-from typing import Dict, Any
-from datetime import datetime
 
 app = FastAPI()
 
@@ -2299,6 +2297,320 @@ async def get_admin_overview():
                     "recent_missing_24h": 0
                 }
             }
+
+@app.get("/api/admin/analytics")
+async def get_admin_analytics(limit: int = Query(15, ge=1, le=100)):
+    """Provide dashboard-ready analytics summary and recent activity."""
+    limit = max(1, min(limit, 100))
+    window_label = "30 days"
+    open_statuses = ["Pending", "Under Investigation"]
+
+    def summarize_change(current_window, previous_window):
+        current_value = int(current_window or 0)
+        previous_value = int(previous_window or 0)
+        change = current_value - previous_value
+        trend = "up" if change > 0 else "down" if change < 0 else "neutral"
+        if previous_value > 0:
+            percent = (change / previous_value) * 100
+            delta_text = f"{change:+d} ({percent:+.1f}% vs prior {window_label})"
+        else:
+            if change > 0:
+                delta_text = f"+{change} vs prior {window_label}"
+            elif change < 0:
+                delta_text = f"{change} vs prior {window_label}"
+            else:
+                delta_text = f"No change vs prior {window_label}"
+        return delta_text, trend
+
+    def serialize_timestamp(value):
+        if isinstance(value, datetime):
+            dt_value = value
+        elif isinstance(value, date):
+            dt_value = datetime.combine(value, datetime.min.time())
+        else:
+            try:
+                dt_value = datetime.fromisoformat(str(value))
+            except Exception:
+                dt_value = datetime.utcnow()
+        return dt_value, dt_value.isoformat()
+
+    with engine.connect() as conn:
+        try:
+            # Crime metrics
+            total_crimes = conn.execute(text("SELECT COUNT(*) FROM crime")).scalar() or 0
+            crimes_recent_30 = conn.execute(
+                text("SELECT COUNT(*) FROM crime WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")
+            ).scalar() or 0
+            crimes_previous_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM crime
+                    WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                    """
+                )
+            ).scalar() or 0
+
+            open_cases = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM crime
+                    WHERE LOWER(status) IN ('pending', 'under investigation')
+                    """
+                )
+            ).scalar() or 0
+            open_recent_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM crime
+                    WHERE LOWER(status) IN ('pending', 'under investigation')
+                      AND COALESCE(updated_at, created_at) >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    """
+                )
+            ).scalar() or 0
+            open_previous_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM crime
+                    WHERE LOWER(status) IN ('pending', 'under investigation')
+                      AND COALESCE(updated_at, created_at) < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND COALESCE(updated_at, created_at) >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                    """
+                )
+            ).scalar() or 0
+
+            # Missing persons
+            active_missing = conn.execute(
+                text("SELECT COUNT(*) FROM missing_person WHERE LOWER(status) = 'missing'")
+            ).scalar() or 0
+            missing_recent_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM missing_person
+                    WHERE LOWER(status) = 'missing'
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    """
+                )
+            ).scalar() or 0
+            missing_previous_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM missing_person
+                    WHERE LOWER(status) = 'missing'
+                      AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                    """
+                )
+            ).scalar() or 0
+
+            # Users
+            total_users = conn.execute(text("SELECT COUNT(*) FROM appuser")).scalar() or 0
+            users_recent_30 = conn.execute(
+                text("SELECT COUNT(*) FROM appuser WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")
+            ).scalar() or 0
+            users_previous_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM appuser
+                    WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                    """
+                )
+            ).scalar() or 0
+
+            # Wanted criminals
+            active_wanted = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM wanted_criminal
+                    WHERE COALESCE(LOWER(status), '') NOT IN ('captured', 'inactive')
+                    """
+                )
+            ).scalar() or 0
+            wanted_recent_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM wanted_criminal
+                    WHERE COALESCE(LOWER(status), '') NOT IN ('captured', 'inactive')
+                      AND COALESCE(updated_at, created_at) >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    """
+                )
+            ).scalar() or 0
+            wanted_previous_30 = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM wanted_criminal
+                    WHERE COALESCE(LOWER(status), '') NOT IN ('captured', 'inactive')
+                      AND COALESCE(updated_at, created_at) < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND COALESCE(updated_at, created_at) >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                    """
+                )
+            ).scalar() or 0
+
+            summary_cards = []
+
+            delta_text, trend = summarize_change(crimes_recent_30, crimes_previous_30)
+            summary_cards.append({
+                "title": "Crime Reports",
+                "value": int(total_crimes),
+                "subtitle": f"Last {window_label}: {int(crimes_recent_30)} new",
+                "delta": delta_text,
+                "trend": trend,
+                "icon": "🚨"
+            })
+
+            delta_text, trend = summarize_change(open_recent_30, open_previous_30)
+            summary_cards.append({
+                "title": "Open Cases",
+                "value": int(open_cases),
+                "subtitle": f"Active statuses: {', '.join(open_statuses)}",
+                "delta": delta_text,
+                "trend": trend,
+                "icon": "📂"
+            })
+
+            delta_text, trend = summarize_change(users_recent_30, users_previous_30)
+            summary_cards.append({
+                "title": "Registered Users",
+                "value": int(total_users),
+                "subtitle": f"Last {window_label}: {int(users_recent_30)} joined",
+                "delta": delta_text,
+                "trend": trend,
+                "icon": "👥"
+            })
+
+            delta_text, trend = summarize_change(missing_recent_30, missing_previous_30)
+            summary_cards.append({
+                "title": "Active Missing Persons",
+                "value": int(active_missing),
+                "subtitle": f"Last {window_label}: {int(missing_recent_30)} new",
+                "delta": delta_text,
+                "trend": trend,
+                "icon": "🆘"
+            })
+
+            delta_text, trend = summarize_change(wanted_recent_30, wanted_previous_30)
+            summary_cards.append({
+                "title": "Wanted Individuals",
+                "value": int(active_wanted),
+                "subtitle": f"Last {window_label}: {int(wanted_recent_30)} updated",
+                "delta": delta_text,
+                "trend": trend,
+                "icon": "🎯"
+            })
+
+            per_category = limit // 3
+            if per_category < 3:
+                per_category = min(limit, 3)
+            if per_category < 1:
+                per_category = 1
+            activity_entries = []
+
+            crime_rows = conn.execute(
+                text(
+                    """
+                    SELECT crime_id, status, created_at, updated_at,
+                           JSON_UNQUOTE(JSON_EXTRACT(crime_data, '$.type')) AS crime_type,
+                           JSON_UNQUOTE(JSON_EXTRACT(crime_data, '$.description')) AS description,
+                           JSON_UNQUOTE(JSON_EXTRACT(location_data, '$.area_name')) AS area_name
+                    FROM crime
+                    ORDER BY created_at DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": per_category}
+            ).mappings().fetchall()
+
+            for row in crime_rows:
+                timestamp_obj, timestamp_iso = serialize_timestamp(row.get("updated_at") or row.get("created_at"))
+                reference_id = row.get("crime_id")
+                ref_int = int(reference_id) if reference_id is not None else None
+                base_title = f"Case CR-{ref_int:03d}" if ref_int is not None else "Crime Report"
+                description = row.get("description") or row.get("crime_type") or "Crime report"
+                area_name = row.get("area_name")
+                if area_name:
+                    description = f"{description} in {area_name}"
+                activity_entries.append((
+                    timestamp_obj,
+                    {
+                        "type": "Crime Report",
+                        "title": base_title,
+                        "description": description,
+                        "reference_id": ref_int,
+                        "status": row.get("status") or "Pending",
+                        "timestamp": timestamp_iso
+                    }
+                ))
+
+            missing_rows = conn.execute(
+                text(
+                    """
+                    SELECT missing_id, name, status, created_at, updated_at, last_seen_location
+                    FROM missing_person
+                    ORDER BY created_at DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": per_category}
+            ).mappings().fetchall()
+
+            for row in missing_rows:
+                timestamp_obj, timestamp_iso = serialize_timestamp(row.get("updated_at") or row.get("created_at"))
+                reference_id = row.get("missing_id")
+                ref_int = int(reference_id) if reference_id is not None else None
+                location_hint = row.get("last_seen_location") or "Location unknown"
+                activity_entries.append((
+                    timestamp_obj,
+                    {
+                        "type": "Missing Person",
+                        "title": row.get("name") or "Missing report",
+                        "description": f"Last seen at {location_hint}",
+                        "reference_id": ref_int,
+                        "status": row.get("status") or "Missing",
+                        "timestamp": timestamp_iso
+                    }
+                ))
+
+            wanted_rows = conn.execute(
+                text(
+                    """
+                    SELECT criminal_id, name, status, created_at, updated_at, last_known_location, danger_level
+                    FROM wanted_criminal
+                    ORDER BY COALESCE(updated_at, created_at) DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": per_category}
+            ).mappings().fetchall()
+
+            for row in wanted_rows:
+                timestamp_obj, timestamp_iso = serialize_timestamp(row.get("updated_at") or row.get("created_at"))
+                reference_id = row.get("criminal_id")
+                ref_int = int(reference_id) if reference_id is not None else None
+                location_hint = row.get("last_known_location") or "Unknown location"
+                danger = row.get("danger_level")
+                description = f"Last known at {location_hint}" if location_hint else "Location unknown"
+                if danger:
+                    description = f"{description} - Danger: {danger}"
+                activity_entries.append((
+                    timestamp_obj,
+                    {
+                        "type": "Wanted Criminal",
+                        "title": row.get("name") or "Wanted individual",
+                        "description": description,
+                        "reference_id": ref_int,
+                        "status": row.get("status") or "Active",
+                        "timestamp": timestamp_iso
+                    }
+                ))
+
+            activity_entries.sort(key=lambda item: item[0], reverse=True)
+            activity_payload = [entry for _, entry in activity_entries[:limit]]
+
+            return {"summary_cards": summary_cards, "activity": activity_payload}
+        except Exception as exc:
+            logging.exception("Error building admin analytics: %s", exc)
+            return {"summary_cards": [], "activity": []}
 
 @app.get("/api/admin/activity-log")
 async def get_admin_activity_log(limit: Optional[int] = Query(50)):

@@ -268,6 +268,116 @@
       resize: vertical;
       min-height: 100px;
     }
+    #analytics-overview {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .analytics-card {
+      background: var(--dark-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-height: 140px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    .analytics-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .analytics-card .metric-icon {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+    .analytics-card .metric-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .analytics-card .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+    .analytics-card .metric-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .analytics-card .metric-trend {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .analytics-card .metric-trend.positive {
+      color: var(--accent-green);
+    }
+    .analytics-card .metric-trend.negative {
+      color: var(--accent-red);
+    }
+    #activity-log {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .activity-item {
+      background: var(--dark-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    .activity-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .activity-item-type {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+    }
+    .activity-item-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .activity-item-description {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .activity-item-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .activity-item-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .analytics-empty {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      padding: 1rem 0;
+    }
     .btn {
       padding: 0.75rem 1.5rem;
       border-radius: 8px;
@@ -3225,6 +3335,8 @@
         loadComplaints();
       } else if (tabName === 'case-management') {
         loadCaseAssignments();
+      } else if (tabName === 'analytics') {
+        loadAnalytics();
       }
       // Auto-scroll chat when opening chat tab
       if (tabName === 'chat') {
@@ -4082,19 +4194,38 @@
 
     // Load analytics from database
     async function loadAnalytics() {
+      const overviewContainer = document.getElementById('analytics-overview');
+      const activityContainer = document.getElementById('activity-log');
+
+      if (!overviewContainer || !activityContainer) {
+        return;
+      }
+
+      overviewContainer.innerHTML = `
+        <div class="analytics-card">
+          <span class="metric-label">Loading metrics…</span>
+          <span class="metric-sub">Retrieving live statistics from the database.</span>
+        </div>
+      `;
+      activityContainer.innerHTML = '<div class="activity-item"><span>Loading recent activity…</span></div>';
+
       try {
-        const response = await fetch('/api/admin/analytics');
-        const data = await response.json();
-        
-        if (data.success) {
-          displayAnalytics(data.analytics);
-        } else {
-          console.error('Failed to load analytics:', data.error);
-          document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
+        const response = await fetch(resolveApiUrl('/api/admin/analytics?limit=15'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Analytics request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        displayAnalytics(payload);
       } catch (error) {
         console.error('Error loading analytics:', error);
-        document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
+        overviewContainer.innerHTML = `
+          <div class="analytics-card">
+            <span class="metric-label">Analytics unavailable</span>
+            <span class="metric-sub">Unable to reach the analytics endpoint right now.</span>
+          </div>
+        `;
+        activityContainer.innerHTML = '<div class="activity-item"><span>Recent activity could not be loaded.</span></div>';
       }
     }
 
@@ -4122,44 +4253,65 @@
       renderMissingPersonRows(persons, tbody);
     }
 
-    function displayAnalytics(analytics) {
-      const container = document.getElementById('analytics-container');
-      
-      container.innerHTML = `
-        <div class="analytics-grid">
-          <div class="stat-card">
-            <h3>${analytics.total_crimes}</h3>
-            <p>Total Crime Reports</p>
-          </div>
-          <div class="stat-card">
-            <h3>${analytics.pending_crimes}</h3>
-            <p>Pending Cases</p>
-          </div>
-          <div class="stat-card">
-            <h3>${analytics.total_users}</h3>
-            <p>Registered Users</p>
-          </div>
-          <div class="stat-card">
-            <h3>${analytics.total_missing}</h3>
-            <p>Missing Persons</p>
-          </div>
-          <div class="stat-card">
-            <h3>${analytics.total_wanted}</h3>
-            <p>Active Wanted</p>
-          </div>
-        </div>
-        
-        <div class="recent-activity">
-          <h3>Recent Activity</h3>
-          ${analytics.recent_activity.map(activity => `
-            <div class="activity-item">
-              <span class="activity-type">${activity.activity_type}</span>
-              <span class="activity-details">${activity.details}</span>
-              <span class="activity-time">${new Date(activity.created_at).toLocaleString()}</span>
-            </div>
-          `).join('')}
-        </div>
-      `;
+    function displayAnalytics(payload) {
+      const overviewContainer = document.getElementById('analytics-overview');
+      const activityContainer = document.getElementById('activity-log');
+
+      if (!overviewContainer || !activityContainer) {
+        return;
+      }
+
+      const cards = Array.isArray(payload.summary_cards) ? payload.summary_cards : [];
+      const activity = Array.isArray(payload.activity) ? payload.activity : [];
+
+      overviewContainer.innerHTML = cards.length
+        ? cards.map(card => {
+            const value = formatNumberDisplay(card.value ?? 0);
+            const subtitle = card.subtitle ? escapeHtml(card.subtitle) : '';
+            const delta = card.delta ? escapeHtml(card.delta) : '';
+            const trendClass = card.trend === 'down' ? 'negative' : card.trend === 'up' ? 'positive' : '';
+            const iconMarkup = card.icon ? `<span class="metric-icon">${escapeHtml(card.icon)}</span>` : '';
+            return `
+              <div class="analytics-card">
+                <div class="analytics-card-header">
+                  <span class="metric-label">${escapeHtml(card.title || 'Metric')}</span>
+                  ${iconMarkup}
+                </div>
+                <span class="metric-value">${value}</span>
+                ${subtitle ? `<span class="metric-sub">${subtitle}</span>` : ''}
+                ${delta ? `<span class="metric-trend ${trendClass}">${delta}</span>` : ''}
+              </div>
+            `;
+          }).join('')
+        : '<div class="analytics-card"><span class="metric-label">No analytics available.</span></div>';
+
+      activityContainer.innerHTML = activity.length
+        ? activity.map(entry => {
+            const typeLabel = escapeHtml(entry.type || 'Activity');
+            const title = entry.title ? escapeHtml(entry.title) : '';
+            const description = entry.description ? escapeHtml(entry.description) : '';
+            const metaId = entry.reference_id !== undefined && entry.reference_id !== null
+              ? `#${escapeHtml(String(entry.reference_id))}`
+              : '—';
+            const statusInfo = normalizeStatus(entry.status || 'Pending');
+            const statusLabel = escapeHtml(statusInfo.display || 'Pending');
+            const timestamp = formatDateTimeDisplay(entry.timestamp);
+            return `
+              <div class="activity-item">
+                <div class="activity-item-header">
+                  <span class="activity-item-type">${typeLabel}</span>
+                  <span class="activity-item-status ${statusInfo.className}">${statusLabel}</span>
+                </div>
+                ${title ? `<div class="activity-item-title">${title}</div>` : ''}
+                ${description ? `<div class="activity-item-description">${description}</div>` : ''}
+                <div class="activity-item-meta">
+                  <span>${metaId}</span>
+                  <span>${timestamp}</span>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="activity-item"><span>No recent activity recorded.</span></div>';
     }
 
     function showUserStatsModal(statsSummary) {
