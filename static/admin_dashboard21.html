@@ -279,6 +279,11 @@
       align-items: center;
       gap: 0.5rem;
     }
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     .btn-primary {
       background: var(--accent-purple);
       color: white;
@@ -1426,7 +1431,6 @@
               <th>Complaint ID</th>
               <th>Reporter Contact</th>
               <th>Reported At</th>
-              <th>Channel</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -1606,6 +1610,8 @@
   const wantedCriminalCache = new Map();
   const policeStationCache = new Map();
   const missingPersonsCache = new Map();
+  const complaintsCache = new Map();
+  let complaintsList = [];
     const ROLE_ACTIONS = [
       { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
       { value: 'Admin', label: 'Make Admin', className: 'btn btn-primary' },
@@ -1777,12 +1783,6 @@
         { crime_id: 4, area_name: 'Shamshernagar', city: 'Sylhet', status: 'pending' },
     ];
 
-    const complaintsData = [
-        { complaint_id: 101, reporter_contact: 'john.doe@email.com', reported_at: new Date().toISOString(), channel: 'Web Form', status: 'verified' },
-        { complaint_id: 102, reporter_contact: '+88017xxxxxxxx', reported_at: new Date(Date.now() - 3600000).toISOString(), channel: 'Phone Call', status: 'pending' },
-        { complaint_id: 103, reporter_contact: 'jane.smith@email.com', reported_at: new Date(Date.now() - 7200000).toISOString(), channel: 'Mobile App', status: 'pending' },
-    ];
-
     const assignmentsData = [
         { assignment_id: 501, crime_id: 1, full_name: 'Officer Rahman', duty_role: 'Lead Investigator', assigned_at: new Date().toISOString(), status: 'in_progress' },
         { assignment_id: 502, crime_id: 2, full_name: 'Inspector Ali', duty_role: 'Initial Assessment', assigned_at: new Date(Date.now() - 86400000).toISOString(), status: 'reported' },
@@ -1893,6 +1893,11 @@
 
     function renderCrimeRows(crimes, tbody) {
       tbody.innerHTML = '';
+      if (!Array.isArray(crimes) || !crimes.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No crime reports found.</td></tr>';
+        return;
+      }
+
       crimes.forEach(crime => {
         const locationText = formatCrimeLocation(crime.location_data, crime);
         const statusInfo = normalizeStatus(crime.status);
@@ -1912,6 +1917,146 @@
             </button>
           </td>
         `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function parseMaybeJson(value) {
+      if (!value) {
+        return null;
+      }
+      if (typeof value === 'object') {
+        return value;
+      }
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch (error) {
+          console.warn('Failed to parse JSON payload:', error);
+          return null;
+        }
+      }
+      return null;
+    }
+
+    function normalizeCrimeRecord(rawRecord) {
+      if (!rawRecord || typeof rawRecord !== 'object') {
+        return null;
+      }
+      const record = { ...rawRecord };
+      const structuredFields = [
+        'location_data',
+        'crime_data',
+        'victim_data',
+        'criminal_data',
+        'weapon_data',
+        'witness_data',
+        'evidence_files'
+      ];
+
+      structuredFields.forEach(field => {
+        if (record[field] && typeof record[field] === 'string') {
+          const parsed = parseMaybeJson(record[field]);
+          if (parsed !== null) {
+            record[field] = parsed;
+          }
+        }
+      });
+
+      return record;
+    }
+
+    function deriveReporterContact(record) {
+      const candidateValues = [
+        record?.crime_data?.reporter_contact,
+        record?.victim_data?.phone,
+        record?.victim_data?.email,
+        record?.witness_data?.phone,
+        record?.witness_data?.name,
+        record?.reporter_id ? `Reporter ID ${record.reporter_id}` : null
+      ];
+
+      const primary = candidateValues.find(value => typeof value === 'string' && value.trim());
+      return primary ? primary.trim() : 'Anonymous reporter';
+    }
+
+    function formatIncidentLocation(locationData) {
+      if (!locationData || typeof locationData !== 'object') {
+        return 'Unknown location';
+      }
+
+      const area = locationData.area_name || locationData.area || '';
+      const city = locationData.city || '';
+      const details = locationData.details || locationData.address || '';
+
+      const summaryParts = [area, city].filter(Boolean).map(part => String(part).trim());
+      const summary = summaryParts.length ? summaryParts.join(', ') : 'Location unspecified';
+
+      if (details && String(details).trim()) {
+        return `${summary} (${String(details).trim()})`;
+      }
+
+      return summary;
+    }
+
+    function coerceEvidenceList(value) {
+      const parsed = Array.isArray(value) ? value : parseMaybeJson(value);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+
+    function renderComplaintsTable(records, tbody) {
+      if (!Array.isArray(records) || !records.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No reports are awaiting verification right now.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      records.forEach(record => {
+        const complaintId = Number(record.crime_id);
+        const displayId = Number.isFinite(complaintId) ? `COMP-${String(complaintId).padStart(3, '0')}` : 'COMP-???';
+        const statusInfo = normalizeStatus(record.status || 'Pending');
+        const statusKey = (record.status || 'Pending').toLowerCase();
+        const isPending = statusKey === 'pending';
+        const isVerified = statusKey === 'verified';
+
+        const reporterContact = escapeHtml(deriveReporterContact(record));
+        const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at));
+        const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
+
+        const verifyDisabled = isPending ? '' : 'disabled';
+        const rejectDisabled = isPending ? '' : 'disabled';
+        const escalateDisabled = isVerified ? '' : 'disabled';
+        const verifyTitle = isPending ? 'Mark report as verified' : 'Already verified';
+        const rejectTitle = isPending ? 'Reject this report' : 'Only pending reports can be rejected';
+        const escalateTitle = isVerified ? 'Escalate to case management' : 'Verify the report before escalating';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${escapeHtml(displayId)}</td>
+          <td>${reporterContact}</td>
+          <td>${reportedAt}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button class="btn btn-success" title="${escapeHtml(verifyTitle)}" onclick="verifyComplaint(${complaintId})" ${verifyDisabled}>
+              <span>✓</span>
+              Verify
+            </button>
+            <button class="btn btn-danger" title="${escapeHtml(rejectTitle)}" onclick="rejectComplaint(${complaintId})" ${rejectDisabled}>
+              <span>✗</span>
+              Reject
+            </button>
+            <button class="btn btn-secondary" title="${escapeHtml(escalateTitle)}" onclick="escalateToCrime(${complaintId})" ${escalateDisabled}>
+              <span>📋</span>
+              Escalate to Crime
+            </button>
+            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+              <span>👁️</span>
+              View Details
+            </button>
+          </td>
+        `;
+
         tbody.appendChild(row);
       });
     }
@@ -3318,57 +3463,57 @@
     // Load complaints for verify reports tab
     async function loadComplaints() {
       const tbody = document.getElementById('complaints-table');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading user complaints...</td></tr>';
+      if (!tbody) {
+        return;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading reports…</td></tr>';
+
       try {
-        // --- MOCK DATA SIMULATION ---
-        await new Promise(resolve => setTimeout(resolve, 300)); 
-        const result = { success: true, complaints: complaintsData };
-        // --- END MOCK DATA SIMULATION ---
-        
-        if (result.success) {
-          tbody.innerHTML = ''; // Clear existing rows
-          
-          result.complaints.forEach(complaint => {
-            const row = document.createElement('tr');
-            const statusClass = complaint.status === 'verified' ? 'verified' : 'pending';
-            const statusText = complaint.status.charAt(0).toUpperCase() + complaint.status.slice(1);
-            
-            row.innerHTML = `
-              <td>COMP-${complaint.complaint_id.toString().padStart(3, '0')}</td>
-              <td>${complaint.reporter_contact}</td>
-              <td>${new Date(complaint.reported_at).toLocaleString()}</td>
-              <td>${complaint.channel}</td>
-              <td><span class="status-badge status-${statusClass}">${statusText}</span></td>
-              <td>
-                ${complaint.status === 'pending' ? `
-                  <button class="btn btn-success" onclick="verifyComplaint(${complaint.complaint_id})">
-                    <span>✓</span>
-                    Verify
-                  </button>
-                  <button class="btn btn-danger" onclick="rejectComplaint(${complaint.complaint_id})">
-                    <span>✗</span>
-                    Reject
-                  </button>
-                ` : `
-                  <button class="btn btn-primary" onclick="escalateToCrime(${complaint.complaint_id})">
-                    <span>📋</span>
-                    Escalate to Crime
-                  </button>
-                `}
-                <button class="action-btn" onclick="viewComplaintDetails(${complaint.complaint_id})">
-                  <span>👁️</span>
-                  View Details
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-red);">Failed to load complaints.</td></tr>';
+        const response = await fetch(resolveApiUrl('/api/crimes?limit=200'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const fetchedRecords = Array.isArray(payload.crimes) ? payload.crimes : [];
+
+        const normalized = fetchedRecords
+          .map(normalizeCrimeRecord)
+          .filter(record => record && Number.isFinite(Number(record.crime_id)));
+
+        const relevantStatuses = new Set(['pending', 'verified']);
+        const filtered = normalized.filter(record => relevantStatuses.has((record.status || 'Pending').toLowerCase()));
+
+        filtered.sort((a, b) => {
+          const statusPriority = status => {
+            const key = (status || 'Pending').toLowerCase();
+            if (key === 'pending') return 0;
+            if (key === 'verified') return 1;
+            return 2;
+          };
+          const priorityDiff = statusPriority(a.status) - statusPriority(b.status);
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+          const aDate = new Date(a.updated_at || a.created_at || 0).getTime();
+          const bDate = new Date(b.updated_at || b.created_at || 0).getTime();
+          return bDate - aDate;
+        });
+
+        complaintsList = filtered;
+        complaintsCache.clear();
+        filtered.forEach(record => {
+          const id = Number(record.crime_id);
+          if (Number.isFinite(id)) {
+            complaintsCache.set(id, record);
+          }
+        });
+
+        renderComplaintsTable(filtered, tbody);
       } catch (error) {
-        console.error('Process Error loading complaints:', error);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-red);">An error occurred while processing complaint data.</td></tr>';
+        console.error('Error loading complaints:', error);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--accent-red);">Unable to load reports right now. Please try again shortly.</td></tr>';
       }
     }
 
@@ -3418,55 +3563,243 @@
 
     // Complaint verification functions
     async function verifyComplaint(complaintId) {
-      showConfirm(`Are you sure you want to verify complaint COMP-${complaintId.toString().padStart(3, '0')}? This will flag it for escalation.`, async (confirmed) => {
-        if (confirmed) {
-          try {
-            // Simulated verification and update of mock data
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
-            if(index !== -1) complaintsData[index].status = 'verified';
+      const numericId = Number(complaintId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid complaint reference. Please refresh the page.');
+        return;
+      }
 
-            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **VERIFIED**!`);
-            loadComplaints(); // Refresh the table
-          } catch (error) {
-            console.error('Error:', error);
-            showAlert(`Error verifying complaint: ${error.message}`);
+      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
+      const record = complaintsCache.get(numericId);
+      if (record && (record.status || '').toLowerCase() === 'verified') {
+        showAlert(`${displayId} is already verified.`);
+        return;
+      }
+
+      showConfirm(`Verify ${displayId}? This will mark the report as ready for escalation.`, async confirmed => {
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}/status`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              crime_id: numericId,
+              new_status: 'Verified',
+              notes: 'Verified via admin dashboard',
+              changed_by: CURRENT_ADMIN_ID
+            })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = payload.detail || payload.message || 'Failed to verify the complaint.';
+            throw new Error(message);
           }
+
+          showAlert(`${displayId} has been verified successfully.`);
+          await loadComplaints();
+        } catch (error) {
+          console.error('Error verifying complaint:', error);
+          showAlert(`Unable to verify ${displayId}: ${error.message || 'Unknown error'}`);
         }
       });
     }
 
     async function rejectComplaint(complaintId) {
-      showConfirm(`Are you sure you want to **REJECT** complaint COMP-${complaintId.toString().padStart(3, '0')}? This action cannot be undone.`, async (confirmed) => {
-        if (confirmed) {
-          try {
-            // Simulated rejection and removal from mock data
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const index = complaintsData.findIndex(c => c.complaint_id === complaintId);
-            if(index !== -1) complaintsData.splice(index, 1);
-            
-            showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been successfully **REJECTED** and archived.`);
-            loadComplaints(); // Refresh the table
-          } catch (error) {
-            console.error('Error:', error);
-            showAlert(`Error rejecting complaint: ${error.message}`);
+      const numericId = Number(complaintId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid complaint reference. Please refresh the page.');
+        return;
+      }
+
+      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
+      const record = complaintsCache.get(numericId);
+      if (!record) {
+        showAlert(`Unable to locate ${displayId}. Please reload the reports list.`);
+        return;
+      }
+
+      if ((record.status || '').toLowerCase() !== 'pending') {
+        showAlert(`${displayId} can no longer be rejected because it is not pending.`);
+        return;
+      }
+
+      showConfirm(`Reject ${displayId}? This will permanently remove the report from the system.`, async confirmed => {
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}`), { method: 'DELETE' });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = payload.detail || payload.message || 'Failed to reject the complaint.';
+            throw new Error(message);
           }
+
+          showAlert(`${displayId} has been rejected and removed.`);
+          await loadComplaints();
+        } catch (error) {
+          console.error('Error rejecting complaint:', error);
+          showAlert(`Unable to reject ${displayId}: ${error.message || 'Unknown error'}`);
         }
       });
     }
 
-    function escalateToCrime(complaintId) {
-      showConfirm(`Are you sure you want to escalate verified complaint COMP-${complaintId.toString().padStart(3, '0')} to a formal crime report?`, (confirmed) => {
-        if (confirmed) {
-          console.log(`Escalating complaint ${complaintId} to crime report`);
-          showAlert(`Complaint COMP-${complaintId.toString().padStart(3, '0')} has been **ESCALATED** to a crime report! (New CRIME ID TBD)`);
+    async function escalateToCrime(complaintId) {
+      const numericId = Number(complaintId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid complaint reference. Please refresh the page.');
+        return;
+      }
+
+      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
+      const record = complaintsCache.get(numericId);
+      if (!record) {
+        showAlert(`Unable to locate ${displayId}. Try refreshing the reports list.`);
+        return;
+      }
+
+      if ((record.status || '').toLowerCase() !== 'verified') {
+        showAlert(`Please verify ${displayId} before escalating it to case management.`);
+        return;
+      }
+
+      showConfirm(`Escalate ${displayId} to case management?`, async confirmed => {
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}/status`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              crime_id: numericId,
+              new_status: 'Under Investigation',
+              notes: 'Escalated to case management',
+              changed_by: CURRENT_ADMIN_ID
+            })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = payload.detail || payload.message || 'Failed to escalate the complaint.';
+            throw new Error(message);
+          }
+
+          showAlert(`${displayId} has been escalated to case management.`);
+          await loadComplaints();
+          showTab('case-management');
+        } catch (error) {
+          console.error('Error escalating complaint:', error);
+          showAlert(`Unable to escalate ${displayId}: ${error.message || 'Unknown error'}`);
         }
       });
     }
 
     function viewComplaintDetails(complaintId) {
-      console.log(`Viewing details for complaint: ${complaintId}`);
-      showAlert(`Loading detailed information for complaint COMP-${complaintId.toString().padStart(3, '0')}... (This is where the full report contents would display)`);
+      const numericId = Number(complaintId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid complaint reference. Please refresh the page.');
+        return;
+      }
+
+      const record = complaintsCache.get(numericId);
+      if (!record) {
+        showAlert('Unable to find the report details. Please reload and try again.');
+        return;
+      }
+
+      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
+      const statusInfo = normalizeStatus(record.status || 'Pending');
+      const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at));
+      const locationSummary = escapeHtml(formatIncidentLocation(record.location_data));
+      const reporterContact = escapeHtml(deriveReporterContact(record));
+      const crimeType = escapeHtml(record?.crime_data?.type || 'Not provided');
+      const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
+
+      const incidentItems = [
+        `<li><strong>Status:</strong> ${statusBadge}</li>`,
+        `<li><strong>Reported:</strong> ${reportedAt}</li>`,
+        `<li><strong>Location:</strong> ${locationSummary}</li>`,
+        `<li><strong>Reporter Contact:</strong> ${reporterContact}</li>`,
+        `<li><strong>Incident Type:</strong> ${crimeType}</li>`
+      ].join('');
+
+      const descriptionBlock = record?.crime_data?.description
+        ? `<div class="stats-insights"><h4>Description</h4><p>${escapeHtml(record.crime_data.description)}</p></div>`
+        : '';
+
+      const victim = record?.victim_data && typeof record.victim_data === 'object' ? record.victim_data : null;
+      const victimItems = victim ? [
+        victim.name ? `<li><strong>Name:</strong> ${escapeHtml(victim.name)}</li>` : null,
+        victim.phone ? `<li><strong>Phone:</strong> ${escapeHtml(victim.phone)}</li>` : null,
+        victim.email ? `<li><strong>Email:</strong> ${escapeHtml(victim.email)}</li>` : null,
+        victim.gender ? `<li><strong>Gender:</strong> ${escapeHtml(victim.gender)}</li>` : null,
+        victim.injury_details ? `<li><strong>Injuries:</strong> ${escapeHtml(victim.injury_details)}</li>` : null
+      ].filter(Boolean).join('') : '';
+      const victimBlock = victimItems
+        ? `<div class="stats-insights"><h4>Victim Details</h4><ul>${victimItems}</ul></div>`
+        : '';
+
+      const witness = record?.witness_data && typeof record.witness_data === 'object' ? record.witness_data : null;
+      const witnessItems = witness ? [
+        witness.name ? `<li><strong>Name:</strong> ${escapeHtml(witness.name)}</li>` : null,
+        witness.phone ? `<li><strong>Phone:</strong> ${escapeHtml(witness.phone)}</li>` : null,
+        witness.protection_required ? `<li><strong>Protection Required:</strong> ${escapeHtml(witness.protection_required)}</li>` : null
+      ].filter(Boolean).join('') : '';
+      const witnessBlock = witnessItems
+        ? `<div class="stats-insights"><h4>Witness Details</h4><ul>${witnessItems}</ul></div>`
+        : '';
+
+      const evidenceList = coerceEvidenceList(record.evidence_files);
+      const evidenceItems = evidenceList
+        .map((item, index) => {
+          if (!item) {
+            return null;
+          }
+          const label = escapeHtml(item.original_name || item.filename || `Evidence ${index + 1}`);
+          const url = item.url || item.file_url;
+          if (url) {
+            return `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${label}</a></li>`;
+          }
+          return `<li>${label}</li>`;
+        })
+        .filter(Boolean)
+        .join('');
+      const evidenceBlock = evidenceItems
+        ? `<div class="stats-insights"><h4>Evidence</h4><ul>${evidenceItems}</ul></div>`
+        : '';
+
+      modalContainer.classList.add('modal-wide');
+      modalMessage.innerHTML = `
+        <div class="stats-modal">
+          <div class="stats-header">
+            <h3>${escapeHtml(displayId)}</h3>
+            <p>${reportedAt} · ${escapeHtml(statusInfo.display)}</p>
+          </div>
+          <div class="stats-insights"><h4>Incident Summary</h4><ul>${incidentItems}</ul></div>
+          ${descriptionBlock}
+          ${victimBlock}
+          ${witnessBlock}
+          ${evidenceBlock}
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'btn btn-primary';
+      closeButton.textContent = 'Close';
+      closeButton.onclick = () => closeModal();
+      modalButtons.appendChild(closeButton);
+
+      modalOverlay.classList.add('show');
     }
 
     // Case management functions

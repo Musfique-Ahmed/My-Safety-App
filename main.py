@@ -736,6 +736,20 @@ async def get_crime_by_id(crime_id: int):
             
         return {"crime": crime}
 
+
+@app.delete("/api/crimes/{crime_id}")
+async def delete_crime_record(crime_id: int):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("DELETE FROM crime WHERE crime_id = :crime_id"),
+            {"crime_id": crime_id}
+        )
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Crime not found")
+
+    return {"message": "Crime report deleted"}
+
 # ==================== MISSING PERSON ENDPOINTS ====================
 
 
