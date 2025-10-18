@@ -538,6 +538,120 @@
       color: var(--text-secondary);
       font-size: 0.8rem;
     }
+    .timeline-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .timeline-item {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.9rem;
+    }
+    .timeline-status {
+      border-left: 4px solid var(--accent-purple);
+      padding-left: 0.75rem;
+    }
+    .timeline-assignment {
+      border-left: 4px solid var(--accent-blue);
+      padding-left: 0.75rem;
+    }
+    .timeline-meta {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+    .timeline-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+    }
+    .timeline-notes {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .timeline-actor {
+      color: var(--accent-blue);
+    }
+    .timeline-modal {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .timeline-header h3 {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
+    .timeline-header p {
+      margin: 0.25rem 0 0;
+      color: var(--text-secondary);
+    }
+    .timeline-summary ul,
+    .assignment-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .assignment-list li {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 0.65rem;
+      font-size: 0.9rem;
+    }
+    .timeline-section h4,
+    .timeline-summary h4 {
+      margin: 0 0 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .status-update-modal {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .status-update-modal h3 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+    .status-update-meta {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .status-update-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .status-update-fields label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .status-update-error {
+      margin: 0;
+      color: var(--accent-red);
+      font-size: 0.85rem;
+      min-height: 1.1rem;
+    }
     .action-btn {
       background: transparent;
       color: var(--text-secondary);
@@ -1749,6 +1863,7 @@
   const missingPersonsCache = new Map();
   const complaintsCache = new Map();
   const emergencyAlertsCache = new Map();
+  const caseAssignmentsCache = new Map();
   let complaintsList = [];
     const ROLE_ACTIONS = [
       { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
@@ -1757,6 +1872,15 @@
       { value: 'Officer', label: 'Make Officer', className: 'btn btn-secondary' },
       { value: 'User', label: 'Demote to User', className: 'btn btn-danger' }
     ];
+    const CASE_STATUS_OPTIONS = [
+      'Escalated',
+      'Pending',
+      'Under Investigation',
+      'In Progress',
+      'Awaiting Evidence',
+      'Resolved',
+      'Case Closed'
+    ];
     const chartInstances = { role: null, status: null };
   const CHART_COLOR_PALETTE = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#6366f1', '#14b8a6', '#ec4899'];
   const CURRENT_ADMIN_ID = Number(window.currentAdminId || window.ADMIN_ID || 1);
@@ -1764,6 +1888,8 @@
     const criminalForm = document.getElementById('criminal-form');
   const addStationFormContainer = document.getElementById('add-station-form');
   const stationForm = document.getElementById('station-form');
+  const assignCaseFormContainer = document.getElementById('assign-case-form');
+  const caseAssignmentForm = document.getElementById('case-assignment-form');
 
   function closeModal(event) {
     if (event && event.currentTarget === modalOverlay && event.target !== modalOverlay) {
@@ -1827,6 +1953,30 @@
     addStationFormContainer.style.display = 'none';
     if (stationForm) {
       stationForm.reset();
+    }
+  }
+
+  function showAssignCaseForm() {
+    if (!assignCaseFormContainer) {
+      showAlert('Assign case form is unavailable right now.');
+      return;
+    }
+    assignCaseFormContainer.style.display = 'block';
+    const primaryField = assignCaseFormContainer.querySelector('input[name="crime_id"]');
+    if (primaryField) {
+      primaryField.focus();
+      primaryField.select();
+    }
+    assignCaseFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideAssignCaseForm() {
+    if (!assignCaseFormContainer) {
+      return;
+    }
+    assignCaseFormContainer.style.display = 'none';
+    if (caseAssignmentForm) {
+      caseAssignmentForm.reset();
     }
   }
 
@@ -1990,7 +2140,9 @@
         'seen': 'status-verified',
         'unseen': 'status-reported',
         'found': 'status-verified',
-        'missing': 'status-reported'
+        'missing': 'status-reported',
+        'escalated': 'status-under-investigation',
+        'rejected': 'status-reported'
       };
       const className = classMap[normalized] || 'status-pending';
       const display = raw.replace(/_/g, ' ');
@@ -2108,6 +2260,7 @@
 
     function deriveReporterContact(record) {
       const candidateValues = [
+        record?.reporter_contact,
         record?.crime_data?.reporter_contact,
         record?.victim_data?.phone,
         record?.victim_data?.email,
@@ -2153,14 +2306,15 @@
       tbody.innerHTML = '';
 
       records.forEach(record => {
-        const complaintId = Number(record.crime_id);
+        const complaintId = Number(record.complaint_id ?? record.crime_id);
         const displayId = Number.isFinite(complaintId) ? `COMP-${String(complaintId).padStart(3, '0')}` : 'COMP-???';
         const statusInfo = normalizeStatus(record.status || 'Pending');
         const statusKey = (record.status || 'Pending').toLowerCase();
         const isPending = statusKey === 'pending';
         const isVerified = statusKey === 'verified';
+        const isEscalated = statusKey === 'escalated';
 
-        const reporterContact = escapeHtml(deriveReporterContact(record));
+        const reporterContact = escapeHtml(record.reporter_contact || deriveReporterContact(record) || 'Not provided');
         const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at));
         const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
 
@@ -2168,31 +2322,52 @@
         const rejectTitle = 'Reject this report';
         const escalateTitle = 'Escalate to case management';
 
-        const actionButtons = isVerified
-          ? `
-              <button class="btn btn-secondary" title="${escapeHtml(escalateTitle)}" onclick="escalateToCrime(${complaintId})">
-                <span>📋</span>
-                Escalate to Crime
-              </button>
-              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
-                <span>👁️</span>
-                View Details
-              </button>
-            `
-          : `
-              <button class="btn btn-success" title="${escapeHtml(verifyTitle)}" onclick="verifyComplaint(${complaintId})">
-                <span>✓</span>
-                Verify
-              </button>
-              <button class="btn btn-danger" title="${escapeHtml(rejectTitle)}" onclick="rejectComplaint(${complaintId})">
-                <span>✗</span>
-                Reject
-              </button>
-              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
-                <span>👁️</span>
-                View Details
-              </button>
-            `;
+        let actionButtons = '';
+        if (isEscalated) {
+          actionButtons = `
+            <button class="btn btn-secondary" disabled title="Already escalated to case management.">
+              <span>📋</span>
+              Escalated
+            </button>
+            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+              <span>👁️</span>
+              View Details
+            </button>
+          `;
+        } else if (isVerified) {
+          actionButtons = `
+            <button class="btn btn-secondary" title="${escapeHtml(escalateTitle)}" onclick="escalateToCrime(${complaintId})">
+              <span>📋</span>
+              Escalate to Crime
+            </button>
+            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+              <span>👁️</span>
+              View Details
+            </button>
+          `;
+        } else if (isPending) {
+          actionButtons = `
+            <button class="btn btn-success" title="${escapeHtml(verifyTitle)}" onclick="verifyComplaint(${complaintId})">
+              <span>✓</span>
+              Verify
+            </button>
+            <button class="btn btn-danger" title="${escapeHtml(rejectTitle)}" onclick="rejectComplaint(${complaintId})">
+              <span>✗</span>
+              Reject
+            </button>
+            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+              <span>👁️</span>
+              View Details
+            </button>
+          `;
+        } else {
+          actionButtons = `
+            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+              <span>👁️</span>
+              View Details
+            </button>
+          `;
+        }
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -2524,6 +2699,77 @@
         } catch (error) {
           console.error('Failed to add police station:', error);
           showAlert(error.message || 'Unable to add police station right now.');
+        } finally {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+        }
+      });
+    }
+
+    if (caseAssignmentForm) {
+      caseAssignmentForm.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const submitButton = caseAssignmentForm.querySelector('button[type="submit"]');
+        const originalLabel = submitButton ? submitButton.innerHTML : '';
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<span>⏳</span> Assigning...';
+        }
+
+        const formData = new FormData(caseAssignmentForm);
+        const crimeId = Number(formData.get('crime_id'));
+        const officerId = Number(formData.get('user_id'));
+        const dutyRole = (formData.get('duty_role') || '').toString().trim();
+
+        const missingFields = [];
+        if (!Number.isFinite(crimeId) || crimeId <= 0) {
+          missingFields.push('a valid Crime ID');
+        }
+        if (!Number.isFinite(officerId) || officerId <= 0) {
+          missingFields.push('a valid Officer ID');
+        }
+        if (!dutyRole) {
+          missingFields.push('a duty role');
+        }
+
+        if (missingFields.length) {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalLabel;
+          }
+          showAlert(`Please provide ${missingFields.join(', ')} before assigning.`);
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveApiUrl('/api/admin/assign-case'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              crime_id: crimeId,
+              user_id: officerId,
+              duty_role: dutyRole
+            })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const detail = payload.detail || payload.message || `Request failed with status ${response.status}`;
+            throw new Error(detail);
+          }
+
+          showAlert(payload.message || 'Case assigned successfully.');
+          caseAssignmentForm.reset();
+          hideAssignCaseForm();
+          await loadCaseAssignments();
+        } catch (error) {
+          console.error('Failed to assign case:', error);
+          showAlert(error.message || 'Unable to assign case right now.');
         } finally {
           if (submitButton) {
             submitButton.disabled = false;
@@ -4032,19 +4278,42 @@
       tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading reports…</td></tr>';
 
       try {
-        const response = await fetch(resolveApiUrl('/api/crimes?limit=200'), { cache: 'no-store' });
+        const response = await fetch(resolveApiUrl('/api/admin/complaints'), { cache: 'no-store' });
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
 
         const payload = await response.json().catch(() => ({}));
-        const fetchedRecords = Array.isArray(payload.crimes) ? payload.crimes : [];
+        const fetchedRecords = Array.isArray(payload.complaints) ? payload.complaints : [];
 
-        const normalized = fetchedRecords
-          .map(normalizeCrimeRecord)
-          .filter(record => record && Number.isFinite(Number(record.crime_id)));
+        const normalized = fetchedRecords.map(raw => {
+          const record = { ...raw };
+          const complaintId = Number(record.complaint_id ?? record.crime_id);
+          record.complaint_id = complaintId;
+          record.status = (record.status || 'Pending').toString();
+          record.created_at = record.created_at || record.reported_at;
+          record.updated_at = record.updated_at || record.created_at;
 
-        const relevantStatuses = new Set(['pending', 'verified']);
+          const parsedComplaint = parseMaybeJson(record.complaint_data) || {};
+          record.complaint_data = parsedComplaint;
+
+          if (!record.crime_data || typeof record.crime_data !== 'object') {
+            record.crime_data = {
+              type: parsedComplaint.subject || parsedComplaint.type || 'User Complaint',
+              description: parsedComplaint.description || parsedComplaint.details || '',
+              reporter_contact: record.reporter_contact || parsedComplaint.reporter_contact || ''
+            };
+          }
+
+          if (!record.location_data) {
+            const locationHint = parsedComplaint.location || parsedComplaint.address || parsedComplaint.area || parsedComplaint.location_label;
+            record.location_data = locationHint ? { area_name: locationHint } : null;
+          }
+
+          return record;
+        });
+
+        const relevantStatuses = new Set(['pending', 'verified', 'escalated']);
         const filtered = normalized.filter(record => relevantStatuses.has((record.status || 'Pending').toLowerCase()));
 
         filtered.sort((a, b) => {
@@ -4052,7 +4321,8 @@
             const key = (status || 'Pending').toLowerCase();
             if (key === 'pending') return 0;
             if (key === 'verified') return 1;
-            return 2;
+            if (key === 'escalated') return 2;
+            return 3;
           };
           const priorityDiff = statusPriority(a.status) - statusPriority(b.status);
           if (priorityDiff !== 0) {
@@ -4066,7 +4336,7 @@
         complaintsList = filtered;
         complaintsCache.clear();
         filtered.forEach(record => {
-          const id = Number(record.crime_id);
+          const id = Number(record.complaint_id ?? record.crime_id);
           if (Number.isFinite(id)) {
             complaintsCache.set(id, record);
           }
@@ -4102,6 +4372,7 @@
           return;
         }
 
+        caseAssignmentsCache.clear();
         tbody.innerHTML = '';
 
         records.forEach(record => {
@@ -4109,6 +4380,10 @@
           const crimeId = Number(record.crime_id);
           const hasAssignment = Number.isFinite(assignmentId) && assignmentId > 0;
           const canViewHistory = Number.isFinite(crimeId) && crimeId > 0;
+
+          if (hasAssignment) {
+            caseAssignmentsCache.set(assignmentId, record);
+          }
 
           const assignmentLabel = hasAssignment
             ? `ASSIGN-${String(assignmentId).padStart(3, '0')}`
@@ -4123,7 +4398,7 @@
             ? escapeHtml(formatDateTimeDisplay(record.assigned_at))
             : escapeHtml('Not assigned yet');
 
-          const statusSource = record.assignment_status || record.crime_status || 'Pending';
+          const statusSource = record.crime_status || record.assignment_status || 'Pending';
           const statusInfo = normalizeStatus(statusSource);
           const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
 
@@ -4196,14 +4471,12 @@
         }
 
         try {
-          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}/status`), {
-            method: 'PUT',
+          const response = await fetch(resolveApiUrl(`/api/admin/complaints/${numericId}/verify`), {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              crime_id: numericId,
-              new_status: 'Verified',
               notes: 'Verified via admin dashboard',
-              changed_by: CURRENT_ADMIN_ID
+              verified_by: CURRENT_ADMIN_ID
             })
           });
 
@@ -4236,7 +4509,8 @@
         return;
       }
 
-      if ((record.status || '').toLowerCase() !== 'pending') {
+      const statusKey = (record.status || '').toLowerCase();
+      if (statusKey !== 'pending') {
         showAlert(`${displayId} can no longer be rejected because it is not pending.`);
         return;
       }
@@ -4247,7 +4521,14 @@
         }
 
         try {
-          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}`), { method: 'DELETE' });
+          const response = await fetch(resolveApiUrl(`/api/admin/complaints/${numericId}/reject`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              notes: 'Rejected via admin dashboard',
+              rejected_by: CURRENT_ADMIN_ID
+            })
+          });
           const payload = await response.json().catch(() => ({}));
           if (!response.ok) {
             const message = payload.detail || payload.message || 'Failed to reject the complaint.';
@@ -4277,7 +4558,13 @@
         return;
       }
 
-      if ((record.status || '').toLowerCase() !== 'verified') {
+      const statusKey = (record.status || '').toLowerCase();
+      if (statusKey === 'escalated') {
+        showAlert(`${displayId} is already escalated to case management.`);
+        return;
+      }
+
+      if (statusKey !== 'verified') {
         showAlert(`Please verify ${displayId} before escalating it to case management.`);
         return;
       }
@@ -4288,13 +4575,10 @@
         }
 
         try {
-          const response = await fetch(resolveApiUrl(`/api/crimes/${numericId}/status`), {
-            method: 'PUT',
+          const response = await fetch(resolveApiUrl(`/api/admin/complaints/${numericId}/escalate`), {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              crime_id: numericId,
-              new_status: 'Under Investigation',
-              notes: 'Escalated to case management',
               changed_by: CURRENT_ADMIN_ID
             })
           });
@@ -4305,8 +4589,11 @@
             throw new Error(message);
           }
 
-          showAlert(`${displayId} has been escalated to case management.`);
+          const newCaseId = Number(payload.crime_id);
+          const caseLabel = Number.isFinite(newCaseId) ? `CR-${String(newCaseId).padStart(3, '0')}` : 'a new case';
+          showAlert(`${displayId} has been escalated to case management as ${caseLabel}.`);
           await loadComplaints();
+          await loadCaseAssignments();
           showTab('case-management');
         } catch (error) {
           console.error('Error escalating complaint:', error);
@@ -4330,18 +4617,25 @@
 
       const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
       const statusInfo = normalizeStatus(record.status || 'Pending');
-      const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at));
+      const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at || record.updated_at));
       const locationSummary = escapeHtml(formatIncidentLocation(record.location_data));
       const reporterContact = escapeHtml(deriveReporterContact(record));
       const crimeType = escapeHtml(record?.crime_data?.type || 'Not provided');
       const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
+      const channelLine = record?.channel ? `<li><strong>Channel:</strong> ${escapeHtml(record.channel)}</li>` : '';
+      const priorityLine = record?.priority ? `<li><strong>Priority:</strong> ${escapeHtml(record.priority)}</li>` : '';
+      const verificationNotes = record?.verification_notes
+        ? `<div class="stats-insights"><h4>Verification Notes</h4><p>${escapeHtml(record.verification_notes)}</p></div>`
+        : '';
 
       const incidentItems = [
         `<li><strong>Status:</strong> ${statusBadge}</li>`,
         `<li><strong>Reported:</strong> ${reportedAt}</li>`,
         `<li><strong>Location:</strong> ${locationSummary}</li>`,
         `<li><strong>Reporter Contact:</strong> ${reporterContact}</li>`,
-        `<li><strong>Incident Type:</strong> ${crimeType}</li>`
+        `<li><strong>Incident Type:</strong> ${crimeType}</li>`,
+        channelLine,
+        priorityLine
       ].join('');
 
       const descriptionBlock = record?.crime_data?.description
@@ -4398,6 +4692,7 @@
           </div>
           <div class="stats-insights"><h4>Incident Summary</h4><ul>${incidentItems}</ul></div>
           ${descriptionBlock}
+          ${verificationNotes}
           ${victimBlock}
           ${witnessBlock}
           ${evidenceBlock}
@@ -4417,15 +4712,267 @@
     }
 
     // Case management functions
-    function updateCaseStatus(assignmentId) {
-      console.log(`Attempting to update status for assignment ${assignmentId}`);
-      // NOTE: Replacing prompt() with an informative modal.
-      showAlert(`To update the case status for ASSIGN-${assignmentId.toString().padStart(3, '0')}, a full modal form with status selection and notes field would appear here for data entry.`);
+    async function updateCaseStatus(assignmentId) {
+      const numericId = Number(assignmentId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid assignment reference. Please refresh and try again.');
+        return;
+      }
+
+      const record = caseAssignmentsCache.get(numericId);
+      if (!record) {
+        showAlert('Assignment details are unavailable. Please reload the case list and try again.');
+        return;
+      }
+
+      const crimeId = Number(record.crime_id);
+      if (!Number.isFinite(crimeId) || crimeId <= 0) {
+        showAlert('Unable to determine which crime this assignment belongs to.');
+        return;
+      }
+
+      const assignmentLabel = `ASSIGN-${String(numericId).padStart(3, '0')}`;
+      const crimeLabel = `CR-${String(crimeId).padStart(3, '0')}`;
+      const officerLabel = (record.full_name || record.username || record.email || 'Assigned officer').toString();
+      const currentStatusRaw = (record.crime_status || record.assignment_status || 'Pending').toString();
+      const normalizedCurrent = currentStatusRaw.toLowerCase().trim();
+
+      const seenStatuses = new Set();
+      const statusChoices = [];
+      [currentStatusRaw, ...CASE_STATUS_OPTIONS].forEach(status => {
+        if (!status) {
+          return;
+        }
+        const value = status.toString();
+        const key = value.toLowerCase().trim();
+        if (seenStatuses.has(key)) {
+          return;
+        }
+        seenStatuses.add(key);
+        statusChoices.push(value);
+      });
+
+      const optionsMarkup = statusChoices
+        .map(status => {
+          const trimmed = status.toString();
+          const isSelected = trimmed.toLowerCase().trim() === normalizedCurrent;
+          const safeLabel = escapeHtml(trimmed);
+          return `<option value="${safeLabel}"${isSelected ? ' selected' : ''}>${safeLabel}</option>`;
+        })
+        .join('');
+
+      modalContainer.classList.add('modal-wide');
+      modalButtons.classList.remove('stacked');
+      modalMessage.innerHTML = `
+        <div class="status-update-modal">
+          <div>
+            <h3>Update Case Status</h3>
+            <p class="status-update-meta">${escapeHtml(assignmentLabel)} · ${escapeHtml(crimeLabel)} · ${escapeHtml(officerLabel)}</p>
+            <p class="status-update-meta">Current: ${escapeHtml(normalizeStatus(currentStatusRaw).display)}</p>
+          </div>
+          <div class="status-update-fields">
+            <label for="status-update-select">
+              New Status
+              <select id="status-update-select" class="form-select">
+                ${optionsMarkup}
+              </select>
+            </label>
+            <label for="status-update-notes">
+              Notes (optional)
+              <textarea id="status-update-notes" class="form-textarea" rows="4" placeholder="Add context or next steps for the responding officer."></textarea>
+            </label>
+            <p id="status-update-error" class="status-update-error" role="alert"></p>
+          </div>
+        </div>
+      `;
+      modalButtons.innerHTML = '';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.onclick = () => closeModal();
+      modalButtons.appendChild(cancelButton);
+
+      const saveButton = document.createElement('button');
+      saveButton.className = 'btn btn-primary';
+      saveButton.textContent = 'Save';
+      modalButtons.appendChild(saveButton);
+
+      modalOverlay.classList.add('show');
+
+      const statusSelect = modalContainer.querySelector('#status-update-select');
+      const notesInput = modalContainer.querySelector('#status-update-notes');
+      const errorBox = modalContainer.querySelector('#status-update-error');
+
+      saveButton.onclick = async () => {
+        if (!statusSelect) {
+          showAlert('Unable to locate the status form. Please try again.');
+          return;
+        }
+
+        const newStatus = statusSelect.value.trim();
+        if (!newStatus) {
+          if (errorBox) {
+            errorBox.textContent = 'Please choose a status before saving.';
+          }
+          return;
+        }
+
+        if (errorBox) {
+          errorBox.textContent = '';
+        }
+
+        const payload = {
+          new_status: newStatus,
+          notes: notesInput ? notesInput.value.trim() || null : null
+        };
+        if (Number.isFinite(CURRENT_ADMIN_ID) && CURRENT_ADMIN_ID > 0) {
+          payload.changed_by = CURRENT_ADMIN_ID;
+        }
+
+        const originalLabel = saveButton.textContent;
+        saveButton.disabled = true;
+        saveButton.textContent = 'Updating...';
+
+        try {
+          const response = await fetch(resolveApiUrl(`/api/crimes/${crimeId}/status`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({}));
+            const message = errorPayload.detail || errorPayload.message || `Request failed with status ${response.status}`;
+            throw new Error(message);
+          }
+
+          closeModal();
+          await loadCaseAssignments();
+          setTimeout(() => showAlert('Case status updated successfully.'), 120);
+        } catch (error) {
+          console.error('Error updating case status:', error);
+          if (errorBox) {
+            errorBox.textContent = error.message || 'Failed to update status.';
+          } else {
+            closeModal();
+            showAlert(error.message || 'Failed to update status.');
+          }
+        } finally {
+          saveButton.disabled = false;
+          saveButton.textContent = originalLabel;
+        }
+      };
     }
 
-    function viewStatusHistory(crimeId) {
-      console.log(`Viewing status history for crime: ${crimeId}`);
-      showAlert(`Loading status history and timeline for CRIME-${crimeId.toString().padStart(3, '0')}...`);
+    async function viewStatusHistory(crimeId) {
+      const numericId = Number(crimeId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid case reference. Please refresh and try again.');
+        return;
+      }
+
+      modalContainer.classList.add('modal-wide');
+      modalButtons.classList.remove('stacked');
+      modalMessage.innerHTML = '<p style="margin: 0; color: var(--text-secondary);">Loading case timeline...</p>';
+      modalButtons.innerHTML = '';
+      modalOverlay.classList.add('show');
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/admin/cases/${numericId}/history`), { cache: 'no-store' });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const errorMessage = payload.detail || payload.message || `Request failed with status ${response.status}`;
+          throw new Error(errorMessage);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const crime = payload && payload.crime ? payload.crime : {};
+        const timeline = Array.isArray(payload?.timeline) ? payload.timeline : [];
+        const assignments = Array.isArray(payload?.assignment_events) ? payload.assignment_events : [];
+        const statusInfo = normalizeStatus(crime.status || 'Pending');
+        const displayId = `CR-${numericId.toString().padStart(3, '0')}`;
+
+        const crimeDetails = [
+          `<li><strong>Status:</strong> <span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span></li>`,
+          `<li><strong>Reported:</strong> ${escapeHtml(formatDateTimeDisplay(crime.reported_at))}</li>`,
+          crime.updated_at ? `<li><strong>Last Updated:</strong> ${escapeHtml(formatDateTimeDisplay(crime.updated_at))}</li>` : null,
+          crime.crime_type ? `<li><strong>Type:</strong> ${escapeHtml(crime.crime_type)}</li>` : null,
+          crime.crime_description ? `<li><strong>Description:</strong> ${escapeHtml(crime.crime_description)}</li>` : null,
+          crime.area_name ? `<li><strong>Area:</strong> ${escapeHtml(crime.area_name)}</li>` : null
+        ].filter(Boolean).join('');
+
+        const timelineItems = timeline.length
+          ? timeline.map(entry => {
+              const timestamp = escapeHtml(formatDateTimeDisplay(entry.timestamp));
+              const actorParts = [];
+              if (entry.actor) {
+                actorParts.push(escapeHtml(entry.actor.toString()));
+              }
+              if (entry.role) {
+                actorParts.push(escapeHtml(entry.role.toString()));
+              }
+              const actorLine = actorParts.length ? `<span class="timeline-actor">${actorParts.join(' · ')}</span>` : '';
+
+              const title = entry.kind === 'assignment'
+                ? `Assigned to ${escapeHtml(entry.label || 'Assigned officer')}`
+                : `Status updated to ${escapeHtml(normalizeStatus(entry.label || 'Pending').display)}`;
+
+              const notesLine = entry.notes ? `<p class="timeline-notes">${escapeHtml(entry.notes)}</p>` : '';
+              const itemClass = entry.kind === 'assignment' ? 'timeline-assignment' : 'timeline-status';
+
+              return `
+                <li class="timeline-item ${itemClass}">
+                  <div class="timeline-meta">${timestamp}${actorLine ? ` · ${actorLine}` : ''}</div>
+                  <div class="timeline-title">${title}</div>
+                  ${notesLine}
+                </li>
+              `;
+            }).join('')
+          : '<li class="timeline-item"><div class="timeline-title">No status changes recorded yet.</div></li>';
+
+        const activeAssignments = assignments.filter(entry => (entry.status || '').toLowerCase() === 'active');
+        const assignmentList = activeAssignments.length
+          ? activeAssignments.map(entry => {
+              const officer = entry.officer_name || (entry.user_id ? `Officer #${entry.user_id}` : 'Assigned officer');
+              const assignedAt = escapeHtml(formatDateTimeDisplay(entry.assigned_at));
+              const role = entry.duty_role ? ` · ${escapeHtml(entry.duty_role)}` : '';
+              return `<li>${escapeHtml(officer)}${role}<br><span class="timeline-meta">Assigned ${assignedAt}</span></li>`;
+            }).join('')
+          : '<li>No active assignments.</li>';
+
+        modalMessage.innerHTML = `
+          <div class="timeline-modal">
+            <div class="timeline-header">
+              <h3>${escapeHtml(displayId)} Timeline</h3>
+              <p>Comprehensive status history for this case.</p>
+            </div>
+            <div class="timeline-summary">
+              <h4>Case Summary</h4>
+              <ul>${crimeDetails}</ul>
+            </div>
+            <div class="timeline-section">
+              <h4>Status & Assignment Timeline</h4>
+              <ul class="timeline-list">${timelineItems}</ul>
+            </div>
+            <div class="timeline-section">
+              <h4>Active Assignments</h4>
+              <ul class="assignment-list">${assignmentList}</ul>
+            </div>
+          </div>
+        `;
+
+        modalButtons.innerHTML = '';
+        const closeButton = document.createElement('button');
+        closeButton.className = 'btn btn-primary';
+        closeButton.textContent = 'Close';
+        closeButton.onclick = () => closeModal();
+        modalButtons.appendChild(closeButton);
+      } catch (error) {
+        console.error('Failed to load status history:', error);
+        closeModal();
+        showAlert(error.message || 'Unable to load case history right now.');
+      }
     }
 
     function viewCrimeDetails(crimeId) {

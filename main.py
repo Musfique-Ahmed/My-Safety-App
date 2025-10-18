@@ -1471,6 +1471,23 @@ async def get_user_conversations(user_id: int):
 
 # ==================== EMERGENCY ALERT ENDPOINTS ====================
 
+def ensure_status_history_table(conn) -> None:
+    """Create the status_history table if it does not already exist."""
+    conn.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS status_history (
+            history_id INT AUTO_INCREMENT PRIMARY KEY,
+            crime_id INT NOT NULL,
+            new_status VARCHAR(100) NOT NULL,
+            notes TEXT NULL,
+            changed_by INT NULL,
+            changed_at DATETIME NOT NULL,
+            INDEX idx_status_history_crime (crime_id),
+            INDEX idx_status_history_changed (changed_at)
+        )
+        """
+    ))
+
 def ensure_emergency_alerts_table(conn) -> None:
     """Create the emergency_alerts table if it does not already exist."""
     conn.execute(text(
@@ -1498,6 +1515,17 @@ def ensure_emergency_alerts_table(conn) -> None:
         )
         """
     ))
+
+def parse_json_value(value):
+    """Safely parse a JSON string into Python data structures."""
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return None
 
 @app.post("/api/emergency-alert")
 async def submit_emergency_alert(alert: EmergencyAlert):
@@ -1930,6 +1958,8 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
 
             if not current:
                 raise HTTPException(status_code=404, detail="Crime not found")
+
+            ensure_status_history_table(conn)
 
             conn.execute(
                 text(
@@ -3024,6 +3054,396 @@ async def assign_case_to_officer(assignment: CaseAssignment):
             print(f"Error assigning case: {e}")
             return {"message": "Case assigned successfully"}  # Demo fallback
 
+@app.get("/api/admin/cases/{crime_id}/history")
+async def get_case_status_history(crime_id: int):
+    """Return status history and assignment timeline for a given crime case."""
+    with engine.connect() as conn:
+        try:
+            try:
+                ensure_status_history_table(conn)
+            except Exception as exc:  # pragma: no cover - table creation expected to succeed
+                logging.warning("Failed to ensure status_history table exists: %s", exc)
+
+            crime_row = conn.execute(
+                text(
+                    """
+                    SELECT
+                        c.crime_id,
+                        c.status,
+                        c.created_at,
+                        c.updated_at,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.crime_data, '$.type')) AS crime_type,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.crime_data, '$.description')) AS crime_description,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.location_data, '$.area_name')) AS area_name
+                    FROM crime c
+                    WHERE c.crime_id = :crime_id
+                    """
+                ),
+                {"crime_id": crime_id}
+            ).mappings().fetchone()
+
+            if not crime_row:
+                raise HTTPException(status_code=404, detail="Crime case not found")
+
+            status_rows = conn.execute(
+                text(
+                    """
+                    SELECT
+                        sh.history_id,
+                        sh.new_status,
+                        sh.notes,
+                        sh.changed_by,
+                        sh.changed_at,
+                        u.full_name AS changed_by_name,
+                        u.role_hint AS changed_by_role
+                    FROM status_history sh
+                    LEFT JOIN appuser u ON u.user_id = sh.changed_by
+                    WHERE sh.crime_id = :crime_id
+                    ORDER BY sh.changed_at ASC, sh.history_id ASC
+                    """
+                ),
+                {"crime_id": crime_id}
+            ).mappings().fetchall()
+
+            assignment_rows = conn.execute(
+                text(
+                    """
+                    SELECT
+                        ca.assignment_id,
+                        ca.user_id,
+                        ca.duty_role,
+                        ca.assigned_at,
+                        ca.status,
+                        ca.notes,
+                        ca.completion_date,
+                        u.full_name AS officer_name,
+                        u.role_hint AS officer_role
+                    FROM case_assignments ca
+                    LEFT JOIN appuser u ON u.user_id = ca.user_id
+                    WHERE ca.crime_id = :crime_id
+                    ORDER BY ca.assigned_at ASC, ca.assignment_id ASC
+                    """
+                ),
+                {"crime_id": crime_id}
+            ).mappings().fetchall()
+
+            def isoformat(value):
+                if value is None:
+                    return None
+                if isinstance(value, datetime):
+                    return value.isoformat()
+                if isinstance(value, date):
+                    return datetime.combine(value, datetime.min.time()).isoformat()
+                return str(value)
+
+            status_events = [
+                {
+                    "history_id": row.get("history_id"),
+                    "new_status": row.get("new_status"),
+                    "notes": row.get("notes"),
+                    "changed_by": row.get("changed_by"),
+                    "changed_by_name": row.get("changed_by_name"),
+                    "changed_by_role": row.get("changed_by_role"),
+                    "changed_at": isoformat(row.get("changed_at")),
+                }
+                for row in status_rows
+            ]
+
+            assignment_events = [
+                {
+                    "assignment_id": row.get("assignment_id"),
+                    "user_id": row.get("user_id"),
+                    "duty_role": row.get("duty_role"),
+                    "assigned_at": isoformat(row.get("assigned_at")),
+                    "status": row.get("status"),
+                    "notes": row.get("notes"),
+                    "completion_date": isoformat(row.get("completion_date")),
+                    "officer_name": row.get("officer_name"),
+                    "officer_role": row.get("officer_role"),
+                }
+                for row in assignment_rows
+            ]
+
+            timeline_entries = []
+            for event in status_events:
+                timeline_entries.append(
+                    {
+                        "kind": "status",
+                        "label": event.get("new_status"),
+                        "notes": event.get("notes"),
+                        "actor": event.get("changed_by_name") or event.get("changed_by"),
+                        "role": event.get("changed_by_role"),
+                        "timestamp": event.get("changed_at"),
+                    }
+                )
+
+            for event in assignment_events:
+                officer_label = event.get("officer_name") or f"Officer #{event.get('user_id')}"
+                timeline_entries.append(
+                    {
+                        "kind": "assignment",
+                        "label": officer_label,
+                        "notes": event.get("duty_role"),
+                        "actor": officer_label,
+                        "role": event.get("officer_role"),
+                        "timestamp": event.get("assigned_at"),
+                    }
+                )
+
+            def parse_ts(value):
+                if not value:
+                    return datetime.min
+                try:
+                    return datetime.fromisoformat(value)
+                except Exception:
+                    try:
+                        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    except Exception:
+                        return datetime.min
+
+            timeline_entries.sort(key=lambda item: (parse_ts(item.get("timestamp")), item.get("kind")))
+
+            return {
+                "crime": {
+                    "crime_id": crime_row.get("crime_id"),
+                    "status": crime_row.get("status"),
+                    "reported_at": isoformat(crime_row.get("created_at")),
+                    "updated_at": isoformat(crime_row.get("updated_at")),
+                    "crime_type": crime_row.get("crime_type"),
+                    "crime_description": crime_row.get("crime_description"),
+                    "area_name": crime_row.get("area_name"),
+                },
+                "status_events": status_events,
+                "assignment_events": assignment_events,
+                "timeline": timeline_entries,
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logging.exception("Failed to fetch status history for crime %s: %s", crime_id, exc)
+            raise HTTPException(status_code=500, detail="Failed to fetch case history")
+
+@app.get("/api/admin/complaints")
+async def get_admin_complaints(limit: int = Query(200, ge=1, le=500)):
+    """Fetch recent user complaints for verification workflow."""
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT
+                    complaint_id,
+                    reporter_contact,
+                    channel,
+                    status,
+                    priority,
+                    assigned_to,
+                    verification_notes,
+                    complaint_data,
+                    created_at,
+                    updated_at
+                FROM user_complaints
+                ORDER BY created_at DESC
+                LIMIT :limit
+                """
+            ),
+            {"limit": limit}
+        ).mappings().fetchall()
+
+    complaints = []
+    for row in rows:
+        item = dict(row)
+        payload = parse_json_value(item.get("complaint_data")) or {}
+        item["complaint_data"] = payload if payload else None
+        item["status"] = item.get("status") or "Pending"
+        # Provide normalized structures expected by the dashboard UI
+        crime_payload = item.get("crime_data")
+        if not isinstance(crime_payload, dict):
+            item["crime_data"] = {
+                "type": payload.get("subject") or payload.get("type") or "User Complaint",
+                "description": payload.get("description") or payload.get("details") or "",
+                "reporter_contact": item.get("reporter_contact") or payload.get("reporter_contact")
+            }
+        location_hint = (
+            payload.get("location")
+            or payload.get("location_label")
+            or payload.get("address")
+            or payload.get("area")
+        )
+        if location_hint and not item.get("location_data"):
+            item["location_data"] = {"area_name": location_hint}
+        complaints.append(item)
+
+    return {"complaints": complaints}
+
+@app.post("/api/admin/complaints/{complaint_id}/verify")
+async def verify_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Mark a complaint as verified."""
+    notes = None
+    if payload:
+        notes = payload.get("notes") or payload.get("verification_notes")
+
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                UPDATE user_complaints
+                SET status = 'Verified',
+                    verification_notes = COALESCE(:notes, verification_notes),
+                    updated_at = :updated_at
+                WHERE complaint_id = :complaint_id
+                """
+            ),
+            {
+                "complaint_id": complaint_id,
+                "notes": notes,
+                "updated_at": datetime.utcnow()
+            }
+        )
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+
+    return {"message": "Complaint verified"}
+
+@app.post("/api/admin/complaints/{complaint_id}/reject")
+async def reject_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Reject a complaint and record the reason if provided."""
+    notes = None
+    if payload:
+        notes = payload.get("notes") or payload.get("verification_notes") or payload.get("reason")
+
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                UPDATE user_complaints
+                SET status = 'Rejected',
+                    verification_notes = COALESCE(:notes, verification_notes),
+                    updated_at = :updated_at
+                WHERE complaint_id = :complaint_id
+                """
+            ),
+            {
+                "complaint_id": complaint_id,
+                "notes": notes,
+                "updated_at": datetime.utcnow()
+            }
+        )
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+
+    return {"message": "Complaint rejected"}
+
+@app.post("/api/admin/complaints/{complaint_id}/escalate")
+async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Create a crime record from a verified complaint and mark it escalated."""
+    with engine.begin() as conn:
+        complaint = conn.execute(
+            text(
+                """
+                SELECT complaint_id, reporter_contact, complaint_data, status, priority
+                FROM user_complaints
+                WHERE complaint_id = :complaint_id
+                FOR UPDATE
+                """
+            ),
+            {"complaint_id": complaint_id}
+        ).mappings().fetchone()
+
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+
+        status_value = (complaint.get("status") or "").lower()
+        if status_value == "escalated":
+            return {"message": "Complaint already escalated"}
+
+        if status_value not in {"verified", "pending"}:
+            raise HTTPException(status_code=400, detail="Complaint cannot be escalated in its current status")
+
+        complaint_payload = parse_json_value(complaint.get("complaint_data")) or {}
+        subject = complaint_payload.get("subject") or complaint_payload.get("type") or "User Complaint"
+        description = complaint_payload.get("description") or complaint_payload.get("details") or "Escalated user complaint"
+        location_hint = (
+            complaint_payload.get("location")
+            or complaint_payload.get("address")
+            or complaint_payload.get("area")
+            or complaint_payload.get("location_label")
+        )
+
+        priority_raw = (complaint.get("priority") or payload.get("priority") if payload else "") or "Medium"
+        priority_value = str(priority_raw).strip().title()
+        if priority_value not in {"Low", "Medium", "High", "Critical"}:
+            priority_value = "Medium"
+
+        now = datetime.utcnow()
+        crime_insert = conn.execute(
+            text(
+                """
+                INSERT INTO crime (reporter_id, crime_data, location_data, status, priority_level, incident_date, created_at, updated_at)
+                VALUES (:reporter_id, :crime_data, :location_data, :status, :priority_level, :incident_date, :created_at, :updated_at)
+                """
+            ),
+            {
+                "reporter_id": None,
+                "crime_data": json.dumps({
+                    "type": subject,
+                    "description": description,
+                    "source": "user-complaint",
+                    "source_complaint_id": complaint_id,
+                    "reporter_contact": complaint.get("reporter_contact") or complaint_payload.get("reporter_contact"),
+                }),
+                "location_data": json.dumps({"area_name": location_hint} if location_hint else {}),
+                "status": "Escalated",
+                "priority_level": priority_value,
+                "incident_date": None,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+
+        new_crime_id = crime_insert.lastrowid
+
+        ensure_status_history_table(conn)
+        try:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO status_history (crime_id, new_status, notes, changed_by, changed_at)
+                    VALUES (:crime_id, :new_status, :notes, :changed_by, :changed_at)
+                    """
+                ),
+                {
+                    "crime_id": new_crime_id,
+                    "new_status": "Escalated",
+                    "notes": "Escalated from user complaint",
+                    "changed_by": payload.get("changed_by") if payload else None,
+                    "changed_at": now,
+                }
+            )
+        except Exception:
+            pass
+
+        conn.execute(
+            text(
+                """
+                UPDATE user_complaints
+                SET status = 'Escalated',
+                    updated_at = :updated_at
+                WHERE complaint_id = :complaint_id
+                """
+            ),
+            {
+                "complaint_id": complaint_id,
+                "updated_at": now,
+            }
+        )
+
+    return {
+        "message": "Complaint escalated to case management",
+        "crime_id": new_crime_id
+    }
+
 @app.get("/api/admin/case-management")
 async def get_case_management_cases():
     """Return crimes under investigation along with assignment details."""
@@ -3051,7 +3471,7 @@ async def get_case_management_cases():
                     FROM crime c
                     LEFT JOIN case_assignments ca ON ca.crime_id = c.crime_id
                     LEFT JOIN appuser u ON ca.user_id = u.user_id
-                    WHERE LOWER(c.status) IN ('under investigation', 'investigating', 'in progress', 'assigned')
+                    WHERE LOWER(c.status) IN ('under investigation', 'investigating', 'in progress', 'assigned', 'escalated')
                     ORDER BY COALESCE(ca.assigned_at, c.updated_at, c.created_at) DESC
                     """
                 )
