@@ -153,10 +153,9 @@ class CaseAssignment(BaseModel):
     duty_role: str
 
 class StatusUpdate(BaseModel):
-    crime_id: int
     new_status: str
-    notes: str
-    changed_by: int
+    notes: Optional[str] = None
+    changed_by: Optional[int] = None
 
 class ChatMessage(BaseModel):
     user_id: int
@@ -1961,6 +1960,10 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
 
             ensure_status_history_table(conn)
 
+            new_status_value = status_update.new_status.strip()
+            notes_value = (status_update.notes or "").strip() or None
+            changed_by_value = status_update.changed_by if status_update.changed_by is not None else None
+
             conn.execute(
                 text(
                     """
@@ -1970,7 +1973,7 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
                     """
                 ),
                 {
-                    "status": status_update.new_status,
+                    "status": new_status_value,
                     "updated_at": datetime.utcnow(),
                     "crime_id": crime_id
                 }
@@ -1986,9 +1989,9 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
                     ),
                     {
                         "crime_id": crime_id,
-                        "new_status": status_update.new_status,
-                        "notes": status_update.notes,
-                        "changed_by": status_update.changed_by,
+                        "new_status": new_status_value,
+                        "notes": notes_value,
+                        "changed_by": changed_by_value,
                         "changed_at": datetime.utcnow()
                     }
                 )
@@ -1999,7 +2002,7 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
             "message": "Crime status updated successfully",
             "crime_id": crime_id,
             "previous_status": current["status"],
-            "new_status": status_update.new_status
+            "new_status": new_status_value
         }
     except HTTPException:
         raise
