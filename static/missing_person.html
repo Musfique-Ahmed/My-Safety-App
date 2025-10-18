@@ -597,15 +597,192 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
 });
 
-// Panic button functionality
-document.getElementById('panic-btn').addEventListener('click', async () => {
-  await Swal.fire({
-    icon: 'warning',
-    title: 'Panic Alert Sent',
-    text: 'Emergency services have been notified.',
-    confirmButtonColor: '#EF4444'
+function resolveAuthenticatedUser() {
+  const candidates = [
+    window.currentUser,
+    window.CURRENT_USER,
+    window.AUTH_USER,
+    window.USER,
+    window.loggedInUser,
+    window.user
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') {
+      continue;
+    }
+    const userId = Number(candidate.user_id ?? candidate.id ?? candidate.pk ?? candidate.uid);
+    if (Number.isFinite(userId) && userId > 0) {
+      return {
+        user_id: userId,
+        snapshot: {
+          user_id: userId,
+          username: candidate.username ?? candidate.name ?? candidate.full_name ?? null,
+          email: candidate.email ?? candidate.mail ?? null,
+          role_hint: candidate.role_hint ?? candidate.role ?? null
+        }
+      };
+    }
+  }
+
+  const storageKeys = ['mysafety_user', 'mysafetyCurrentUser', 'currentUser', 'user'];
+  for (const key of storageKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        continue;
+      }
+      const userId = Number(parsed.user_id ?? parsed.id ?? parsed.pk ?? parsed.uid);
+      if (Number.isFinite(userId) && userId > 0) {
+        return {
+          user_id: userId,
+          snapshot: {
+            user_id: userId,
+            username: parsed.username ?? parsed.name ?? parsed.full_name ?? null,
+            email: parsed.email ?? null,
+            role_hint: parsed.role_hint ?? parsed.role ?? null
+          }
+        };
+      }
+    } catch (error) {
+      console.warn('Unable to parse stored user info:', error);
+    }
+  }
+
+  return { user_id: null, snapshot: null };
+}
+
+function getGeolocation(timeoutMs = 8000) {
+  return new Promise(resolve => {
+    if (!('geolocation' in navigator)) {
+      resolve({ location: null, label: null, error: 'Geolocation not supported' });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      resolve({ location: null, label: null, error: 'Geolocation request timed out' });
+    }, timeoutMs);
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        clearTimeout(timer);
+        resolve({
+          location: {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            captured_at: new Date(position.timestamp).toISOString()
+          },
+          label: 'GPS coordinates captured',
+          error: null
+        });
+      },
+      error => {
+        clearTimeout(timer);
+        resolve({ location: null, label: null, error: error.message || 'Unable to obtain location' });
+      },
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
+    );
   });
-});
+}
+
+// Panic button functionality (sends alert to backend)
+const panicButton = document.getElementById('panic-btn');
+if (panicButton) {
+  panicButton.addEventListener('click', async event => {
+    event.preventDefault();
+    if (panicButton.dataset.loading === 'true') {
+      return;
+    }
+
+    panicButton.dataset.loading = 'true';
+    panicButton.classList.add('opacity-70', 'cursor-not-allowed');
+
+    Swal.fire({
+      title: 'Sending panic alert…',
+      text: 'We are notifying nearby responders.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const userContext = resolveAuthenticatedUser();
+      const geo = await getGeolocation();
+
+      const payload = {
+        alert_type: 'panic_button',
+        description: `Panic button triggered from ${document.title || 'My Safety portal'}.`,
+        severity: 'High',
+        metadata: {
+          page: window.location.pathname,
+          user_agent: navigator.userAgent,
+          location_error: geo.error,
+          triggered_at: new Date().toISOString()
+        }
+      };
+
+      if (Number.isFinite(userContext.user_id) && userContext.user_id > 0) {
+        payload.user_id = userContext.user_id;
+        if (userContext.snapshot) {
+          payload.metadata.user_snapshot = userContext.snapshot;
+        }
+      }
+
+      if (geo.location) {
+        payload.location = {
+          latitude: geo.location.latitude,
+          longitude: geo.location.longitude,
+          accuracy: geo.location.accuracy,
+          captured_at: geo.location.captured_at
+        };
+      }
+
+      if (geo.label) {
+        payload.address_label = geo.label;
+      }
+
+      const response = await fetch(`${API_BASE}/api/emergency-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = result.detail || result.message || `Request failed with status ${response.status}`;
+        throw new Error(detail);
+      }
+
+      Swal.close();
+      await Swal.fire({
+        icon: 'success',
+        title: 'Panic Alert Sent',
+        text: 'Emergency services have been notified.',
+        confirmButtonColor: '#10B981'
+      });
+    } catch (error) {
+      console.error('Failed to send panic alert:', error);
+      Swal.close();
+      await Swal.fire({
+        icon: 'error',
+        title: 'Unable to send alert',
+        text: error.message || 'Please try again or contact support.',
+        confirmButtonColor: '#EF4444'
+      });
+    } finally {
+      panicButton.dataset.loading = 'false';
+      panicButton.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+  });
+}
 // --- END USER MENU DROPDOWN LOGIC ---
 
 </script>

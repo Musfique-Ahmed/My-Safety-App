@@ -1039,10 +1039,11 @@
       <button class="tab-btn" onclick="showTab('police-stations', event)">Police Stations</button>
       <button class="tab-btn" onclick="showTab('missing-persons', event)">Missing Persons</button>
       <button class="tab-btn" onclick="showTab('add-crime', event)">Add Crime</button>
-      <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
-      <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
-      <!--<button class="tab-btn" onclick="showTab('chat', event)">Chat</button>-->
-      <button class="tab-btn" onclick="showTab('analytics', event)">Analytics</button>
+  <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
+  <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
+  <!--<button class="tab-btn" onclick="showTab('chat', event)">Chat</button>-->
+  <button class="tab-btn" onclick="showTab('emergency', event)">Emergency</button>
+  <button class="tab-btn" onclick="showTab('analytics', event)">Analytics</button>
     </div>
 
     <!-- Overview Tab -->
@@ -1623,6 +1624,32 @@
       </div>
     </div>
 
+    <!-- Emergency Tab -->
+    <div id="emergency" class="tab-content">
+      <div class="section-card">
+        <h2 class="section-title">Emergency Dispatch Center</h2>
+        <p class="section-description">Monitor panic alerts and dispatch officers as soon as a user triggers the panic button.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Alert ID</th>
+              <th>User</th>
+              <th>Contact</th>
+              <th>Location</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Reported At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="emergency-table">
+            <!-- Emergency alerts will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Chat Tab -->
     <div id="chat" class="tab-content">
       <div class="section-card">
@@ -1721,6 +1748,7 @@
   const policeStationCache = new Map();
   const missingPersonsCache = new Map();
   const complaintsCache = new Map();
+  const emergencyAlertsCache = new Map();
   let complaintsList = [];
     const ROLE_ACTIONS = [
       { value: 'Super Admin', label: 'Make Super Admin', className: 'btn btn-primary' },
@@ -1952,6 +1980,8 @@
         'reported': 'status-reported',
         'under investigation': 'status-under-investigation',
         'in progress': 'status-in-progress',
+        'assigned': 'status-in-progress',
+        'dispatched': 'status-in-progress',
         'case closed': 'status-case-closed',
         'solved': 'status-resolved',
         'resolved': 'status-resolved',
@@ -2134,12 +2164,35 @@
         const reportedAt = escapeHtml(formatDateTimeDisplay(record.created_at));
         const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
 
-        const verifyDisabled = isPending ? '' : 'disabled';
-        const rejectDisabled = isPending ? '' : 'disabled';
-        const escalateDisabled = isVerified ? '' : 'disabled';
-        const verifyTitle = isPending ? 'Mark report as verified' : 'Already verified';
-        const rejectTitle = isPending ? 'Reject this report' : 'Only pending reports can be rejected';
-        const escalateTitle = isVerified ? 'Escalate to case management' : 'Verify the report before escalating';
+        const verifyTitle = 'Mark report as verified';
+        const rejectTitle = 'Reject this report';
+        const escalateTitle = 'Escalate to case management';
+
+        const actionButtons = isVerified
+          ? `
+              <button class="btn btn-secondary" title="${escapeHtml(escalateTitle)}" onclick="escalateToCrime(${complaintId})">
+                <span>📋</span>
+                Escalate to Crime
+              </button>
+              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+                <span>👁️</span>
+                View Details
+              </button>
+            `
+          : `
+              <button class="btn btn-success" title="${escapeHtml(verifyTitle)}" onclick="verifyComplaint(${complaintId})">
+                <span>✓</span>
+                Verify
+              </button>
+              <button class="btn btn-danger" title="${escapeHtml(rejectTitle)}" onclick="rejectComplaint(${complaintId})">
+                <span>✗</span>
+                Reject
+              </button>
+              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+                <span>👁️</span>
+                View Details
+              </button>
+            `;
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -2148,22 +2201,7 @@
           <td>${reportedAt}</td>
           <td>${statusBadge}</td>
           <td>
-            <button class="btn btn-success" title="${escapeHtml(verifyTitle)}" onclick="verifyComplaint(${complaintId})" ${verifyDisabled}>
-              <span>✓</span>
-              Verify
-            </button>
-            <button class="btn btn-danger" title="${escapeHtml(rejectTitle)}" onclick="rejectComplaint(${complaintId})" ${rejectDisabled}>
-              <span>✗</span>
-              Reject
-            </button>
-            <button class="btn btn-secondary" title="${escapeHtml(escalateTitle)}" onclick="escalateToCrime(${complaintId})" ${escalateDisabled}>
-              <span>📋</span>
-              Escalate to Crime
-            </button>
-            <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
-              <span>👁️</span>
-              View Details
-            </button>
+            ${actionButtons}
           </td>
         `;
 
@@ -2673,6 +2711,416 @@
         `;
         tbody.appendChild(row);
       });
+    }
+
+    function formatEmergencySeverity(severity) {
+      const raw = (severity || 'Medium').toString().trim();
+      const normalized = raw.toLowerCase();
+      const classMap = {
+        'low': 'danger-low',
+        'medium': 'danger-medium',
+        'moderate': 'danger-medium',
+        'high': 'danger-high',
+        'critical': 'danger-extreme'
+      };
+      const className = classMap[normalized] || 'danger-medium';
+      const label = raw.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+      return { className, label };
+    }
+
+    function resolveEmergencyMetadata(record) {
+      if (!record || record.metadata === null || record.metadata === undefined) {
+        return {};
+      }
+      if (typeof record.metadata === 'string') {
+        const parsed = parseMaybeJson(record.metadata);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      }
+      if (typeof record.metadata === 'object') {
+        return record.metadata;
+      }
+      return {};
+    }
+
+    function formatEmergencyLocation(record) {
+      const metadata = resolveEmergencyMetadata(record);
+      const locationParts = [];
+      const label = (record.location_label || '').toString().trim();
+      if (label) {
+        locationParts.push(label);
+      }
+      const metadataHints = [
+        metadata.exact_address,
+        metadata.address,
+        metadata.street,
+        metadata.road,
+        metadata.neighborhood,
+        metadata.area,
+        metadata.city,
+        metadata.district,
+        metadata.administrative_area,
+        metadata.nearest_landmark,
+        metadata.landmark,
+        metadata.additional_info,
+        metadata.notes
+      ];
+      metadataHints.forEach(value => {
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed && !locationParts.includes(trimmed)) {
+            locationParts.push(trimmed);
+          }
+        }
+      });
+
+      let baseText = locationParts.length ? locationParts[0] : 'Unknown location';
+      const lat = Number(record.latitude);
+      const lng = Number(record.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        baseText += ` (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      }
+
+      return baseText;
+    }
+
+    function formatEmergencyUserLabel(record) {
+      const snapshot = record && record.user_snapshot && typeof record.user_snapshot === 'object'
+        ? record.user_snapshot
+        : {};
+      const nameCandidates = [
+        snapshot.full_name,
+        snapshot.name,
+        snapshot.display_name,
+        snapshot.username
+      ].filter(value => typeof value === 'string' && value.trim());
+      let label = nameCandidates.length ? nameCandidates[0].trim() : '';
+      const userId = Number(record && record.user_id);
+      if (Number.isFinite(userId) && userId > 0) {
+        const idDisplay = `#${String(userId).padStart(3, '0')}`;
+        label = label ? `${label} · ${idDisplay}` : `User ${idDisplay}`;
+      }
+      return label || 'Unknown user';
+    }
+
+    function getEmergencyContactDetails(record) {
+      const snapshot = record && record.user_snapshot && typeof record.user_snapshot === 'object'
+        ? record.user_snapshot
+        : {};
+      const phoneKeys = ['phone', 'phone_number', 'contact_phone', 'mobile', 'primary_phone'];
+      const emailKeys = ['email', 'contact_email', 'primary_email'];
+      const phone = phoneKeys
+        .map(key => snapshot[key])
+        .find(value => typeof value === 'string' && value.trim());
+      const email = emailKeys
+        .map(key => snapshot[key])
+        .find(value => typeof value === 'string' && value.trim());
+      return {
+        phone: phone ? phone.trim() : '',
+        email: email ? email.trim() : ''
+      };
+    }
+
+    function formatEmergencyMetadataValue(value) {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      if (typeof value === 'string') {
+        return value.trim();
+      }
+      if (Array.isArray(value)) {
+        return value
+          .map(item => formatEmergencyMetadataValue(item))
+          .filter(Boolean)
+          .join(', ');
+      }
+      if (typeof value === 'object') {
+        return Object.entries(value)
+          .map(([key, val]) => `${key.replace(/[_-]/g, ' ')}: ${formatEmergencyMetadataValue(val)}`)
+          .filter(Boolean)
+          .join('; ');
+      }
+      return value.toString();
+    }
+
+    function formatEmergencyMetadataBlock(metadata) {
+      const entries = Object.entries(metadata || {})
+        .filter(([, value]) => value !== null && value !== undefined && value !== '' && !(typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length));
+      if (!entries.length) {
+        return '';
+      }
+      const listItems = entries
+        .map(([key, value]) => {
+          const label = key.replace(/[_-]/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+          const displayValue = formatEmergencyMetadataValue(value) || 'Provided';
+          return `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(displayValue)}</li>`;
+        })
+        .join('');
+      return `
+        <div class="stats-insights">
+          <h4>Additional Details</h4>
+          <ul>${listItems}</ul>
+        </div>
+      `;
+    }
+
+    function renderEmergencyRows(alerts, tbody) {
+      const dataset = Array.isArray(alerts) ? alerts : [];
+
+      if (!dataset.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No emergency alerts at this time.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      dataset.forEach(alert => {
+        const alertId = Number(alert.alert_id ?? alert.id);
+        const displayId = Number.isFinite(alertId) ? `EMG-${String(alertId).padStart(4, '0')}` : 'N/A';
+        const severityInfo = formatEmergencySeverity(alert.severity);
+        const statusInfo = normalizeStatus(alert.status || 'New');
+        const locationText = formatEmergencyLocation(alert);
+        const shortenedLocation = locationText.length > 80 ? `${locationText.slice(0, 77)}…` : locationText;
+        const userLabel = formatEmergencyUserLabel(alert);
+        const contactDetails = getEmergencyContactDetails(alert);
+        const contactParts = [];
+        if (contactDetails.phone) {
+          contactParts.push(escapeHtml(contactDetails.phone));
+        }
+        if (contactDetails.email) {
+          contactParts.push(escapeHtml(contactDetails.email));
+        }
+        const contactDisplay = contactParts.length ? contactParts.join(' · ') : 'Not provided';
+        const reportedAt = formatDateTimeDisplay(alert.created_at);
+        const statusRaw = (alert.status || '').toString().trim().toLowerCase();
+        const canAssign = statusRaw !== 'dispatched' && statusRaw !== 'resolved';
+        const assignLabel = alert.assigned_officer_id ? 'Reassign' : 'Assign';
+        const assignmentNote = alert.assigned_officer_id
+          ? `<div style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.75rem;">Officer #${escapeHtml(String(alert.assigned_officer_id).padStart(3, '0'))}</div>`
+          : '';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${escapeHtml(displayId)}</td>
+          <td>${escapeHtml(userLabel)}</td>
+          <td>${contactDisplay}</td>
+          <td title="${escapeHtml(locationText)}">${escapeHtml(shortenedLocation)}</td>
+          <td><span class="danger-badge ${severityInfo.className}">${escapeHtml(severityInfo.label)}</span></td>
+          <td>
+            <span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>
+            ${assignmentNote}
+          </td>
+          <td>${escapeHtml(reportedAt)}</td>
+          <td>
+            ${Number.isFinite(alertId)
+              ? `
+                <button class="action-btn" data-action="view-emergency" data-alert-id="${alertId}">
+                  <span>👁️</span>
+                  View
+                </button>
+                <button class="action-btn" data-action="assign-emergency" data-alert-id="${alertId}" ${canAssign ? '' : 'disabled'}>
+                  <span>🚔</span>
+                  ${assignLabel}
+                </button>
+              `
+              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function openEmergencyAssignModal(alertId) {
+      const numericId = Number(alertId);
+      if (!Number.isFinite(numericId) || numericId <= 0 || !emergencyAlertsCache.has(numericId)) {
+        showAlert('Emergency alert not found.');
+        return;
+      }
+
+      const record = emergencyAlertsCache.get(numericId);
+      const severityInfo = formatEmergencySeverity(record.severity);
+      const statusInfo = normalizeStatus(record.status || 'New');
+      const displayId = `EMG-${String(numericId).padStart(4, '0')}`;
+
+      modalContainer.classList.remove('modal-wide');
+      modalMessage.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.9rem;">
+          <div>
+            <strong>${escapeHtml(displayId)}</strong>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+              ${escapeHtml(formatEmergencyUserLabel(record))}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--text-secondary);">
+            <div>Severity: <span class="danger-badge ${severityInfo.className}" style="font-size:0.7rem;">${escapeHtml(severityInfo.label)}</span></div>
+            <div>Status: <span class="status-badge ${statusInfo.className}" style="font-size:0.7rem;">${escapeHtml(statusInfo.display)}</span></div>
+          </div>
+          <label for="emergency-officer-id" class="form-label" style="margin-bottom:0;">Officer ID</label>
+          <input id="emergency-officer-id" type="number" min="1" class="form-input" placeholder="Enter responding officer ID" value="${record.assigned_officer_id ? escapeHtml(String(record.assigned_officer_id)) : ''}" />
+          <small style="color: var(--text-secondary);">Assign an available officer or detective to coordinate the response.</small>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.add('stacked');
+
+      const submitButton = document.createElement('button');
+      submitButton.className = 'btn btn-primary';
+      submitButton.id = 'emergency-assign-submit';
+      submitButton.textContent = record.assigned_officer_id ? 'Reassign Officer' : 'Assign Officer';
+      submitButton.onclick = () => submitEmergencyAssignment(numericId);
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.onclick = () => closeModal();
+
+      modalButtons.appendChild(submitButton);
+      modalButtons.appendChild(cancelButton);
+
+      modalOverlay.classList.add('show');
+
+      setTimeout(() => {
+        const input = document.getElementById('emergency-officer-id');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 0);
+    }
+
+    async function submitEmergencyAssignment(alertId) {
+      const numericId = Number(alertId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid emergency alert reference.');
+        return;
+      }
+
+      const input = document.getElementById('emergency-officer-id');
+      if (!input) {
+        showAlert('Assignment form is unavailable right now.');
+        return;
+      }
+
+      const officerId = Number(input.value);
+      if (!Number.isFinite(officerId) || officerId <= 0) {
+        showAlert('Enter a valid officer ID before assigning.');
+        return;
+      }
+
+      const submitButton = document.getElementById('emergency-assign-submit');
+      const originalLabel = submitButton ? submitButton.textContent : '';
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Assigning…';
+      }
+
+      try {
+        const response = await fetch(resolveApiUrl(`/api/admin/emergencies/${numericId}/assign`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ officer_id: officerId })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = payload.detail || payload.message || `Request failed with status ${response.status}`;
+          throw new Error(detail);
+        }
+
+        modalButtons.classList.remove('stacked');
+        closeModal();
+        showAlert(`Officer ${officerId} assigned to emergency alert EMG-${String(numericId).padStart(4, '0')}.`);
+        await loadEmergencies();
+      } catch (error) {
+        console.error('Error assigning emergency alert:', error);
+        showAlert(error.message || 'Unable to assign officer right now.');
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = originalLabel || 'Assign Officer';
+        }
+      }
+    }
+
+    function viewEmergencyDetails(alertId) {
+      const numericId = Number(alertId);
+      if (!Number.isFinite(numericId) || numericId <= 0 || !emergencyAlertsCache.has(numericId)) {
+        showAlert('Emergency alert details are unavailable right now.');
+        return;
+      }
+
+      const record = emergencyAlertsCache.get(numericId);
+      const displayId = `EMG-${String(numericId).padStart(4, '0')}`;
+      const severityInfo = formatEmergencySeverity(record.severity);
+      const statusInfo = normalizeStatus(record.status || 'New');
+      const metadata = resolveEmergencyMetadata(record);
+      const contactDetails = getEmergencyContactDetails(record);
+      const contactItems = [
+        contactDetails.phone ? `<li><strong>Phone:</strong> ${escapeHtml(contactDetails.phone)}</li>` : '',
+        contactDetails.email ? `<li><strong>Email:</strong> ${escapeHtml(contactDetails.email)}</li>` : ''
+      ].filter(Boolean).join('');
+      const locationText = formatEmergencyLocation(record);
+      const metadataBlock = formatEmergencyMetadataBlock(metadata);
+      const assignmentSnapshot = record && record.assigned_officer_snapshot && typeof record.assigned_officer_snapshot === 'object'
+        ? record.assigned_officer_snapshot
+        : {};
+
+      modalContainer.classList.add('modal-wide');
+
+      modalMessage.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1.2rem;">
+          <div>
+            <h3 style="margin:0;">${escapeHtml(displayId)}</h3>
+            <p style="margin:0.3rem 0 0;color:var(--text-secondary);">Reported ${escapeHtml(formatDateTimeDisplay(record.created_at))}</p>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+            <span class="danger-badge ${severityInfo.className}" style="font-size:0.75rem;">${escapeHtml(severityInfo.label)}</span>
+            <span class="status-badge ${statusInfo.className}" style="font-size:0.75rem;">${escapeHtml(statusInfo.display)}</span>
+            ${record.linked_crime_id ? `<span style="background: rgba(139, 92, 246, 0.18); color: #c4b5fd; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.75rem;">Linked Crime: CR-${escapeHtml(String(record.linked_crime_id).padStart(3, '0'))}</span>` : ''}
+          </div>
+          <div style="display:grid;gap:1rem;">
+            <div class="stats-insights">
+              <h4>User</h4>
+              <ul>
+                <li><strong>Name:</strong> ${escapeHtml(formatEmergencyUserLabel(record))}</li>
+                ${contactItems || '<li>Contact information not provided.</li>'}
+              </ul>
+            </div>
+            <div class="stats-insights">
+              <h4>Location</h4>
+              <ul>
+                <li>${escapeHtml(locationText)}</li>
+                ${metadata.nearest_landmark ? `<li><strong>Landmark:</strong> ${escapeHtml(metadata.nearest_landmark)}</li>` : ''}
+              </ul>
+            </div>
+            <div class="stats-insights">
+              <h4>Description</h4>
+              <p style="margin:0;">${escapeHtml(record.description || 'No additional description provided.')}</p>
+            </div>
+            ${record.assigned_officer_id ? `
+              <div class="stats-insights">
+                <h4>Assignment</h4>
+                <ul>
+                  <li><strong>Officer ID:</strong> ${escapeHtml(String(record.assigned_officer_id))}</li>
+                  ${assignmentSnapshot.full_name ? `<li><strong>Name:</strong> ${escapeHtml(assignmentSnapshot.full_name)}</li>` : ''}
+                  ${assignmentSnapshot.role_hint ? `<li><strong>Role:</strong> ${escapeHtml(assignmentSnapshot.role_hint)}</li>` : ''}
+                  ${record.assigned_at ? `<li><strong>Assigned At:</strong> ${escapeHtml(formatDateTimeDisplay(record.assigned_at))}</li>` : ''}
+                </ul>
+              </div>
+            ` : ''}
+            ${metadataBlock}
+          </div>
+        </div>
+      `;
+
+      modalButtons.innerHTML = '';
+      modalButtons.classList.remove('stacked');
+      const okButton = document.createElement('button');
+      okButton.className = 'btn btn-primary';
+      okButton.textContent = 'Close';
+      okButton.onclick = () => closeModal();
+      modalButtons.appendChild(okButton);
+      modalOverlay.classList.add('show');
     }
 
     function viewPoliceStation(stationId) {
@@ -3337,6 +3785,8 @@
         loadCaseAssignments();
       } else if (tabName === 'analytics') {
         loadAnalytics();
+      } else if (tabName === 'emergency') {
+        loadEmergencies();
       }
       // Auto-scroll chat when opening chat tab
       if (tabName === 'chat') {
@@ -3632,44 +4082,96 @@
     // Load case assignments
     async function loadCaseAssignments() {
       const tbody = document.getElementById('assignments-table');
+      if (!tbody) {
+        return;
+      }
+
       tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading case assignments...</td></tr>';
+
       try {
-        // --- MOCK DATA SIMULATION ---
-        await new Promise(resolve => setTimeout(resolve, 300)); 
-        const result = { success: true, assignments: assignmentsData };
-        // --- END MOCK DATA SIMULATION ---
-        
-        if (result.success) {
-          tbody.innerHTML = ''; // Clear existing rows
-          
-          result.assignments.forEach(assignment => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>ASSIGN-${assignment.assignment_id.toString().padStart(3, '0')}</td>
-              <td>CRIME-${assignment.crime_id.toString().padStart(3, '0')}</td>
-              <td>${assignment.full_name || assignment.username || 'Unassigned'}</td>
-              <td>${assignment.duty_role}</td>
-              <td>${new Date(assignment.assigned_at).toLocaleString()}</td>
-              <td><span class="status-badge status-${assignment.status.replace('_', '-')}">${assignment.status.replace('_', ' ')}</span></td>
-              <td>
-                <button class="btn btn-primary" onclick="updateCaseStatus(${assignment.assignment_id})">
-                  <span>📝</span>
-                  Update Status
-                </button>
-                <button class="btn btn-secondary" onclick="viewStatusHistory(${assignment.crime_id})">
-                  <span>📊</span>
-                  View History
-                </button>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
-        } else {
-             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Failed to load assignments.</td></tr>';
+        const response = await fetch(resolveApiUrl('/api/admin/case-management'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
+
+        const payload = await response.json().catch(() => ({}));
+        const records = Array.isArray(payload.cases) ? payload.cases : [];
+
+        if (!records.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No cases are currently under investigation.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+
+        records.forEach(record => {
+          const assignmentId = Number(record.assignment_id);
+          const crimeId = Number(record.crime_id);
+          const hasAssignment = Number.isFinite(assignmentId) && assignmentId > 0;
+          const canViewHistory = Number.isFinite(crimeId) && crimeId > 0;
+
+          const assignmentLabel = hasAssignment
+            ? `ASSIGN-${String(assignmentId).padStart(3, '0')}`
+            : 'Unassigned';
+          const crimeLabel = Number.isFinite(crimeId)
+            ? `CR-${String(crimeId).padStart(3, '0')}`
+            : 'CR-???';
+
+          const officerName = escapeHtml(record.full_name || record.username || record.email || 'Unassigned');
+          const dutyRole = escapeHtml(record.duty_role || 'Pending assignment');
+          const assignedAtDisplay = record.assigned_at
+            ? escapeHtml(formatDateTimeDisplay(record.assigned_at))
+            : escapeHtml('Not assigned yet');
+
+          const statusSource = record.assignment_status || record.crime_status || 'Pending';
+          const statusInfo = normalizeStatus(statusSource);
+          const statusBadge = `<span class="status-badge ${statusInfo.className}">${escapeHtml(statusInfo.display)}</span>`;
+
+          const updateButton = hasAssignment
+            ? `<button class="btn btn-primary" onclick="updateCaseStatus(${assignmentId})">
+                <span>📝</span>
+                Update Status
+              </button>`
+            : `<button class="btn btn-primary" disabled title="Assign this case before updating status.">
+                <span>📝</span>
+                Update Status
+              </button>`;
+
+          const historyButton = canViewHistory
+            ? `<button class="btn btn-secondary" onclick="viewStatusHistory(${crimeId})">
+                <span>📊</span>
+                View History
+              </button>`
+            : `<button class="btn btn-secondary" disabled title="History unavailable for this record.">
+                <span>📊</span>
+                View History
+              </button>`;
+
+          const caseMeta = record.crime_type
+            ? `<div style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(record.crime_type)}</div>`
+            : '';
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${escapeHtml(assignmentLabel)}</td>
+            <td>
+              ${escapeHtml(crimeLabel)}
+              ${caseMeta}
+            </td>
+            <td>${officerName}</td>
+            <td>${dutyRole}</td>
+            <td>${assignedAtDisplay}</td>
+            <td>${statusBadge}</td>
+            <td>
+              ${updateButton}
+              ${historyButton}
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
       } catch (error) {
-        console.error('Process Error loading case assignments:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">An error occurred while processing assignment data.</td></tr>';
+        console.error('Error loading case assignments:', error);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load case assignments right now.</td></tr>';
       }
     }
 
@@ -4192,6 +4694,58 @@
       }
     }
 
+    async function loadEmergencies() {
+      const tbody = document.getElementById('emergency-table');
+      if (!tbody) {
+        return;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading emergency alerts…</td></tr>';
+
+      try {
+        const response = await fetch(resolveApiUrl('/api/admin/emergencies?limit=100'), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const alerts = Array.isArray(payload.emergencies) ? payload.emergencies : [];
+
+        emergencyAlertsCache.clear();
+        const normalizedAlerts = alerts.map(rawAlert => {
+          const alertId = Number(rawAlert.alert_id ?? rawAlert.id);
+          const userSnapshot = rawAlert.user_snapshot && typeof rawAlert.user_snapshot === 'object'
+            ? rawAlert.user_snapshot
+            : parseMaybeJson(rawAlert.user_snapshot) || {};
+          const officerSnapshot = rawAlert.assigned_officer_snapshot && typeof rawAlert.assigned_officer_snapshot === 'object'
+            ? rawAlert.assigned_officer_snapshot
+            : parseMaybeJson(rawAlert.assigned_officer_snapshot) || null;
+          const metadata = resolveEmergencyMetadata(rawAlert);
+          const normalized = {
+            ...rawAlert,
+            alert_id: Number.isFinite(alertId) ? alertId : rawAlert.alert_id,
+            user_snapshot: userSnapshot,
+            assigned_officer_snapshot: officerSnapshot,
+            metadata
+          };
+          if (Number.isFinite(alertId)) {
+            emergencyAlertsCache.set(alertId, normalized);
+          }
+          return normalized;
+        });
+
+        if (!normalizedAlerts.length) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No emergency alerts at this time.</td></tr>';
+          return;
+        }
+
+        renderEmergencyRows(normalizedAlerts, tbody);
+      } catch (error) {
+        console.error('Error loading emergency alerts:', error);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load emergency alerts right now.</td></tr>';
+      }
+    }
+
     // Load analytics from database
     async function loadAnalytics() {
       const overviewContainer = document.getElementById('analytics-overview');
@@ -4495,6 +5049,33 @@
           viewMissingPerson(missingId);
         } else {
           showAlert('Missing person details are not available for this entry.');
+        }
+        return;
+      }
+
+      const emergencyViewBtn = event.target.closest('[data-action="view-emergency"]');
+      if (emergencyViewBtn) {
+        event.preventDefault();
+        const alertId = Number(emergencyViewBtn.dataset.alertId);
+        if (Number.isFinite(alertId) && alertId > 0) {
+          viewEmergencyDetails(alertId);
+        } else {
+          showAlert('Emergency alert details are not available for this entry.');
+        }
+        return;
+      }
+
+      const emergencyAssignBtn = event.target.closest('[data-action="assign-emergency"]');
+      if (emergencyAssignBtn) {
+        if (emergencyAssignBtn.disabled) {
+          return;
+        }
+        event.preventDefault();
+        const alertId = Number(emergencyAssignBtn.dataset.alertId);
+        if (Number.isFinite(alertId) && alertId > 0) {
+          openEmergencyAssignModal(alertId);
+        } else {
+          showAlert('Emergency alert data is unavailable for assignment.');
         }
         return;
       }

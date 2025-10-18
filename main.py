@@ -165,10 +165,17 @@ class ChatMessage(BaseModel):
     is_admin: Optional[bool] = False
 
 class EmergencyAlert(BaseModel):
-    location: dict
+    user_id: Optional[int] = None
+    location: Optional[Dict[str, Any]] = None
+    address_label: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     alert_type: str
     description: str
     severity: str = "High"
+
+
+class EmergencyAssignment(BaseModel):
+    officer_id: int
 
 class CriminalSighting(BaseModel):
     last_seen_time: str
@@ -738,6 +745,10 @@ async def get_crime_by_id(crime_id: int):
 @app.delete("/api/crimes/{crime_id}")
 async def delete_crime_record(crime_id: int):
     with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM case_assignments WHERE crime_id = :crime_id"),
+            {"crime_id": crime_id}
+        )
         result = conn.execute(
             text("DELETE FROM crime WHERE crime_id = :crime_id"),
             {"crime_id": crime_id}
@@ -1460,55 +1471,327 @@ async def get_user_conversations(user_id: int):
 
 # ==================== EMERGENCY ALERT ENDPOINTS ====================
 
+def ensure_emergency_alerts_table(conn) -> None:
+    """Create the emergency_alerts table if it does not already exist."""
+    conn.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS emergency_alerts (
+            alert_id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NULL,
+            user_snapshot LONGTEXT NULL,
+            linked_crime_id INT NULL,
+            location_label VARCHAR(255) NULL,
+            latitude DECIMAL(10, 7) NULL,
+            longitude DECIMAL(10, 7) NULL,
+            alert_type VARCHAR(100) NOT NULL,
+            severity VARCHAR(50) NOT NULL DEFAULT 'High',
+            description TEXT NULL,
+            metadata LONGTEXT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'New',
+            assigned_officer_id INT NULL,
+            assigned_officer_snapshot LONGTEXT NULL,
+            assigned_at DATETIME NULL,
+            created_at DATETIME NOT NULL,
+            resolved_at DATETIME NULL,
+            INDEX idx_emergency_status (status),
+            INDEX idx_emergency_created_at (created_at)
+        )
+        """
+    ))
+
 @app.post("/api/emergency-alert")
 async def submit_emergency_alert(alert: EmergencyAlert):
-    """Handle panic button and emergency alerts"""
-    with engine.connect() as conn:
+    """Handle panic button and emergency alerts."""
+
+    def coerce_float(value):
         try:
-            # For now, just log the emergency - in production, this would trigger real alerts
-            print(f"🚨 EMERGENCY ALERT: {alert.alert_type} at {alert.location}")
-            
-            # Create emergency crime report
-            emergency_crime = {
-                "location": alert.location,
-                "crime": {
-                    "type": "Emergency",
-                    "description": f"EMERGENCY ALERT: {alert.description}",
-                    "time": datetime.utcnow().isoformat(),
-                    "severity": alert.severity,
-                    "alert_type": alert.alert_type
+            if value is None:
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    try:
+        with engine.begin() as conn:
+            ensure_emergency_alerts_table(conn)
+
+            user_snapshot = None
+            if alert.user_id:
+                user_row = conn.execute(
+                    text("""
+                        SELECT user_id, username, email, role_hint, status
+                        FROM appuser
+                        WHERE user_id = :user_id
+                    """),
+                    {"user_id": alert.user_id}
+                ).mappings().fetchone()
+
+                if not user_row:
+                    raise HTTPException(status_code=404, detail="User not found for panic alert")
+
+                user_snapshot = {
+                    "user_id": user_row["user_id"],
+                    "username": user_row.get("username"),
+                    "email": user_row.get("email"),
+                    "role_hint": user_row.get("role_hint"),
+                    "status": user_row.get("status")
                 }
+
+            location_payload = alert.location or {}
+            if not isinstance(location_payload, dict):
+                try:
+                    location_payload = dict(location_payload)
+                except Exception:
+                    location_payload = {}
+
+            latitude = coerce_float(location_payload.get("latitude") or location_payload.get("lat"))
+            longitude = coerce_float(location_payload.get("longitude") or location_payload.get("lng"))
+            location_label = alert.address_label or location_payload.get("label") or location_payload.get("address")
+
+            emergency_crime_payload = {
+                "type": "Emergency",
+                "description": f"EMERGENCY ALERT: {alert.description}",
+                "time": datetime.utcnow().isoformat(),
+                "severity": alert.severity,
+                "alert_type": alert.alert_type
             }
-            
-            result = conn.execute(
-                text("""
-                    INSERT INTO crime (location_data, crime_data, status, created_at)
-                    VALUES (:location_data, :crime_data, :status, :created_at)
-                """),
+
+            crime_result = conn.execute(
+                text(
+                    """
+                    INSERT INTO crime (location_data, crime_data, status, reporter_id, created_at)
+                    VALUES (:location_data, :crime_data, :status, :reporter_id, :created_at)
+                    """
+                ),
                 {
-                    "location_data": json.dumps(emergency_crime["location"]),
-                    "crime_data": json.dumps(emergency_crime["crime"]),
+                    "location_data": json.dumps(location_payload),
+                    "crime_data": json.dumps(emergency_crime_payload),
                     "status": "Emergency",
+                    "reporter_id": alert.user_id,
                     "created_at": datetime.utcnow()
                 }
             )
-            conn.commit()
-            alert_id = result.lastrowid
-            
-            return {
-                "message": "Emergency alert sent successfully",
-                "alert_id": alert_id,
-                "status": "Emergency services notified"
+            linked_crime_id = crime_result.lastrowid
+
+            metadata_payload = alert.metadata or {}
+            alert_result = conn.execute(
+                text(
+                    """
+                    INSERT INTO emergency_alerts (
+                        user_id,
+                        user_snapshot,
+                        linked_crime_id,
+                        location_label,
+                        latitude,
+                        longitude,
+                        alert_type,
+                        severity,
+                        description,
+                        metadata,
+                        status,
+                        created_at
+                    )
+                    VALUES (
+                        :user_id,
+                        :user_snapshot,
+                        :linked_crime_id,
+                        :location_label,
+                        :latitude,
+                        :longitude,
+                        :alert_type,
+                        :severity,
+                        :description,
+                        :metadata,
+                        :status,
+                        :created_at
+                    )
+                    """
+                ),
+                {
+                    "user_id": alert.user_id,
+                    "user_snapshot": json.dumps(user_snapshot) if user_snapshot else None,
+                    "linked_crime_id": linked_crime_id,
+                    "location_label": location_label,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "description": alert.description,
+                    "metadata": json.dumps(metadata_payload) if metadata_payload else None,
+                    "status": "New",
+                    "created_at": datetime.utcnow()
+                }
+            )
+
+            alert_id = alert_result.lastrowid
+
+        return {
+            "message": "Emergency alert sent successfully",
+            "alert_id": alert_id,
+            "crime_id": linked_crime_id,
+            "status": "Emergency services notified"
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("Error processing emergency alert: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to process emergency alert")
+
+
+@app.get("/api/admin/emergencies")
+async def get_admin_emergencies(status: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=500)):
+    """Retrieve recent emergency alerts with enrichment for the admin dashboard."""
+    with engine.connect() as conn:
+        ensure_emergency_alerts_table(conn)
+
+        params: Dict[str, Any] = {"limit": limit}
+        base_query = (
+            """
+            SELECT alert_id, user_id, user_snapshot, linked_crime_id, location_label,
+                   latitude, longitude, alert_type, severity, description, metadata,
+                   status, assigned_officer_id, assigned_officer_snapshot, assigned_at,
+                   created_at, resolved_at
+            FROM emergency_alerts
+            """
+        )
+
+        if status:
+            base_query += " WHERE LOWER(status) = :status"
+            params["status"] = status.lower()
+
+        base_query += " ORDER BY created_at DESC LIMIT :limit"
+
+        rows = conn.execute(text(base_query), params).mappings().fetchall()
+
+    emergencies = []
+    for row in rows:
+        def decode_json(value):
+            if not value:
+                return None
+            try:
+                return json.loads(value)
+            except Exception:
+                return None
+
+        emergency = {
+            "alert_id": row["alert_id"],
+            "user_id": row["user_id"],
+            "user_snapshot": decode_json(row.get("user_snapshot")),
+            "linked_crime_id": row.get("linked_crime_id"),
+            "location_label": row.get("location_label") or "Unknown location",
+            "latitude": float(row.get("latitude")) if row.get("latitude") is not None else None,
+            "longitude": float(row.get("longitude")) if row.get("longitude") is not None else None,
+            "alert_type": row.get("alert_type"),
+            "severity": row.get("severity"),
+            "description": row.get("description"),
+            "metadata": decode_json(row.get("metadata")) or {},
+            "status": row.get("status"),
+            "assigned_officer_id": row.get("assigned_officer_id"),
+            "assigned_officer_snapshot": decode_json(row.get("assigned_officer_snapshot")),
+            "assigned_at": row.get("assigned_at"),
+            "created_at": row.get("created_at"),
+            "resolved_at": row.get("resolved_at")
+        }
+
+        emergencies.append(emergency)
+
+    return {"emergencies": emergencies}
+
+
+@app.put("/api/admin/emergencies/{alert_id}/assign")
+async def assign_emergency(alert_id: int, assignment: EmergencyAssignment):
+    """Assign an officer to a specific emergency alert."""
+    try:
+        with engine.begin() as conn:
+            ensure_emergency_alerts_table(conn)
+
+            alert_row = conn.execute(
+                text(
+                    """
+                    SELECT alert_id, status, linked_crime_id
+                    FROM emergency_alerts
+                    WHERE alert_id = :alert_id
+                    FOR UPDATE
+                    """
+                ),
+                {"alert_id": alert_id}
+            ).mappings().fetchone()
+
+            if not alert_row:
+                raise HTTPException(status_code=404, detail="Emergency alert not found")
+
+            officer = conn.execute(
+                text(
+                    """
+                    SELECT user_id, username, email, role_hint, status
+                    FROM appuser
+                    WHERE user_id = :user_id
+                """
+                ),
+                {"user_id": assignment.officer_id}
+            ).mappings().fetchone()
+
+            if not officer:
+                raise HTTPException(status_code=404, detail="Officer not found")
+
+            role_hint = (officer.get("role_hint") or "").lower()
+            if role_hint not in {"officer", "detective", "admin"}:
+                raise HTTPException(status_code=400, detail="User is not authorized for emergency response")
+
+            officer_snapshot = {
+                "user_id": officer["user_id"],
+                "username": officer.get("username"),
+                "email": officer.get("email"),
+                "role_hint": officer.get("role_hint"),
+                "status": officer.get("status")
             }
-            
-        except Exception as e:
-            print(f"Error processing emergency alert: {e}")
-            # Still return success for demo
-            return {
-                "message": "Emergency alert sent successfully",
-                "alert_id": 1,
-                "status": "Emergency services notified"
-            }
+
+            conn.execute(
+                text(
+                    """
+                    UPDATE emergency_alerts
+                    SET assigned_officer_id = :officer_id,
+                        assigned_officer_snapshot = :snapshot,
+                        assigned_at = :assigned_at,
+                        status = :status
+                    WHERE alert_id = :alert_id
+                    """
+                ),
+                {
+                    "officer_id": officer["user_id"],
+                    "snapshot": json.dumps(officer_snapshot),
+                    "assigned_at": datetime.utcnow(),
+                    "status": "Dispatched",
+                    "alert_id": alert_id
+                }
+            )
+
+            linked_crime_id = alert_row.get("linked_crime_id")
+            if linked_crime_id:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE crime
+                        SET status = 'Under Investigation', updated_at = :updated_at
+                        WHERE crime_id = :crime_id
+                        """
+                    ),
+                    {
+                        "updated_at": datetime.utcnow(),
+                        "crime_id": linked_crime_id
+                    }
+                )
+
+        return {
+            "message": "Emergency alert assigned successfully",
+            "alert_id": alert_id,
+            "officer_id": assignment.officer_id
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("Failed to assign officer to emergency: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to assign officer to emergency alert")
 
 # ==================== FORM DATA ENDPOINTS ====================
 
@@ -1638,38 +1921,39 @@ async def get_missing_person_statistics():
 
 @app.put("/api/crimes/{crime_id}/status")
 async def update_crime_status(crime_id: int, status_update: StatusUpdate):
-    with engine.connect() as conn:
-        try:
-            # Check if crime exists
-            crime_exists = conn.execute(
-                text("SELECT crime_id FROM crime WHERE crime_id = :crime_id"),
+    try:
+        with engine.begin() as conn:
+            current = conn.execute(
+                text("SELECT crime_id, status FROM crime WHERE crime_id = :crime_id FOR UPDATE"),
                 {"crime_id": crime_id}
-            ).fetchone()
-            
-            if not crime_exists:
+            ).mappings().fetchone()
+
+            if not current:
                 raise HTTPException(status_code=404, detail="Crime not found")
-            
-            # Update crime status
+
             conn.execute(
-                text("""
-                    UPDATE crime 
-                    SET status = :status, updated_at = :updated_at 
+                text(
+                    """
+                    UPDATE crime
+                    SET status = :status, updated_at = :updated_at
                     WHERE crime_id = :crime_id
-                """),
+                    """
+                ),
                 {
                     "status": status_update.new_status,
                     "updated_at": datetime.utcnow(),
                     "crime_id": crime_id
                 }
             )
-            
-            # Insert status history if table exists
+
             try:
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO status_history (crime_id, new_status, notes, changed_by, changed_at)
                         VALUES (:crime_id, :new_status, :notes, :changed_by, :changed_at)
-                    """),
+                        """
+                    ),
                     {
                         "crime_id": crime_id,
                         "new_status": status_update.new_status,
@@ -1678,16 +1962,20 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
                         "changed_at": datetime.utcnow()
                     }
                 )
-            except:
-                pass  # Status history table may not exist yet
-            
-            conn.commit()
-            return {"message": "Crime status updated successfully"}
-        except HTTPException:
-            raise
-        except Exception as e:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to update status: {str(e)}")
+            except Exception:
+                pass
+
+        return {
+            "message": "Crime status updated successfully",
+            "crime_id": crime_id,
+            "previous_status": current["status"],
+            "new_status": status_update.new_status
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("Failed to update crime status: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Failed to update status: {str(exc)}")
 
 # ==================== SEARCH ENDPOINTS ====================
 
@@ -2735,6 +3023,44 @@ async def assign_case_to_officer(assignment: CaseAssignment):
             conn.rollback()
             print(f"Error assigning case: {e}")
             return {"message": "Case assigned successfully"}  # Demo fallback
+
+@app.get("/api/admin/case-management")
+async def get_case_management_cases():
+    """Return crimes under investigation along with assignment details."""
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(
+                text(
+                    """
+                    SELECT
+                        c.crime_id,
+                        c.status AS crime_status,
+                        c.created_at,
+                        c.updated_at,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.crime_data, '$.type')) AS crime_type,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.crime_data, '$.description')) AS crime_description,
+                        JSON_UNQUOTE(JSON_EXTRACT(c.location_data, '$.area_name')) AS area_name,
+                        ca.assignment_id,
+                        ca.user_id,
+                        ca.duty_role,
+                        ca.assigned_at,
+                        ca.status AS assignment_status,
+                        u.username,
+                        u.full_name,
+                        u.email
+                    FROM crime c
+                    LEFT JOIN case_assignments ca ON ca.crime_id = c.crime_id
+                    LEFT JOIN appuser u ON ca.user_id = u.user_id
+                    WHERE LOWER(c.status) IN ('under investigation', 'investigating', 'in progress', 'assigned')
+                    ORDER BY COALESCE(ca.assigned_at, c.updated_at, c.created_at) DESC
+                    """
+                )
+            ).mappings().fetchall()
+
+            return {"cases": [dict(row) for row in result]}
+        except Exception as exc:
+            logging.exception("Error fetching case management cases: %s", exc)
+            return {"cases": []}
 
 @app.get("/api/admin/case-assignments")
 async def get_case_assignments():
