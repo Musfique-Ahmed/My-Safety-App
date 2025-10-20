@@ -3447,6 +3447,56 @@ async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[s
         "crime_id": new_crime_id
     }
 
+
+@app.post("/api/admin/complaints/from-crime/{crime_id}")
+async def convert_crime_to_complaint(crime_id: int):
+    """Create a user_complaints row from an existing crime so it can be verified/rejected via the complaints workflow."""
+    with engine.begin() as conn:
+        crime_row = conn.execute(
+            text(
+                "SELECT crime_id, reporter_id, crime_data, location_data, status, priority_level, created_at FROM crime WHERE crime_id = :crime_id FOR UPDATE"
+            ),
+            {"crime_id": crime_id}
+        ).mappings().fetchone()
+
+        if not crime_row:
+            raise HTTPException(status_code=404, detail="Crime not found")
+
+        # Build complaint_data from crime_data if possible
+        crime_payload = parse_json_value(crime_row.get("crime_data")) or {}
+        location_payload = parse_json_value(crime_row.get("location_data")) or {}
+
+        complaint_data = {
+            "subject": crime_payload.get("type") or crime_payload.get("subject") or "Mapped Crime",
+            "description": crime_payload.get("description") or crime_payload.get("details") or "",
+            "location": location_payload or crime_payload.get("location") or crime_payload.get("location_label")
+        }
+
+        now = datetime.utcnow()
+
+        # Insert into user_complaints
+        insert = conn.execute(
+            text(
+                "INSERT INTO user_complaints (reporter_contact, channel, status, priority, complaint_data, created_at, updated_at) VALUES (:reporter_contact, :channel, :status, :priority, :complaint_data, :created_at, :updated_at)"
+            ),
+            {
+                "reporter_contact": crime_payload.get("reporter_contact") or None,
+                "channel": crime_payload.get("source") or "Mapped",
+                "status": "Pending",
+                "priority": crime_row.get("priority_level") or crime_payload.get("priority") or "Medium",
+                "complaint_data": json.dumps(complaint_data),
+                "created_at": crime_row.get("created_at") or now,
+                "updated_at": now
+            }
+        )
+
+        new_complaint_id = insert.lastrowid
+
+        return {
+            "message": "Converted crime to complaint",
+            "complaint_id": new_complaint_id
+        }
+
 @app.get("/api/admin/case-management")
 async def get_case_management_cases():
     """Return crimes under investigation along with assignment details."""

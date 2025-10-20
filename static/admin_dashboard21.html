@@ -2307,7 +2307,10 @@
 
       records.forEach(record => {
         const complaintId = Number(record.complaint_id ?? record.crime_id);
-        const displayId = Number.isFinite(complaintId) ? `COMP-${String(complaintId).padStart(3, '0')}` : 'COMP-???';
+  const isMappedCrime = (record.source === 'mappedCrime');
+        const displayId = Number.isFinite(complaintId)
+          ? (isMappedCrime ? `CR-${String(complaintId).padStart(3, '0')}` : `COMP-${String(complaintId).padStart(3, '0')}`)
+          : (isMappedCrime ? 'CR-???' : 'COMP-???');
         const statusInfo = normalizeStatus(record.status || 'Pending');
         const statusKey = (record.status || 'Pending').toLowerCase();
         const isPending = statusKey === 'pending';
@@ -2323,7 +2326,35 @@
         const escalateTitle = 'Escalate to case management';
 
         let actionButtons = '';
-        if (isEscalated) {
+        // If this row was mapped from a crime record (not an actual user_complaint),
+        // don't show verify/reject actions which call complaint endpoints that don't exist.
+        if (isMappedCrime) {
+          if (isVerified) {
+            // If the mapped crime is already verified, allow escalation
+            actionButtons = `
+              <button class="btn btn-primary" title="Escalate this verified crime to Escalated status" onclick="escalateCrime(${complaintId})">
+                ⚠️ Escalate
+              </button>
+              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+                <span>👁️</span>
+                View Details
+              </button>
+            `;
+          } else {
+            actionButtons = `
+              <button class="btn btn-success" title="Mark crime as verified" onclick="verifyComplaint(${complaintId})">
+                ✓ Verify
+              </button>
+              <button class="btn btn-danger" title="Reject this crime report" onclick="rejectComplaint(${complaintId})">
+                ✕ Reject
+              </button>
+              <button class="action-btn" onclick="viewComplaintDetails(${complaintId})">
+                <span>👁️</span>
+                View Details
+              </button>
+            `;
+          }
+        } else if (isEscalated) {
           actionButtons = `
             <button class="btn btn-secondary" disabled title="Already escalated to case management.">
               <span>📋</span>
@@ -4268,53 +4299,122 @@
       }
     }
 
-    // Load complaints for verify reports tab
+    // Load complaints for verify reports tab (merge official complaints + recent pending crimes)
     async function loadComplaints() {
       const tbody = document.getElementById('complaints-table');
-      if (!tbody) {
-        return;
-      }
+      if (!tbody) return;
 
       tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading reports…</td></tr>';
 
       try {
-        const response = await fetch(resolveApiUrl('/api/admin/complaints'), { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
+        // Fetch complaints and crime reports (pending + verified) in parallel
+        const [complaintsRes, pendingCrimesRes, verifiedCrimesRes] = await Promise.allSettled([
+          fetch(resolveApiUrl('/api/admin/complaints'), { cache: 'no-store' }),
+          fetch(resolveApiUrl('/api/crimes?status=pending&limit=200'), { cache: 'no-store' }),
+          fetch(resolveApiUrl('/api/crimes?status=verified&limit=200'), { cache: 'no-store' })
+        ]);
+
+        let fetchedComplaints = [];
+        if (complaintsRes.status === 'fulfilled' && complaintsRes.value.ok) {
+          const payload = await complaintsRes.value.json().catch(() => ({}));
+          fetchedComplaints = Array.isArray(payload.complaints) ? payload.complaints : [];
+        } else {
+          console.warn('Complaints endpoint failed or non-OK', complaintsRes);
         }
 
-        const payload = await response.json().catch(() => ({}));
-        const fetchedRecords = Array.isArray(payload.complaints) ? payload.complaints : [];
+        const mapCrimeToRecord = (crime) => {
+          const rawCrimeData = parseMaybeJson(crime.crime_data) || {};
+          const locationPayload = parseMaybeJson(crime.location_data) || crime.location_data;
+          return {
+            complaint_id: Number(crime.crime_id ?? crime.id),
+            reporter_contact: crime.reporter_contact || crime.reporter_id || rawCrimeData.reporter_contact || null,
+            status: (crime.status || rawCrimeData.status || 'pending'),
+            created_at: crime.created_at || rawCrimeData.created_at || crime.incident_time || null,
+            updated_at: crime.updated_at || crime.created_at || rawCrimeData.updated_at || null,
+            complaint_data: {
+              subject: crime.crime_type || rawCrimeData.type || 'Crime report',
+              description: crime.crime_description || rawCrimeData.description || ''
+            },
+            location_data: locationPayload || (crime.area_name ? { area_name: crime.area_name } : null),
+            crime_data: rawCrimeData
+          };
+        };
 
-        const normalized = fetchedRecords.map(raw => {
+        let crimeRecords = [];
+        if (pendingCrimesRes.status === 'fulfilled' && pendingCrimesRes.value.ok) {
+          const payload = await pendingCrimesRes.value.json().catch(() => ({}));
+          const pendingList = Array.isArray(payload.crimes) ? payload.crimes : (Array.isArray(payload) ? payload : []);
+          crimeRecords.push(...pendingList.map(mapCrimeToRecord));
+        } else {
+          console.warn('Pending crimes endpoint failed or non-OK', pendingCrimesRes);
+        }
+
+        if (verifiedCrimesRes.status === 'fulfilled' && verifiedCrimesRes.value.ok) {
+          const payload = await verifiedCrimesRes.value.json().catch(() => ({}));
+          const verifiedList = Array.isArray(payload.crimes) ? payload.crimes : (Array.isArray(payload) ? payload : []);
+          crimeRecords.push(...verifiedList.map(mapCrimeToRecord));
+        } else {
+          console.warn('Verified crimes endpoint failed or non-OK', verifiedCrimesRes);
+        }
+
+        // Merge, dedupe by id (complaints preferred over mapped crimes)
+        const statusPriorityValue = status => {
+          const key = (status || '').toString().toLowerCase();
+          if (key === 'pending') return 0;
+          if (key === 'verified') return 1;
+          if (key === 'escalated') return 2;
+          return -1;
+        };
+
+        const byId = new Map();
+        fetchedComplaints.forEach(rec => {
+          const id = Number(rec.complaint_id ?? rec.crime_id ?? rec.id);
+          if (!Number.isFinite(id)) return;
+          const copy = { ...rec, source: 'complaint' };
+          byId.set(id, copy);
+        });
+        crimeRecords.forEach(rec => {
+          const id = Number(rec.complaint_id ?? rec.crime_id ?? rec.id);
+          if (!Number.isFinite(id)) return;
+          const incoming = { ...rec, source: 'mappedCrime' };
+          const existing = byId.get(id);
+          if (!existing) {
+            byId.set(id, incoming);
+            return;
+          }
+          if (existing.source === 'mappedCrime') {
+            const existingRank = statusPriorityValue(existing.status);
+            const incomingRank = statusPriorityValue(incoming.status);
+            if (incomingRank >= existingRank) {
+              byId.set(id, incoming);
+            }
+          }
+        });
+
+        const merged = Array.from(byId.values()).map(raw => {
           const record = { ...raw };
           const complaintId = Number(record.complaint_id ?? record.crime_id);
           record.complaint_id = complaintId;
           record.status = (record.status || 'Pending').toString();
-          record.created_at = record.created_at || record.reported_at;
+          record.created_at = record.created_at || record.reported_at || null;
           record.updated_at = record.updated_at || record.created_at;
-
-          const parsedComplaint = parseMaybeJson(record.complaint_data) || {};
-          record.complaint_data = parsedComplaint;
-
+          record.complaint_data = parseMaybeJson(record.complaint_data) || (typeof record.complaint_data === 'object' ? record.complaint_data : {});
           if (!record.crime_data || typeof record.crime_data !== 'object') {
             record.crime_data = {
-              type: parsedComplaint.subject || parsedComplaint.type || 'User Complaint',
-              description: parsedComplaint.description || parsedComplaint.details || '',
-              reporter_contact: record.reporter_contact || parsedComplaint.reporter_contact || ''
+              type: record.complaint_data.subject || record.complaint_data.type || 'User Complaint',
+              description: record.complaint_data.description || record.complaint_data.details || '',
+              reporter_contact: record.reporter_contact || record.complaint_data.reporter_contact || ''
             };
           }
-
           if (!record.location_data) {
-            const locationHint = parsedComplaint.location || parsedComplaint.address || parsedComplaint.area || parsedComplaint.location_label;
+            const locationHint = record.complaint_data.location || record.complaint_data.address || record.location_data?.area_name;
             record.location_data = locationHint ? { area_name: locationHint } : null;
           }
-
           return record;
         });
 
         const relevantStatuses = new Set(['pending', 'verified', 'escalated']);
-        const filtered = normalized.filter(record => relevantStatuses.has((record.status || 'Pending').toLowerCase()));
+        const filtered = merged.filter(record => relevantStatuses.has((record.status || 'Pending').toLowerCase()));
 
         filtered.sort((a, b) => {
           const statusPriority = status => {
@@ -4325,9 +4425,7 @@
             return 3;
           };
           const priorityDiff = statusPriority(a.status) - statusPriority(b.status);
-          if (priorityDiff !== 0) {
-            return priorityDiff;
-          }
+          if (priorityDiff !== 0) return priorityDiff;
           const aDate = new Date(a.updated_at || a.created_at || 0).getTime();
           const bDate = new Date(b.updated_at || b.created_at || 0).getTime();
           return bDate - aDate;
@@ -4337,9 +4435,7 @@
         complaintsCache.clear();
         filtered.forEach(record => {
           const id = Number(record.complaint_id ?? record.crime_id);
-          if (Number.isFinite(id)) {
-            complaintsCache.set(id, record);
-          }
+          if (Number.isFinite(id)) complaintsCache.set(id, record);
         });
 
         renderComplaintsTable(filtered, tbody);
@@ -4458,8 +4554,25 @@
         return;
       }
 
-      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
       const record = complaintsCache.get(numericId);
+      const isMappedCrime = record && record.source === 'mappedCrime';
+      const displayId = `${isMappedCrime ? 'CR' : 'COMP'}-${String(numericId).padStart(3, '0')}`;
+      // If this row was mapped from a pending crime, use the crime status API instead
+      if (record && record.source === 'mappedCrime') {
+        const confirmed = await new Promise(res => showConfirm(`Verify ${displayId}? This will mark the crime as verified.`, r => res(r)));
+        if (!confirmed) return;
+        try {
+          await updateCrimeStatus(numericId, 'Verified', 'Verified via admin dashboard');
+          showAlert(`${displayId} marked as Verified.`);
+          await loadComplaints();
+          return;
+        } catch (err) {
+          console.error('Error verifying mapped crime:', err);
+          showAlert(`Unable to verify ${displayId}: ${err.message || 'Unknown error'}`);
+          return;
+        }
+      }
+
       if (record && (record.status || '').toLowerCase() === 'verified') {
         showAlert(`${displayId} is already verified.`);
         return;
@@ -4495,6 +4608,8 @@
       });
     }
 
+    /* conversion helper removed — mapped crimes are now verified/rejected directly via crime status API */
+
     async function rejectComplaint(complaintId) {
       const numericId = Number(complaintId);
       if (!Number.isFinite(numericId) || numericId <= 0) {
@@ -4502,8 +4617,9 @@
         return;
       }
 
-      const displayId = `COMP-${String(numericId).padStart(3, '0')}`;
       const record = complaintsCache.get(numericId);
+      const isMappedCrime = record && record.source === 'mappedCrime';
+      const displayId = `${isMappedCrime ? 'CR' : 'COMP'}-${String(numericId).padStart(3, '0')}`;
       if (!record) {
         showAlert(`Unable to locate ${displayId}. Please reload the reports list.`);
         return;
@@ -4521,27 +4637,68 @@
         }
 
         try {
-          const response = await fetch(resolveApiUrl(`/api/admin/complaints/${numericId}/reject`), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              notes: 'Rejected via admin dashboard',
-              rejected_by: CURRENT_ADMIN_ID
-            })
-          });
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            const message = payload.detail || payload.message || 'Failed to reject the complaint.';
-            throw new Error(message);
+          if (record.source === 'mappedCrime') {
+            // Use crime status API to mark as Rejected
+            await updateCrimeStatus(numericId, 'Rejected', 'Rejected via admin dashboard');
+            showAlert(`${displayId} has been rejected and removed.`);
+          } else {
+            const response = await fetch(resolveApiUrl(`/api/admin/complaints/${numericId}/reject`), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                notes: 'Rejected via admin dashboard',
+                rejected_by: CURRENT_ADMIN_ID
+              })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              const message = payload.detail || payload.message || 'Failed to reject the complaint.';
+              throw new Error(message);
+            }
+            showAlert(`${displayId} has been rejected and removed.`);
           }
 
-          showAlert(`${displayId} has been rejected and removed.`);
           await loadComplaints();
         } catch (error) {
           console.error('Error rejecting complaint:', error);
           showAlert(`Unable to reject ${displayId}: ${error.message || 'Unknown error'}`);
         }
       });
+    }
+
+    // Helper: update a crime's status via the crimes status endpoint
+    async function updateCrimeStatus(crimeId, newStatus, notes = '') {
+      const resp = await fetch(resolveApiUrl(`/api/crimes/${crimeId}/status`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_status: newStatus, notes: notes, changed_by: CURRENT_ADMIN_ID })
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(body.detail || body.message || 'Failed to update crime status');
+      }
+      return body;
+    }
+
+    // Escalate a crime to 'Escalated' status
+    async function escalateCrime(crimeId) {
+      const numericId = Number(crimeId);
+      if (!Number.isFinite(numericId) || numericId <= 0) {
+        showAlert('Invalid crime reference.');
+        return;
+      }
+      const confirmed = await new Promise(res => showConfirm(`Escalate CR-${String(numericId).padStart(3,'0')} to case management?`, r => res(r)));
+      if (!confirmed) return;
+      try {
+        await updateCrimeStatus(numericId, 'Escalated', 'Escalated via admin dashboard');
+        showAlert(`CR-${String(numericId).padStart(3,'0')} is now Escalated.`);
+        await loadComplaints();
+        await loadCaseAssignments();
+        showTab('case-management');
+      } catch (err) {
+        console.error('Failed to escalate crime:', err);
+        showAlert(`Unable to escalate CR-${String(numericId).padStart(3,'0')}: ${err.message || 'Unknown error'}`);
+      }
     }
 
     async function escalateToCrime(complaintId) {
