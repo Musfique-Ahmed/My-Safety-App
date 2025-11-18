@@ -276,7 +276,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you need help or have questions:
 - Create an issue on GitHub
-- Contact: your-email@example.com
+- Contact: anikmushfik@gmail.com
 - API Documentation: http://localhost:8000/docs
 
 ## 🙏 Acknowledgments
