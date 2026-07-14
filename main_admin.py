@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from db import fetch_all, fetch_one, execute, parse_json_field, insert_and_get_id
+from auth import require_admin  # JWT bearer-token admin guard for /api/admin/* routes
 
 
 app = FastAPI(title="My Safety App API")
@@ -30,7 +31,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
-def root():
+def root(_user: dict = Depends(require_admin)):
     return {"message": "My Safety App API running"}
 
 
@@ -54,7 +55,7 @@ def _parse_json_fields(rows: list[dict], keys: list[str]) -> list[dict]:
 
 
 @app.get("/api/crimes")
-def get_crimes():
+def get_crimes(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT crime_id, status, crime_data, location_data "
         "FROM crime ORDER BY created_at DESC LIMIT 200"
@@ -74,7 +75,7 @@ def get_crimes():
 
 
 @app.get("/api/admin/users")
-def get_users():
+def get_users(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT user_id, username, email, role_hint, status, created_at "
         "FROM appuser ORDER BY created_at DESC LIMIT 200"
@@ -83,7 +84,7 @@ def get_users():
 
 
 @app.get("/api/admin/wanted-criminals")
-def get_wanted_criminals():
+def get_wanted_criminals(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT criminal_id, name, alias, crimes_committed, danger_level, reward_amount, status "
         "FROM wanted_criminal ORDER BY created_at DESC LIMIT 200"
@@ -92,7 +93,7 @@ def get_wanted_criminals():
 
 
 @app.get("/api/admin/police-stations")
-def get_police_stations():
+def get_police_stations(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT station_id, station_name, station_code, address, phone, email, jurisdiction_area "
         "FROM police_station ORDER BY station_name"
@@ -101,7 +102,7 @@ def get_police_stations():
 
 
 @app.get("/api/admin/missing-persons")
-def get_missing_persons():
+def get_missing_persons(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT missing_id, name, age, gender, last_seen_location, last_seen_date, status "
         "FROM missing_person ORDER BY updated_at DESC LIMIT 200"
@@ -114,7 +115,7 @@ def get_missing_persons():
 
 
 @app.get("/api/admin/complaints")
-def get_complaints():
+def get_complaints(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT complaint_id, reporter_contact, channel, status, created_at "
         "FROM user_complaints ORDER BY created_at DESC LIMIT 200"
@@ -128,7 +129,7 @@ def get_complaints():
 
 
 @app.post("/api/admin/complaints/{complaint_id}/verify")
-def verify_complaint(complaint_id: int):
+def verify_complaint(complaint_id: int, _user: dict = Depends(require_admin)):
     rowcount = execute(
         "UPDATE user_complaints SET status='Verified', updated_at=NOW() WHERE complaint_id=%s",
         (complaint_id,),
@@ -139,7 +140,7 @@ def verify_complaint(complaint_id: int):
 
 
 @app.post("/api/admin/complaints/{complaint_id}/reject")
-def reject_complaint(complaint_id: int):
+def reject_complaint(complaint_id: int, _user: dict = Depends(require_admin)):
     rowcount = execute(
         "UPDATE user_complaints SET status='Rejected', updated_at=NOW() WHERE complaint_id=%s",
         (complaint_id,),
@@ -150,7 +151,7 @@ def reject_complaint(complaint_id: int):
 
 
 @app.get("/api/admin/case-assignments")
-def get_case_assignments():
+def get_case_assignments(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT ca.assignment_id, ca.crime_id, ca.duty_role, ca.assigned_at, ca.status, "
         "       u.full_name, u.username "
@@ -165,7 +166,7 @@ def get_case_assignments():
 
 
 @app.get("/api/admin/analytics")
-def get_analytics():
+def get_analytics(_user: dict = Depends(require_admin)):
     total_crimes = fetch_one("SELECT COUNT(*) AS c FROM crime")["c"]
     pending_crimes = fetch_one(
         "SELECT COUNT(*) AS c FROM crime WHERE status IN ('Pending','Under Investigation','Emergency')"
@@ -193,7 +194,7 @@ def get_analytics():
 # ---------------- Additional datasets (read-only) ----------------
 
 @app.get("/api/admin/activity-log")
-def get_activity_log():
+def get_activity_log(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT log_id, activity_type, item_id, details, performed_by, created_at "
         "FROM activity_log ORDER BY created_at DESC LIMIT 200"
@@ -203,7 +204,7 @@ def get_activity_log():
 
 
 @app.get("/api/admin/admin-activity-log")
-def get_admin_activity_log():
+def get_admin_activity_log(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT log_id, admin_id, action_type, target_table, target_id, action_details, ip_address, user_agent, created_at "
         "FROM admin_activity_log ORDER BY created_at DESC LIMIT 200"
@@ -213,7 +214,7 @@ def get_admin_activity_log():
 
 
 @app.get("/api/admin/api-logs")
-def get_api_logs():
+def get_api_logs(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT log_id, endpoint, method, user_id, ip_address, request_data, response_status, response_time_ms, error_message, created_at "
         "FROM api_logs ORDER BY created_at DESC LIMIT 200"
@@ -223,7 +224,7 @@ def get_api_logs():
 
 
 @app.get("/api/admin/appusers")
-def get_appusers():
+def get_appusers(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT user_id, username, email, full_name, phone, address, role_hint, status, station_id, profile_picture_url, date_of_birth, gender, emergency_contact, created_at, updated_at, last_login "
         "FROM appuser ORDER BY created_at DESC LIMIT 200"
@@ -232,7 +233,7 @@ def get_appusers():
 
 
 @app.get("/api/admin/chat-messages")
-def get_chat_messages():
+def get_chat_messages(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT message_id, user_id, message, report_id, is_admin, read_by_admin, read_by_user, created_at "
         "FROM chat_messages ORDER BY created_at DESC LIMIT 200"
@@ -241,7 +242,7 @@ def get_chat_messages():
 
 
 @app.get("/api/admin/complaints-legacy")
-def get_complaints_legacy():
+def get_complaints_legacy(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT complaint_id, reporter_contact, complaint_text, channel, status, verified_by, created_at, verified_at "
         "FROM complaints ORDER BY created_at DESC LIMIT 200"
@@ -250,7 +251,7 @@ def get_complaints_legacy():
 
 
 @app.get("/api/admin/criminal-sightings")
-def get_criminal_sightings():
+def get_criminal_sightings(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT sighting_id, criminal_id, last_seen_time, last_seen_location, still_with_finder, reporter_contact, verified, created_at "
         "FROM criminal_sightings ORDER BY created_at DESC LIMIT 200"
@@ -259,7 +260,7 @@ def get_criminal_sightings():
 
 
 @app.get("/api/admin/evidence-files")
-def get_evidence_files():
+def get_evidence_files(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT file_id, crime_id, file_name, file_path, file_type, file_size, uploaded_by, description, created_at "
         "FROM evidence_files ORDER BY created_at DESC LIMIT 200"
@@ -268,7 +269,7 @@ def get_evidence_files():
 
 
 @app.get("/api/admin/file-uploads")
-def get_file_uploads():
+def get_file_uploads(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT upload_id, original_filename, stored_filename, file_path, file_type, file_size, uploaded_by, related_table, related_id, upload_purpose, created_at "
         "FROM file_uploads ORDER BY created_at DESC LIMIT 200"
@@ -277,7 +278,7 @@ def get_file_uploads():
 
 
 @app.get("/api/admin/notifications")
-def get_notifications():
+def get_notifications(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT notification_id, user_id, title, message, type, is_read, related_table, related_id, created_at "
         "FROM notifications ORDER BY created_at DESC LIMIT 200"
@@ -286,7 +287,7 @@ def get_notifications():
 
 
 @app.get("/api/admin/status-history")
-def get_status_history():
+def get_status_history(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT history_id, crime_id, new_status, notes, changed_by, changed_at "
         "FROM status_history ORDER BY changed_at DESC LIMIT 200"
@@ -295,7 +296,7 @@ def get_status_history():
 
 
 @app.get("/api/admin/system-settings")
-def get_system_settings():
+def get_system_settings(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT setting_id, setting_key, setting_value, setting_type, description, is_public, updated_by, created_at, updated_at "
         "FROM system_settings ORDER BY setting_key LIMIT 500"
@@ -304,7 +305,7 @@ def get_system_settings():
 
 
 @app.get("/api/admin/user-complaints")
-def get_user_complaints():
+def get_user_complaints(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT complaint_id, reporter_contact, complaint_data, channel, status, priority, assigned_to, verification_notes, created_at, updated_at "
         "FROM user_complaints ORDER BY created_at DESC LIMIT 200"
@@ -317,7 +318,7 @@ def get_user_complaints():
 
 
 @app.get("/api/admin/user-sessions")
-def get_user_sessions():
+def get_user_sessions(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT session_id, user_id, login_time, logout_time, ip_address, user_agent, is_active, expires_at "
         "FROM user_sessions ORDER BY login_time DESC LIMIT 200"
@@ -326,7 +327,7 @@ def get_user_sessions():
 
 
 @app.get("/api/admin/active-cases")
-def get_active_cases_view():
+def get_active_cases_view(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT crime_id, reporter_id, reporter_name, crime_type, city, area, status, priority_level, incident_date, created_at "
         "FROM active_cases ORDER BY created_at DESC LIMIT 200"
@@ -335,7 +336,7 @@ def get_active_cases_view():
 
 
 @app.get("/api/admin/officer-workload")
-def get_officer_workload_view():
+def get_officer_workload_view(_user: dict = Depends(require_admin)):
     sql = (
         "SELECT user_id, full_name, role_hint, station_name, active_assignments "
         "FROM officer_workload ORDER BY active_assignments DESC, full_name LIMIT 200"
@@ -588,14 +589,21 @@ class WantedCriminal(Base):
 
 # --- CRUD for ActivityLog Table ---
 @app.get("/activity_log/{log_id}")
-def read_activity_log(log_id: int, db: Session = Depends(get_db)):
+def read_activity_log(log_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_log = db.query(ActivityLog).filter(ActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Activity log not found")
     return db_log
 
 @app.post("/activity_log/")
-def create_activity_log(activity_type: str, item_id: int, details: str, performed_by: int, db: Session = Depends(get_db)):
+def create_activity_log(
+    activity_type: str,
+    item_id: int,
+    details: str,
+    performed_by: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_activity_log = ActivityLog(
         activity_type=activity_type, item_id=item_id, details=details, performed_by=performed_by
     )
@@ -605,7 +613,13 @@ def create_activity_log(activity_type: str, item_id: int, details: str, performe
     return db_activity_log
 
 @app.put("/activity_log/{log_id}")
-def update_activity_log(log_id: int, activity_type: str, details: str, db: Session = Depends(get_db)):
+def update_activity_log(
+    log_id: int,
+    activity_type: str,
+    details: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_log = db.query(ActivityLog).filter(ActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Activity log not found")
@@ -617,7 +631,7 @@ def update_activity_log(log_id: int, activity_type: str, details: str, db: Sessi
     return db_log
 
 @app.delete("/activity_log/{log_id}")
-def delete_activity_log(log_id: int, db: Session = Depends(get_db)):
+def delete_activity_log(log_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_log = db.query(ActivityLog).filter(ActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Activity log not found")
@@ -629,14 +643,22 @@ def delete_activity_log(log_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for AdminActivityLog Table ---
 @app.get("/admin_activity_log/{log_id}")
-def read_admin_activity_log(log_id: int, db: Session = Depends(get_db)):
+def read_admin_activity_log(log_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_log = db.query(AdminActivityLog).filter(AdminActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Admin activity log not found")
     return db_log
 
 @app.post("/admin_activity_log/")
-def create_admin_activity_log(admin_id: int, action_type: str, target_table: str, target_id: int, action_details: str, db: Session = Depends(get_db)):
+def create_admin_activity_log(
+    admin_id: int,
+    action_type: str,
+    target_table: str,
+    target_id: int,
+    action_details: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_admin_log = AdminActivityLog(
         admin_id=admin_id, action_type=action_type, target_table=target_table, target_id=target_id, action_details=action_details
     )
@@ -646,7 +668,13 @@ def create_admin_activity_log(admin_id: int, action_type: str, target_table: str
     return db_admin_log
 
 @app.put("/admin_activity_log/{log_id}")
-def update_admin_activity_log(log_id: int, action_type: str, action_details: str, db: Session = Depends(get_db)):
+def update_admin_activity_log(
+    log_id: int,
+    action_type: str,
+    action_details: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_log = db.query(AdminActivityLog).filter(AdminActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Admin activity log not found")
@@ -658,7 +686,11 @@ def update_admin_activity_log(log_id: int, action_type: str, action_details: str
     return db_log
 
 @app.delete("/admin_activity_log/{log_id}")
-def delete_admin_activity_log(log_id: int, db: Session = Depends(get_db)):
+def delete_admin_activity_log(
+    log_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_log = db.query(AdminActivityLog).filter(AdminActivityLog.log_id == log_id).first()
     if db_log is None:
         raise HTTPException(status_code=404, detail="Admin activity log not found")
@@ -670,14 +702,18 @@ def delete_admin_activity_log(log_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for CaseAssignments Table ---
 @app.get("/case_assignments/{assignment_id}")
-def read_case_assignment(assignment_id: int, db: Session = Depends(get_db)):
+def read_case_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_assignment = db.query(CaseAssignments).filter(CaseAssignments.assignment_id == assignment_id).first()
     if db_assignment is None:
         raise HTTPException(status_code=404, detail="Case assignment not found")
     return db_assignment
 
 @app.post("/case_assignments/")
-def create_case_assignment(data: CaseAssignmentCreate):
+def create_case_assignment(data: CaseAssignmentCreate, _user: dict = Depends(require_admin)):
     assignment_id = insert_and_get_id(
         """
         INSERT INTO case_assignments (user_id, crime_id, duty_role)
@@ -688,7 +724,13 @@ def create_case_assignment(data: CaseAssignmentCreate):
     return {"success": True, "assignment_id": assignment_id}
 
 @app.put("/case_assignments/{assignment_id}")
-def update_case_assignment(assignment_id: int, status: str, notes: str, db: Session = Depends(get_db)):
+def update_case_assignment(
+    assignment_id: int,
+    status: str,
+    notes: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_assignment = db.query(CaseAssignments).filter(CaseAssignments.assignment_id == assignment_id).first()
     if db_assignment is None:
         raise HTTPException(status_code=404, detail="Case assignment not found")
@@ -700,7 +742,11 @@ def update_case_assignment(assignment_id: int, status: str, notes: str, db: Sess
     return db_assignment
 
 @app.delete("/case_assignments/{assignment_id}")
-def delete_case_assignment(assignment_id: int, db: Session = Depends(get_db)):
+def delete_case_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_assignment = db.query(CaseAssignments).filter(CaseAssignments.assignment_id == assignment_id).first()
     if db_assignment is None:
         raise HTTPException(status_code=404, detail="Case assignment not found")
@@ -712,14 +758,21 @@ def delete_case_assignment(assignment_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for ChatMessages Table ---
 @app.get("/chat_messages/{message_id}")
-def read_chat_message(message_id: int, db: Session = Depends(get_db)):
+def read_chat_message(message_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_message = db.query(ChatMessages).filter(ChatMessages.message_id == message_id).first()
     if db_message is None:
         raise HTTPException(status_code=404, detail="Chat message not found")
     return db_message
 
 @app.post("/chat_messages/")
-def create_chat_message(user_id: int, message: str, report_id: str, is_admin: int, db: Session = Depends(get_db)):
+def create_chat_message(
+    user_id: int,
+    message: str,
+    report_id: str,
+    is_admin: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_chat_message = ChatMessages(
         user_id=user_id, message=message, report_id=report_id, is_admin=is_admin
     )
@@ -729,7 +782,13 @@ def create_chat_message(user_id: int, message: str, report_id: str, is_admin: in
     return db_chat_message
 
 @app.put("/chat_messages/{message_id}")
-def update_chat_message(message_id: int, message: str, is_admin: int, db: Session = Depends(get_db)):
+def update_chat_message(
+    message_id: int,
+    message: str,
+    is_admin: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_message = db.query(ChatMessages).filter(ChatMessages.message_id == message_id).first()
     if db_message is None:
         raise HTTPException(status_code=404, detail="Chat message not found")
@@ -741,7 +800,7 @@ def update_chat_message(message_id: int, message: str, is_admin: int, db: Sessio
     return db_message
 
 @app.delete("/chat_messages/{message_id}")
-def delete_chat_message(message_id: int, db: Session = Depends(get_db)):
+def delete_chat_message(message_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_message = db.query(ChatMessages).filter(ChatMessages.message_id == message_id).first()
     if db_message is None:
         raise HTTPException(status_code=404, detail="Chat message not found")
@@ -753,14 +812,20 @@ def delete_chat_message(message_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for Complaints Table ---
 @app.get("/complaints/{complaint_id}")
-def read_complaint(complaint_id: int, db: Session = Depends(get_db)):
+def read_complaint(complaint_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_complaint = db.query(Complaints).filter(Complaints.complaint_id == complaint_id).first()
     if db_complaint is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return db_complaint
 
 @app.post("/complaints/")
-def create_complaint(reporter_contact: str, complaint_text: str, channel: str, db: Session = Depends(get_db)):
+def create_complaint(
+    reporter_contact: str,
+    complaint_text: str,
+    channel: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_complaint = Complaints(
         reporter_contact=reporter_contact, complaint_text=complaint_text, channel=channel
     )
@@ -770,7 +835,12 @@ def create_complaint(reporter_contact: str, complaint_text: str, channel: str, d
     return db_complaint
 
 @app.put("/complaints/{complaint_id}")
-def update_complaint(complaint_id: int, status: str, db: Session = Depends(get_db)):
+def update_complaint(
+    complaint_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_complaint = db.query(Complaints).filter(Complaints.complaint_id == complaint_id).first()
     if db_complaint is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
@@ -781,7 +851,7 @@ def update_complaint(complaint_id: int, status: str, db: Session = Depends(get_d
     return db_complaint
 
 @app.delete("/complaints/{complaint_id}")
-def delete_complaint(complaint_id: int, db: Session = Depends(get_db)):
+def delete_complaint(complaint_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_complaint = db.query(Complaints).filter(Complaints.complaint_id == complaint_id).first()
     if db_complaint is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
@@ -793,14 +863,14 @@ def delete_complaint(complaint_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for Crime Table ---
 @app.get("/crime/{crime_id}")
-def read_crime(crime_id: int, db: Session = Depends(get_db)):
+def read_crime(crime_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_crime = db.query(Crime).filter(Crime.crime_id == crime_id).first()
     if db_crime is None:
         raise HTTPException(status_code=404, detail="Crime not found")
     return db_crime
 
 @app.post("/crime/")
-def create_crime(data: CrimeCreate):
+def create_crime(data: CrimeCreate, _user: dict = Depends(require_admin)):
     crime_id = insert_and_get_id(
         """
         INSERT INTO crime (reporter_id, crime_data, location_data, status, priority_level)
@@ -818,7 +888,13 @@ def create_crime(data: CrimeCreate):
 
 
 @app.put("/crime/{crime_id}")
-def update_crime(crime_id: int, status: str, priority_level: str, db: Session = Depends(get_db)):
+def update_crime(
+    crime_id: int,
+    status: str,
+    priority_level: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_crime = db.query(Crime).filter(Crime.crime_id == crime_id).first()
     if db_crime is None:
         raise HTTPException(status_code=404, detail="Crime not found")
@@ -830,7 +906,7 @@ def update_crime(crime_id: int, status: str, priority_level: str, db: Session = 
     return db_crime
 
 @app.delete("/crime/{crime_id}")
-def delete_crime(crime_id: int, db: Session = Depends(get_db)):
+def delete_crime(crime_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_crime = db.query(Crime).filter(Crime.crime_id == crime_id).first()
     if db_crime is None:
         raise HTTPException(status_code=404, detail="Crime not found")
@@ -841,7 +917,11 @@ def delete_crime(crime_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for CriminalSightings Table ---
 @app.get("/criminal_sightings/{sighting_id}")
-def read_criminal_sighting(sighting_id: int, db: Session = Depends(get_db)):
+def read_criminal_sighting(
+    sighting_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_row = db.query(CriminalSightings).filter(CriminalSightings.sighting_id == sighting_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Criminal sighting not found")
@@ -857,6 +937,7 @@ def create_criminal_sighting(
     reporter_contact: str | None = None,
     verified: int = 0,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_obj = CriminalSightings(
         criminal_id=criminal_id,
@@ -879,6 +960,7 @@ def update_criminal_sighting(
     still_with_finder: int | None = None,
     verified: int | None = None,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_row = db.query(CriminalSightings).filter(CriminalSightings.sighting_id == sighting_id).first()
     if db_row is None:
@@ -895,7 +977,11 @@ def update_criminal_sighting(
 
 
 @app.delete("/criminal_sightings/{sighting_id}")
-def delete_criminal_sighting(sighting_id: int, db: Session = Depends(get_db)):
+def delete_criminal_sighting(
+    sighting_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_row = db.query(CriminalSightings).filter(CriminalSightings.sighting_id == sighting_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Criminal sighting not found")
@@ -906,7 +992,7 @@ def delete_criminal_sighting(sighting_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for EvidenceFiles Table ---
 @app.get("/evidence_files/{file_id}")
-def read_evidence_file(file_id: int, db: Session = Depends(get_db)):
+def read_evidence_file(file_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_row = db.query(EvidenceFiles).filter(EvidenceFiles.file_id == file_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Evidence file not found")
@@ -923,6 +1009,7 @@ def create_evidence_file(
     file_size: int | None = None,
     description: str | None = None,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_obj = EvidenceFiles(
         crime_id=crime_id,
@@ -946,6 +1033,7 @@ def update_evidence_file(
     file_size: int | None = None,
     description: str | None = None,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_row = db.query(EvidenceFiles).filter(EvidenceFiles.file_id == file_id).first()
     if db_row is None:
@@ -962,7 +1050,7 @@ def update_evidence_file(
 
 
 @app.delete("/evidence_files/{file_id}")
-def delete_evidence_file(file_id: int, db: Session = Depends(get_db)):
+def delete_evidence_file(file_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_row = db.query(EvidenceFiles).filter(EvidenceFiles.file_id == file_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Evidence file not found")
@@ -973,7 +1061,7 @@ def delete_evidence_file(file_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for FileUploads Table ---
 @app.get("/file_uploads/{upload_id}")
-def read_file_upload(upload_id: int, db: Session = Depends(get_db)):
+def read_file_upload(upload_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_row = db.query(FileUploads).filter(FileUploads.upload_id == upload_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="File upload not found")
@@ -992,6 +1080,7 @@ def create_file_upload(
     related_id: int | None = None,
     upload_purpose: str = "other",
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_obj = FileUploads(
         original_filename=original_filename,
@@ -1017,6 +1106,7 @@ def update_file_upload(
     related_id: int | None = None,
     upload_purpose: str | None = None,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_row = db.query(FileUploads).filter(FileUploads.upload_id == upload_id).first()
     if db_row is None:
@@ -1033,7 +1123,7 @@ def update_file_upload(
 
 
 @app.delete("/file_uploads/{upload_id}")
-def delete_file_upload(upload_id: int, db: Session = Depends(get_db)):
+def delete_file_upload(upload_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_row = db.query(FileUploads).filter(FileUploads.upload_id == upload_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="File upload not found")
@@ -1044,7 +1134,7 @@ def delete_file_upload(upload_id: int, db: Session = Depends(get_db)):
 
 # --- CRUD for MissingPerson Table ---
 @app.get("/missing_person/{missing_id}")
-def read_missing_person(missing_id: int, db: Session = Depends(get_db)):
+def read_missing_person(missing_id: int, db: Session = Depends(get_db), _user: dict = Depends(require_admin)):
     db_row = db.query(MissingPerson).filter(MissingPerson.missing_id == missing_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Missing person not found")
@@ -1063,6 +1153,7 @@ def create_missing_person(
     contact_phone: str | None = None,
     status: str = "Missing",
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_obj = MissingPerson(
         name=name,
@@ -1088,6 +1179,7 @@ def update_missing_person(
     contact_phone: str | None = None,
     last_seen_location: str | None = None,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
 ):
     db_row = db.query(MissingPerson).filter(MissingPerson.missing_id == missing_id).first()
     if db_row is None:
@@ -1104,7 +1196,11 @@ def update_missing_person(
 
 
 @app.delete("/missing_person/{missing_id}")
-def delete_missing_person(missing_id: int, db: Session = Depends(get_db)):
+def delete_missing_person(
+    missing_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_admin)
+):
     db_row = db.query(MissingPerson).filter(MissingPerson.missing_id == missing_id).first()
     if db_row is None:
         raise HTTPException(status_code=404, detail="Missing person not found")
@@ -1116,9 +1212,7 @@ def delete_missing_person(missing_id: int, db: Session = Depends(get_db)):
 # --- Minimal create endpoints for PoliceStation and WantedCriminal ---
 
 @app.post("/police_stations/")
-def create_police_station(
-    data: PoliceStationCreate,
-):
+def create_police_station(data: PoliceStationCreate, _user: dict = Depends(require_admin)):
     station_id = insert_and_get_id(
         """
         INSERT INTO police_station (station_name, station_code, address, phone, email, latitude, longitude, jurisdiction_area)
@@ -1139,9 +1233,7 @@ def create_police_station(
 
 
 @app.post("/wanted_criminals/")
-def create_wanted_criminal(
-    data: WantedCriminalCreate,
-):
+def create_wanted_criminal(data: WantedCriminalCreate, _user: dict = Depends(require_admin)):
     criminal_id = insert_and_get_id(
         """
         INSERT INTO wanted_criminal (name, alias, age_range, gender, description, crimes_committed, danger_level, reward_amount, last_known_location, photo_url, added_by, status)
