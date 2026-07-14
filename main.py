@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form, Body,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+import os
 import logging
 from pydantic import BaseModel, validator
 from sqlalchemy import create_engine, text
@@ -44,7 +45,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/mysafetydb"
+def _build_sqlalchemy_url() -> str:
+    user = os.getenv("DB_USER", "root")
+    password = os.getenv("DB_PASSWORD", "")
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "3306")
+    name = os.getenv("DB_NAME", "mysafetydb")
+    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}?charset=utf8mb4"
+
+
+SQLALCHEMY_DATABASE_URL = _build_sqlalchemy_url()
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})
 
 # Mount static files

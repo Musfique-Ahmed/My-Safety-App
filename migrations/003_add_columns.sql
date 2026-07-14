@@ -30,6 +30,7 @@ ALTER TABLE wanted_criminal ADD COLUMN updated_at DATETIME NULL;
 
 -- missing_person
 ALTER TABLE missing_person ADD COLUMN reporter_id INT NULL;
+ALTER TABLE missing_person ADD COLUMN gender VARCHAR(20) NULL;
 ALTER TABLE missing_person ADD COLUMN last_seen_time DATETIME NULL;
 ALTER TABLE missing_person ADD COLUMN height VARCHAR(40) NULL;
 ALTER TABLE missing_person ADD COLUMN eye_color VARCHAR(40) NULL;
