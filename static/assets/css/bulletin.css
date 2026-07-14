@@ -1,0 +1,1041 @@
+/* ============================================================================
+ * bulletin.css — "Case-File Bulletin" design system
+ *
+ * Subject: My Safety — citizen safety reporting for Dhaka Metropolitan.
+ * Audience: Dhaka residents checking if it's safe to ride home at 23:40.
+ *
+ * Tokens are locked. Type is locked. Do not introduce any fourth typeface,
+ * any drop-shadow, any gradient that isn't a stamp. This is paper, not a
+ * SaaS app. Red ink is rare — only on confirmed emergencies.
+ *
+ * Load order in HTML:
+ *   1. <link> Google Fonts (Spectral + Inter + JetBrains Mono)
+ *   2. <link> Leaflet.css
+ *   3. <link rel="stylesheet" href="/static/assets/css/bulletin.css">
+ * ============================================================================ */
+
+
+/* -- 1. Tokens ------------------------------------------------------------ */
+
+:root {
+  /* Paper & ink — the only "background / foreground" pair allowed */
+  --paper:         #F2EDE3;   /* main surface — off-white, aged register paper */
+  --paper-card:    #FAF6EC;   /* card surface, slightly brighter */
+  --paper-warm:    #EBE3D2;   /* deeper paper for separators, footers */
+
+  --ink:           #1A1A1A;   /* primary text, hairlines, headings */
+  --ink-faded:     #5C544A;   /* secondary text */
+  --ink-faint:     #8C8478;   /* tertiary / placeholder */
+
+  --rule:          #9C9486;   /* hairline rules */
+  --rule-soft:     #C9C2B3;   /* softer dividers */
+
+  /* Civic accents — used sparingly */
+  --ink-blue:      #2D4A6B;   /* brand anchor / links / focus ring */
+  --ink-red:       #A23E2C;   /* ONLY for emergencies, urgent alerts */
+  --stamp-gold:    #B58A3D;   /* active case stamp */
+
+  /* Type scale — locked */
+  --t-display:     'Spectral', Georgia, serif;
+  --t-body:        'Inter', system-ui, sans-serif;
+  --t-mono:        'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Spacing — 8pt base */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* Hairlines — never fat */
+  --hair: 1px solid var(--rule);
+  --hair-ink: 1px solid var(--ink);
+  --hair-soft: 1px solid var(--rule-soft);
+
+  /* Layout */
+  --col-gutter: var(--s-5);
+  --max-w: 1280px;
+  --header-h: 96px;
+}
+
+
+/* -- 2. Reset (minimal, scoped) ----------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+button { font: inherit; cursor: pointer; }
+input, select, textarea, button {
+  font-family: var(--t-body);
+  color: var(--ink);
+}
+
+
+/* -- 3. Body & typography ------------------------------------------------ */
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--t-body);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* A faint paper grain — see the design notes about not being a glass app */
+  background-image:
+    radial-gradient(rgba(26,26,26,0.015) 1px, transparent 1px),
+    radial-gradient(rgba(26,26,26,0.015) 1px, transparent 1px);
+  background-size: 4px 4px, 7px 7px;
+  background-position: 0 0, 2px 2px;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--t-display);
+  color: var(--ink);
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+h1 { font-size: clamp(40px, 7vw, 84px); font-weight: 700; }
+h2 { font-size: 22px; }
+h3 { font-size: 17px; }
+h4 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+
+p  { margin: 0 0 var(--s-3); }
+
+a {
+  color: var(--ink-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+a:hover { color: var(--ink); }
+
+
+/* -- 4. Focus & accessibility -------------------------------------------- */
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--ink-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* -- 5. Registry header -------------------------------------------------- */
+
+.registry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--s-6) var(--s-5) var(--s-4);
+  border-bottom: var(--hair-ink);
+  max-width: var(--max-w);
+  margin: 0 auto;
+  gap: var(--s-5);
+}
+
+.registry-header__brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.registry-header__seal {
+  width: 44px;
+  height: 44px;
+  border: var(--hair-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--t-display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.04em;
+  background: var(--paper-card);
+  color: var(--ink);
+}
+
+.registry-header__title {
+  font-family: var(--t-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.registry-header__sub {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faded);
+}
+
+.registry-header__stamp {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  text-align: right;
+  border: var(--hair-ink);
+  padding: var(--s-2) var(--s-3);
+  background: var(--paper-card);
+  white-space: nowrap;
+}
+
+.registry-header__nav {
+  display: flex;
+  gap: var(--s-4);
+  font-family: var(--t-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.registry-header__nav a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+.registry-header__nav a:hover { border-bottom-color: var(--ink); }
+.registry-header__nav a.is-active {
+  color: var(--ink-blue);
+  border-bottom-color: var(--ink-blue);
+}
+
+
+/* -- 6. Section eyebrow (RULE N°) ---------------------------------------- */
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  padding-bottom: var(--s-2);
+  border-bottom: var(--hair);
+  margin-bottom: var(--s-4);
+}
+
+.eyebrow__no {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.eyebrow__title {
+  color: var(--ink);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+
+.eyebrow__meta {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+
+/* -- 7. Main layout & sections ------------------------------------------- */
+
+main {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-5) var(--s-8);
+}
+
+.section {
+  margin-bottom: var(--s-8);
+}
+
+.section__head { margin-bottom: var(--s-4); }
+
+
+/* -- 8. Hero stat block --------------------------------------------------- */
+
+.hero-stat {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-5);
+  align-items: end;
+  padding: var(--s-5) 0;
+  border-bottom: var(--hair-ink);
+}
+
+.hero-stat__number {
+  font-family: var(--t-display);
+  font-weight: 800;
+  font-size: clamp(72px, 14vw, 168px);
+  line-height: 0.9;
+  color: var(--ink);
+  letter-spacing: -0.04em;
+}
+
+.hero-stat__number sup {
+  font-size: 0.4em;
+  vertical-align: top;
+  color: var(--ink-faded);
+  font-weight: 500;
+  margin-left: var(--s-1);
+}
+
+.hero-stat__caption {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-faded);
+  line-height: 1.7;
+  text-align: right;
+  border-left: var(--hair);
+  padding-left: var(--s-4);
+  max-width: 280px;
+}
+
+.hero-stat__caption strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+
+/* -- 9. Split layout (form + map) ---------------------------------------- */
+
+.split {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: var(--col-gutter);
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+
+/* -- 10. Register card (form column) ------------------------------------- */
+
+.register-card {
+  background: var(--paper-card);
+  border: var(--hair-ink);
+  padding: var(--s-5);
+  position: relative;
+}
+
+.register-card__title {
+  font-family: var(--t-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: var(--s-1);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.register-card__lede {
+  color: var(--ink-faded);
+  margin-bottom: var(--s-5);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 38ch;
+}
+
+
+/* Form fields — paper form, not glass form */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--s-4);
+}
+
+.field__label {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-faded);
+  margin-bottom: var(--s-2);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.field__label .tag {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: var(--hair-ink);
+  font-family: var(--t-mono);
+  font-size: 10px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.field input,
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--paper);
+  border: 0;
+  border-bottom: var(--hair-ink);
+  padding: var(--s-3) var(--s-2);
+  font-family: var(--t-body);
+  font-size: 15px;
+  color: var(--ink);
+  border-radius: 0;
+  transition: background-color 0.1s ease;
+}
+
+.field input::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+  font-weight: 300;
+}
+
+.field input:hover,
+.field select:hover {
+  background: var(--paper-warm);
+}
+
+.field input:focus,
+.field select:focus {
+  background: var(--paper);
+}
+
+.field select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+}
+
+.field-with-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-2);
+  align-items: end;
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  border: var(--hair-ink);
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--t-mono);
+  font-size: 14px;
+  border-radius: 0;
+  transition: background-color 0.15s;
+}
+.btn-icon:hover { background: var(--ink); color: var(--paper); }
+
+
+/* Primary submit — the only button styled with paper ink */
+
+.btn-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-4) var(--s-5);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--t-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  border: var(--hair-ink);
+  border-radius: 0;
+  transition: background-color 0.15s, color 0.15s;
+  margin-top: var(--s-3);
+}
+
+.btn-stamp:hover {
+  background: var(--paper-card);
+  color: var(--ink);
+}
+
+.btn-stamp:active { transform: translateY(1px); }
+
+.btn-stamp__chevron {
+  display: inline-block;
+  border: 1px solid currentColor;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  text-align: center;
+  font-size: 9px;
+  font-family: var(--t-mono);
+}
+
+
+/* Panic button — rare red ink moment. STAMPED, not glinting. */
+
+.panic-btn {
+  width: 64px;
+  height: 64px;
+  background: var(--paper-card);
+  color: var(--ink-red);
+  border: var(--hair-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--t-mono);
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  position: relative;
+  border-radius: 0;
+}
+
+.panic-btn::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--ink-red);
+  pointer-events: none;
+}
+
+.panic-btn:hover { background: var(--ink-red); color: var(--paper); }
+.panic-btn:hover::after { border-color: var(--paper); }
+
+
+/* -- 11. Map pane -------------------------------------------------------- */
+
+.map-pane {
+  background: var(--paper-card);
+  border: var(--hair-ink);
+  min-height: 540px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.map-pane__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--hair);
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+}
+
+.map-pane__head .legend {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.legend-dot--heat-low { background: #6FA182; }
+.legend-dot--heat-mid { background: var(--stamp-gold); }
+.legend-dot--heat-hi  { background: var(--ink-red); }
+
+.map {
+  flex: 1;
+  width: 100%;
+  min-height: 480px;
+  /* Leaflet's container needs an explicit height; the inner tile layer fills */
+}
+
+.map .leaflet-container {
+  background: var(--paper);
+}
+
+.map .leaflet-popup-content-wrapper {
+  background: var(--paper-card);
+  border: var(--hair-ink);
+  border-radius: 0;
+  padding: var(--s-3) var(--s-4);
+  font-family: var(--t-body);
+  font-size: 13px;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.map .leaflet-popup-tip {
+  background: var(--paper-card);
+  border: var(--hair-ink);
+}
+.map .leaflet-popup-content { margin: 0; }
+.map .leaflet-popup-close-button { color: var(--ink-faded); }
+
+.popup-title {
+  font-family: var(--t-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--s-1);
+}
+.popup-meta {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faded);
+  margin-bottom: var(--s-2);
+}
+.popup-section h5 {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: var(--s-3) 0 var(--s-1);
+  color: var(--ink);
+}
+.popup-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.popup-section li {
+  padding: 2px 0;
+  border-top: var(--hair-soft);
+}
+.popup-section li:first-child { border-top: 0; }
+.popup-section .resolved { color: var(--ink-faded); text-decoration: line-through; }
+
+
+/* -- 12. Dossier pane (Local Register) ----------------------------------- */
+
+.dossier {
+  margin-top: var(--s-5);
+  background: var(--paper-card);
+  border: var(--hair-ink);
+}
+
+.dossier__head {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--hair);
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dossier__status {
+  font-family: var(--t-body);
+  font-size: 13px;
+  color: var(--ink-faded);
+  text-transform: none;
+  letter-spacing: 0;
+  font-style: italic;
+  padding: var(--s-4);
+  border-bottom: var(--hair-soft);
+}
+
+.dossier__row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto;
+  gap: var(--s-4);
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--hair-soft);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.dossier__row:last-child { border-bottom: 0; }
+.dossier__row:hover { background: var(--paper-warm); }
+
+.dossier__row .tag {
+  width: 28px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--hair-ink);
+  font-family: var(--t-mono);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--paper);
+}
+
+.dossier__row .name {
+  font-family: var(--t-display);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.dossier__row .area {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faded);
+  margin-top: 2px;
+}
+
+.dossier__row .count {
+  font-family: var(--t-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dossier__row .count-label {
+  font-family: var(--t-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  display: block;
+  margin-top: -2px;
+}
+
+.dossier__row .stage {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  border: var(--hair);
+  padding: 2px 6px;
+  background: var(--paper);
+}
+
+.dossier__row.is-danger .count { color: var(--ink-red); }
+.dossier__row.is-danger::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--ink-red);
+}
+
+.dossier__row { position: relative; }
+
+
+/* -- 13. Urgent stamp (signature element) -------------------------------- */
+
+.urgent-stamp {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--ink-red);
+}
+
+.urgent-stamp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg,
+    transparent 38%,
+    rgba(162,62,44,0.18) 38%, rgba(162,62,44,0.18) 41%,
+    transparent 41%, transparent 60%,
+    rgba(162,62,44,0.18) 60%, rgba(162,62,44,0.18) 63%,
+    transparent 63%);
+  pointer-events: none;
+  z-index: 1;
+  animation: urgent-rule 2s ease-in-out infinite;
+}
+
+@keyframes urgent-rule {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.65; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .urgent-stamp::before { animation: none; }
+}
+
+
+/* -- 14. Three-up footer strip (community counters) --------------------- */
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: var(--hair-ink);
+  background: var(--paper-card);
+  margin-top: var(--s-6);
+}
+
+@media (max-width: 720px) {
+  .counters { grid-template-columns: 1fr; }
+}
+
+.counter {
+  padding: var(--s-5);
+  border-right: var(--hair);
+  position: relative;
+}
+
+.counter:last-child { border-right: 0; }
+
+.counter__no {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  margin-bottom: var(--s-3);
+}
+
+.counter__figure {
+  font-family: var(--t-display);
+  font-weight: 700;
+  font-size: 42px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.counter__label {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  margin-top: var(--s-2);
+}
+
+.counter__bar {
+  height: 4px;
+  background: var(--ink);
+  margin-top: var(--s-3);
+  width: var(--w, 60%);
+}
+
+
+/* -- 15. Lightbox (evidence view) --------------------------------------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,26,0.94);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-6);
+}
+
+.lightbox.is-open { display: flex; }
+
+.lightbox__inner {
+  max-width: 90vw;
+  max-height: 86vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.lightbox__media {
+  max-width: 100%;
+  max-height: 78vh;
+  background: var(--paper-card);
+  border: var(--hair);
+}
+
+.lightbox__media img,
+.lightbox__media video {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+}
+
+.lightbox__caption {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--paper);
+  text-align: center;
+  max-width: 60ch;
+}
+
+.lightbox__close,
+.lightbox__nav {
+  position: absolute;
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--paper);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--t-mono);
+  font-size: 16px;
+  border-radius: 0;
+}
+
+.lightbox__close { top: var(--s-4); right: var(--s-4); }
+.lightbox__close:hover { background: var(--paper); color: var(--ink); }
+
+.lightbox__nav--prev { left: var(--s-4); top: 50%; transform: translateY(-50%); }
+.lightbox__nav--next { right: var(--s-4); top: 50%; transform: translateY(-50%); }
+.lightbox__nav:hover { background: var(--paper); color: var(--ink); }
+
+
+/* -- 16. Inline tag glyphs (replacement for Lucide icons) --------------- */
+
+.tag-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.2em;
+  border: 1px solid currentColor;
+  font-family: var(--t-mono);
+  font-size: 0.85em;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+  margin-right: var(--s-1);
+}
+
+.tag-glyph--r { color: var(--ink); }          /* Report */
+.tag-glyph--m { color: var(--ink-blue); }     /* Missing */
+.tag-glyph--w { color: var(--stamp-gold); }   /* Wanted */
+.tag-glyph--alert { color: var(--ink-red); }  /* ! Emergency */
+
+
+/* -- 17. Toast / status line ------------------------------------------- */
+
+.status-line {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  padding: var(--s-2) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.status-line__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--stamp-gold);
+  display: inline-block;
+}
+
+.status-line.is-live .status-line__dot { background: var(--ink-blue); animation: pulse 1.6s ease-in-out infinite; }
+.status-line.is-danger .status-line__dot { background: var(--ink-red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+
+/* -- 18. Compact tabular data (suspect lists, wanted cards) ----------- */
+
+.tabular {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--t-body);
+  font-size: 13px;
+}
+
+.tabular th, .tabular td {
+  text-align: left;
+  padding: var(--s-2) var(--s-3);
+  border-bottom: var(--hair-soft);
+}
+
+.tabular th {
+  font-family: var(--t-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  font-weight: 500;
+  border-bottom: var(--hair-ink);
+}
+
+.tabular td.num {
+  font-family: var(--t-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+
+/* -- 19. Responsive header shrink -------------------------------------- */
+
+@media (max-width: 720px) {
+  .registry-header {
+    padding: var(--s-4);
+    flex-wrap: wrap;
+  }
+  .registry-header__nav { display: none; }
+  main { padding: var(--s-4); }
+  .register-card, .map-pane, .dossier { padding: 0; }
+  .register-card > * { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .map { min-height: 360px; }
+  .hero-stat { grid-template-columns: 1fr; }
+  .hero-stat__caption {
+    border-left: 0;
+    padding-left: 0;
+    border-top: var(--hair);
+    padding-top: var(--s-3);
+    text-align: left;
+    max-width: none;
+  }
+  .dossier__row { grid-template-columns: 40px 1fr auto; }
+  .dossier__row .stage { display: none; }
+}
+
+
+/* -- 20. Print stylesheet (because this is paper) ---------------------- */
+
+@media print {
+  body { background: white; }
+  .map-pane, .lightbox, .btn-stamp, .btn-icon { display: none; }
+  .register-card { border: 1px solid black; }
+}
