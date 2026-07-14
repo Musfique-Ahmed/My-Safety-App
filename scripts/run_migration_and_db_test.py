@@ -1,42 +1,80 @@
-import mysql.connector
+"""Apply all migrations in migrations/ in alphabetical order, then run a smoke test insert.
+
+This replaces the previous one-shot migration runner. After migrations 001-004 are
+applied, status_history, emergency_alerts, police_station, chat_messages,
+criminal_sightings, case_assignments, and user_complaints will exist and the
+columns referenced by code will be in place.
+"""
+import glob
+import os
 import json
 from datetime import datetime
 
-CFG = {'host':'localhost','user':'root','password':'','database':'mysafetydb','port':3306}
+import mysql.connector
 
-def apply_migration(cur):
-    # Run safe ALTER statements; IF NOT EXISTS requires MySQL 8+, but we'll try and ignore errors
-    statements = [
-        "ALTER TABLE crime ADD COLUMN IF NOT EXISTS reporter_id VARCHAR(255) NULL AFTER crime_id",
-        "ALTER TABLE crime ADD COLUMN IF NOT EXISTS incident_date DATETIME NULL AFTER reporter_id",
-        "ALTER TABLE crime ADD COLUMN IF NOT EXISTS evidence_files LONGTEXT NULL AFTER witness_data"
-    ]
-    for s in statements:
-        try:
-            cur.execute(s)
-            print('Executed:', s)
-        except Exception as e:
-            # Try the non-IF NOT EXISTS version if IF NOT EXISTS not supported
-            if 'IF NOT EXISTS' in s:
-                alt = s.replace(' ADD COLUMN IF NOT EXISTS', ' ADD COLUMN')
-                try:
-                    cur.execute(alt)
-                    print('Executed fallback:', alt)
-                except Exception as e2:
-                    print('Could not run statement:', s, 'error:', e2)
-            else:
-                print('Could not run statement:', s, 'error:', e)
+CFG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'mysafetydb',
+    'port': 3306,
+}
+
+MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'migrations')
+
+
+def split_statements(sql: str):
+    """Split a SQL script on top-level semicolons. Naive but adequate for these files."""
+    out, buf = [], []
+    for line in sql.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('--'):
+            continue
+        buf.append(line)
+        if stripped.endswith(';'):
+            out.append('\n'.join(buf).rstrip(';').strip())
+            buf = []
+    if buf:
+        leftover = '\n'.join(buf).strip().rstrip(';').strip()
+        if leftover:
+            out.append(leftover)
+    return out
+
+
+def apply_migrations(cur) -> None:
+    files = sorted(glob.glob(os.path.join(MIGRATIONS_DIR, '*.sql')))
+    for path in files:
+        name = os.path.basename(path)
+        print(f'--- applying {name} ---')
+        with open(path, 'r', encoding='utf-8') as f:
+            sql = f.read()
+        for stmt in split_statements(sql):
+            try:
+                cur.execute(stmt)
+                print(f'  ok: {stmt.splitlines()[0][:80]}')
+            except mysql.connector.Error as e:
+                # Allow "already exists" / "duplicate column" / "duplicate key"
+                msg = str(e).lower()
+                if any(tok in msg for tok in ('already exists', 'duplicate', '1060', '1061', '1091')):
+                    print(f'  skip (already applied): {e}')
+                    continue
+                print(f'  FAIL: {stmt.splitlines()[0][:80]}\n    {e}')
+                raise
+
 
 def insert_test_row(cur):
-    location = {'city':'TestCity','area':'UnitArea','district':'Dhaka','latitude':'23.7','longitude':'90.3'}
-    crime = {'type':'Assault','description':'DB test insert','incident_date':'2025-10-10T22:00:00'}
-    victim = {'name':'DB Victim'}
-    criminal = {'name':'DB Criminal'}
-    witness = {'name':'DB Witness','phone':'0123456789'}
-    evidence = [{'filename':'test.jpg','url':'/static/uploads/test.jpg'}]
+    location = {'city': 'TestCity', 'area': 'UnitArea', 'district': 'Dhaka',
+                'latitude': '23.7', 'longitude': '90.3'}
+    crime = {'type': 'Assault', 'description': 'DB test insert',
+             'incident_date': '2025-10-10T22:00:00'}
+    victim = {'name': 'DB Victim'}
+    criminal = {'name': 'DB Criminal'}
+    witness = {'name': 'DB Witness', 'phone': '0123456789'}
+    evidence = [{'filename': 'test.jpg', 'url': '/static/uploads/test.jpg'}]
 
-    sql = ("INSERT INTO crime (reporter_id, incident_date, location_data, crime_data, victim_data, criminal_data, "
-           "weapon_data, witness_data, evidence_files, status, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)")
+    sql = ("INSERT INTO crime (reporter_id, incident_date, location_data, crime_data, "
+           "victim_data, criminal_data, weapon_data, witness_data, evidence_files, "
+           "status, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)")
     params = (
         'db-tester',
         datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
@@ -48,22 +86,26 @@ def insert_test_row(cur):
         json.dumps(witness),
         json.dumps(evidence),
         'Pending',
-        datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
     )
     cur.execute(sql, params)
     print('Inserted ID', cur.lastrowid)
     return cur.lastrowid
 
+
 def fetch_row(cur, row_id):
-    cur.execute('SELECT crime_id, reporter_id, incident_date, evidence_files, witness_data, victim_data, crime_data FROM crime WHERE crime_id = %s', (row_id,))
+    cur.execute(
+        'SELECT crime_id, reporter_id, incident_date, evidence_files, '
+        'witness_data, victim_data, crime_data FROM crime WHERE crime_id = %s',
+        (row_id,),
+    )
     r = cur.fetchone()
     if not r:
         print('Row not found')
         return
     cols = [d[0] for d in cur.description]
     obj = dict(zip(cols, r))
-    # Try to parse JSON fields
-    for k in ('evidence_files','witness_data','victim_data','crime_data'):
+    for k in ('evidence_files', 'witness_data', 'victim_data', 'crime_data'):
         if obj.get(k):
             try:
                 obj[k] = json.loads(obj[k])
@@ -72,21 +114,24 @@ def fetch_row(cur, row_id):
     print('Fetched row:')
     print(json.dumps(obj, indent=2, default=str))
 
+
 def main():
     try:
         cn = mysql.connector.connect(**CFG)
         cur = cn.cursor()
-        apply_migration(cur)
+        apply_migrations(cur)
         cn.commit()
 
         row_id = insert_test_row(cur)
         cn.commit()
-        # use a new cursor for fetch with dictionary results
         cur2 = cn.cursor()
         fetch_row(cur2, row_id)
-        cur.close(); cur2.close(); cn.close()
+        cur.close()
+        cur2.close()
+        cn.close()
     except Exception as e:
         print('ERROR', e)
+
 
 if __name__ == '__main__':
     main()

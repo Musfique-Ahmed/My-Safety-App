@@ -2200,8 +2200,8 @@
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>CR-${String(numericId).padStart(3, '0')}</td>
-          <td>${locationText}</td>
-          <td><span class="status-badge ${statusInfo.className}">${displayStatus}</span></td>
+          <td>${escapeHtml(locationText)}</td>
+          <td><span class="status-badge ${escapeHtml(statusInfo.className)}">${escapeHtml(displayStatus)}</span></td>
           <td>
             <button class="action-btn" onclick="viewCrimeDetails(${numericId})">
               <span>📄</span>

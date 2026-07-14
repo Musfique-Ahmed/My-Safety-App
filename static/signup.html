@@ -284,6 +284,7 @@
       </div>
     </div>
   </div>
+    <script src="/static/assets/js/api-base.js"></script>
     <script>
     document.getElementById('signupForm').addEventListener('submit', async function(event) {
     event.preventDefault();
@@ -299,15 +300,18 @@
     }
 
     try {
-        const response = await fetch('http://localhost:8000/register', {
+        const response = await fetch(resolveApiUrl('/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
         });
         const result = await response.json();
         if (response.ok) {
-        alert(result.message);
-        window.location.href = "login.html";
+        try {
+            if (result.token) localStorage.setItem('auth_token', result.token);
+            if (result.user) localStorage.setItem('currentUser', JSON.stringify(result.user));
+        } catch (e) {}
+        window.location.href = "/login";
         } else {
         errorMsg.textContent = result.detail || "Signup failed";
         }

@@ -9,6 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -300,16 +302,16 @@ function card(item){
 
   el.className = "rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
   el.innerHTML = `
-    <img src="${item.photo_url}" alt="${item.name}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name)}/600/400'">
+    <img src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
     <div class="p-4">
       <div class="flex justify-between items-center mb-2">
-        <div class="font-semibold">${item.name}</div>
-        <span class="px-2 py-0.5 text-xs ${badgeClass} rounded-full">${badgeLabel}</span>
+        <div class="font-semibold">${escapeHtml(item.name || '')}</div>
+        <span class="px-2 py-0.5 text-xs ${escapeHtml(badgeClass)} rounded-full">${escapeHtml(badgeLabel)}</span>
       </div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Crimes: ${crimesText}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Reward: ৳${rewardText}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${item.last_seen_location} · ${fmt(item.last_seen_time)}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Age: ${ageText} · Height: ${heightText}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Crimes: ${escapeHtml(crimesText)}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Reward: ৳${escapeHtml(rewardText)}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${escapeHtml(item.last_seen_location || '')} · ${escapeHtml(fmt(item.last_seen_time))}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Age: ${escapeHtml(ageText)} · Height: ${escapeHtml(heightText)}</div>
       <div class="mt-2">
         <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
       </div>
@@ -331,7 +333,7 @@ function openModal(item){
   $("#modalTitle").textContent = item.name + " — Details";
   $("#modalBody").innerHTML = `
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <img src="${item.photo_url}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${item.name}">
+      <img src="${escapeHtml(item.photo_url || '')}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${escapeHtml(item.name || '')}">
       <div class="md:col-span-2 text-sm space-y-1">
         <p><b>Crimes:</b> ${crimesText}</p>
         <p><b>Last seen:</b> ${item.last_seen_location} at ${fmt(item.last_seen_time)}</p>
@@ -341,7 +343,7 @@ function openModal(item){
         <p><b>Complexion:</b> ${complexionText}</p>
         <p><b>Status:</b> ${statusText}</p>
         <p><b>With Finder on Last Report:</b> ${withFinderText}</p>
-        <p class="text-gray-500 dark:text-gray-400">${item.note || ""}</p>
+        <p class="text-gray-500 dark:text-gray-400">${escapeHtml(item.note || "")}</p>
         <div>
           <button id="seenBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">I have seen this person</button>
         </div>

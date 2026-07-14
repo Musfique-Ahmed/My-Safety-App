@@ -346,20 +346,47 @@ function openModal(item){
   $("#backdrop").classList.add("flex");
   $("#seenBtn").onclick = ()=> $("#seenWrap").classList.toggle("hidden");
   $("#geoSeen").onclick = ()=> fillWithGeo($("#seen_location"));
-  $("#submitSeen").onclick = ()=>{
+  $("#submitSeen").onclick = async ()=>{
+    const submitBtn = $("#submitSeen");
+    const originalLabel = submitBtn.textContent;
     const payload = {
       criminal_id: item.id,
       last_seen_time: $("#seen_time").value,
       last_seen_location: $("#seen_location").value,
-      still_with_finder: $("#still_with_finder").checked
+      still_with_finder: $("#still_with_finder").checked,
+      reporter_contact: null
     };
-    console.info('Criminal sighting payload', payload);
-    Swal.fire({
-      icon: 'success',
-      title: 'Notification Sent',
-      text: 'Thanks for reporting. Police have been notified of the sighting.',
-      confirmButtonColor: '#3B82F6'
-    }).then(() => closeModal());
+    try {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+      const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${item.id}/sighting`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
+        throw new Error(detail);
+      }
+      await Swal.fire({
+        icon: 'success',
+        title: 'Notification Sent',
+        text: 'Thanks for reporting. Police have been notified of the sighting.',
+        confirmButtonColor: '#3B82F6'
+      });
+      closeModal();
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Could not send',
+        text: err.message || 'Network error',
+        confirmButtonColor: '#EF4444'
+      });
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalLabel;
+    }
   };
 }
 

@@ -1,0 +1,64 @@
+/* Shared sticky header styles. Pages import:
+ *   <link rel="stylesheet" href="/static/assets/css/header.css">
+ */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface-light, #ffffff);
+  color: var(--text-light, #1f2937);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.app-header__inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+}
+.app-header__brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: inherit;
+  text-decoration: none;
+}
+.app-header__nav {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+.nav-link {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.85;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.nav-link:hover { background: rgba(0, 0, 0, 0.05); opacity: 1; }
+.header-btn {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.header-btn:hover { background: rgba(0, 0, 0, 0.05); }
+@media (prefers-color-scheme: dark) {
+  .app-header {
+    background: var(--surface-dark, #1f2937);
+    color: var(--text-dark, #f9fafb);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+  .nav-link:hover, .header-btn:hover { background: rgba(255, 255, 255, 0.08); }
+}

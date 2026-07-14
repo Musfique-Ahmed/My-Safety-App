@@ -219,6 +219,43 @@ The My Safety project provides a functional prototype for citizen reporting with
 
 ---
 
+## Appendix A — Schema drift (post-migrations 001–004)
+
+The DDL block earlier in this report describes the *original* schema. After running migrations 002 (five missing tables), 003 (missing columns), and 004 (indexes), the schema is:
+
+### Tables created in 002 (formerly implicit)
+- `status_history` (lazy-created in code, now in migration)
+- `emergency_alerts` (lazy-created in code, now in migration)
+- `police_station`
+- `chat_messages`
+- `criminal_sightings`
+- `case_assignments`
+- `user_complaints`
+
+### PK renames (code always used the suffixed names)
+- `users` → `appuser` (PK `user_id`)
+- `crime.id` → `crime.crime_id`
+- `missing_person.id` → `missing_person.missing_id`
+- `wanted_criminal.id` → `wanted_criminal.criminal_id`
+
+### Columns added in 003 (used by code, missing from original DDL)
+- `crime.witness_info`, `crime.priority_level`, `crime.updated_at`
+- `wanted_criminal.age_range`, `gender`, `height`, `weight`, `hair_color`, `eye_color`, `distinguishing_marks`, `wanted_since`, `added_by`, `crimes_committed`, `reward_amount`, `last_seen_reported_at`, `last_seen_reported_location`, `last_seen_with_finder`, `capture_date`, `updated_at`
+- `missing_person.reporter_id`, `last_seen_time`, `height`, `eye_color`, `distinguishing_marks`, `clothing_description`, `contact_person`, `contact_phone`, `police_case_number`, `finding_location`, `finder_name`, `finder_phone`, `finder_email`, `still_with_finder`, `updated_at`
+
+### Indexes in 004
+- `crime(status, created_at, reporter_id)`
+- `missing_person(status, created_at)`
+- `wanted_criminal(status, created_at)`
+- `appuser(role_hint, status)`
+- Plus inline 002 indexes on `chat_messages`, `criminal_sightings`, `case_assignments`, `user_complaints`, `police_station`.
+
+### Other renames
+- `wanted_criminal.crimes` → `wanted_criminal.crimes_committed`
+- `wanted_criminal.reward` → `wanted_criminal.reward_amount`
+
+---
+
 Appendix: Helpful commands
 - Run backend (development):
   - uvicorn main:app --reload --host 0.0.0.0 --port 8000

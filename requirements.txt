@@ -10,3 +10,5 @@ mysql-connector-python
 flask-cors
 bcrypt
 python-multipart
+pyjwt
+passlib[bcrypt]>=1.7.4

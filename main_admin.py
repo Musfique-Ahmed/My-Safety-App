@@ -1111,7 +1111,7 @@ def delete_missing_person(missing_id: int, db: Session = Depends(get_db)):
     db.delete(db_row)
     db.commit()
     return {"message": "Missing person deleted successfully"}
-Base.metadata.create_all(bind=engine)
+
 
 # --- Minimal create endpoints for PoliceStation and WantedCriminal ---
 

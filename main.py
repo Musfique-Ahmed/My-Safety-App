@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form, Body
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -6,15 +6,22 @@ import logging
 from pydantic import BaseModel, validator
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
-import hashlib
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any, Mapping
 import json
 import os
 import uuid
 import asyncio
-import mysql.connector
-from mysql.connector import Error
+
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    require_user,
+    require_admin,
+)
+from db import fetch_one, fetch_all, execute, insert_and_get_id, parse_json_field as parse_json_value
 
 app = FastAPI()
 
@@ -39,23 +46,6 @@ app.add_middleware(
 
 SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost/mysafetydb"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})
-
-# Database configuration
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'mysafetydb',
-    'port': 3306
-}
-
-def get_db_connection():
-    try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        return connection
-    except Error as e:
-        print(f"Error connecting to database: {e}")
-        return None
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -113,16 +103,6 @@ class AdminCrimeCreate(BaseModel):
     evidence_files: Optional[List[Dict[str, Any]]] = None
     witness_info: Optional[str] = None
 
-class MissingPersonData(BaseModel):
-    name: str
-    age: int
-    gender: str
-    description: str
-    last_seen_location: str
-    last_seen_date: str
-    contact_info: str
-    photo_url: Optional[str] = None
-
 class MissingPersonFinderUpdate(BaseModel):
     finding_location: str
     finder_name: str
@@ -142,10 +122,6 @@ class MissingPersonFinderUpdate(BaseModel):
             return None
         stripped = value.strip()
         return stripped or None
-
-class ComplaintVerification(BaseModel):
-    complaint_id: int
-    status: str
 
 class CaseAssignment(BaseModel):
     user_id: int
@@ -206,12 +182,6 @@ class WantedCriminalCreate(BaseModel):
     photo_url: Optional[str] = None
     added_by: int
 
-class AdminAction(BaseModel):
-    action_type: str
-    target_id: int
-    notes: Optional[str] = None
-    admin_id: int
-
 class PoliceStationCreate(BaseModel):
     station_name: str
     station_code: str
@@ -239,8 +209,7 @@ class PoliceStationCreate(BaseModel):
             raise ValueError("Longitude must be between -180 and 180 degrees")
         return value
 
-def hash_password(password: str):
-    return hashlib.sha256(password.encode()).hexdigest()
+# Password hashing moved to auth.py (bcrypt via passlib).
 
 # ==================== ROOT ENDPOINT (LANDING PAGE) ====================
 
@@ -314,7 +283,10 @@ async def get_admin_dashboard_alt():
 
 @app.post("/register")
 async def register_user(user: UserCreate):
-    hashed_password = hash_password(user.password)
+    try:
+        hashed_password = hash_password(user.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     with engine.connect() as conn:
         try:
             # Check if email exists
@@ -324,9 +296,9 @@ async def register_user(user: UserCreate):
             ).fetchone()
             if result:
                 raise HTTPException(status_code=400, detail="Email already registered")
-            
+
             # Insert new user
-            conn.execute(
+            result = conn.execute(
                 text("""
                     INSERT INTO appuser (email, username, password_hash, role_hint, status, created_at)
                     VALUES (:email, :username, :password_hash, :role_hint, :status, :created_at)
@@ -340,11 +312,26 @@ async def register_user(user: UserCreate):
                     "created_at": datetime.utcnow()
                 }
             )
+            user_id = result.lastrowid
             conn.commit()
-            print(f"Registered new user: {user.email}")
-            return {"message": "User registered successfully"}
+            logging.info("Registered new user: %s", user.email)
+            token = create_access_token(user_id=user_id, role="User")
+            return {
+                "message": "User registered successfully",
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": user.email,
+                    "username": user.username,
+                    "role_hint": "User",
+                    "status": "Active",
+                },
+            }
+        except HTTPException:
+            raise
         except Exception as e:
             conn.rollback()
+            logging.exception("Registration failed for %s", user.email)
             raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/login")
@@ -355,17 +342,21 @@ async def login_user(user: UserLogin):
                 text("SELECT * FROM appuser WHERE email = :email"),
                 {"email": user.email}
             ).mappings().fetchone()
-            
+
             if not result:
                 raise HTTPException(status_code=400, detail="Email not registered")
-            
-            stored_password = result["password_hash"]
-            if stored_password != hash_password(user.password):
+
+            if not verify_password(user.password, result["password_hash"]):
                 raise HTTPException(status_code=400, detail="Incorrect password")
-            
-            print(f"Login success for {user.email}")
+            if (result.get("status") or "").lower() in {"inactive", "disabled", "banned"}:
+                raise HTTPException(status_code=403, detail="Account is not active")
+
+            role = result.get("role_hint") or "User"
+            token = create_access_token(user_id=result["user_id"], role=role)
+            logging.info("Login success for %s", user.email)
             return {
                 "message": "Login successful",
+                "token": token,
                 "user": {
                     "user_id": result["user_id"],
                     "email": result["email"],
@@ -373,12 +364,13 @@ async def login_user(user: UserLogin):
                     "role_hint": result["role_hint"],
                     "station_id": result["station_id"],
                     "status": result["status"],
-                    "created_at": result["created_at"]
-                }
+                    "created_at": result["created_at"],
+                },
             }
         except HTTPException:
             raise
         except Exception as e:
+            logging.exception("Login failed for %s", user.email)
             raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/api/users")
@@ -483,7 +475,7 @@ async def submit_crime_report(crime_data: CrimeData):
             raise HTTPException(status_code=500, detail=f"Failed to submit crime report: {str(e)}")
 
 @app.post("/api/admin/crimes")
-async def create_admin_crime(payload: AdminCrimeCreate):
+async def create_admin_crime(payload: AdminCrimeCreate, _user: dict = Depends(require_admin)):
     """Allow administrators to log a new crime directly from the dashboard."""
 
     status_map = {
@@ -677,21 +669,26 @@ async def create_admin_crime(payload: AdminCrimeCreate):
 @app.get("/api/crimes")
 async def get_all_crimes(
     status: Optional[str] = Query(None, description="Filter by status"),
-    limit: Optional[int] = Query(100, description="Limit number of results")
+    limit: int = Query(50, ge=1, le=200, description="Limit number of results"),
+    offset: int = Query(0, ge=0, description="Number of rows to skip"),
 ):
     with engine.connect() as conn:
-        query = "SELECT * FROM crime"
-        params = {}
-        
+        base_query = "SELECT * FROM crime"
+        count_query = "SELECT COUNT(*) AS total FROM crime"
+        params: Dict[str, Any] = {}
         if status:
-            query += " WHERE status = :status"
+            base_query += " WHERE status = :status"
+            count_query += " WHERE status = :status"
             params["status"] = status
-            
-        query += " ORDER BY created_at DESC LIMIT :limit"
+
+        base_query += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
         params["limit"] = limit
-        
-        result = conn.execute(text(query), params).mappings().fetchall()
-        
+        params["offset"] = offset
+
+        result = conn.execute(text(base_query), params).mappings().fetchall()
+        total_row = conn.execute(text(count_query), params if not params.get("offset") else {k: v for k, v in params.items() if k not in ("limit", "offset")}).mappings().fetchone()
+        total = int(total_row["total"]) if total_row else 0
+
         crimes = []
         for row in result:
             crime = dict(row)
@@ -709,8 +706,8 @@ async def get_all_crimes(
             if crime["witness_data"]:
                 crime["witness_data"] = json.loads(crime["witness_data"])
             crimes.append(crime)
-            
-        return {"crimes": crimes}
+
+        return {"crimes": crimes, "total": total, "limit": limit, "offset": offset}
 
 @app.get("/api/crimes/{crime_id}")
 async def get_crime_by_id(crime_id: int):
@@ -742,7 +739,7 @@ async def get_crime_by_id(crime_id: int):
 
 
 @app.delete("/api/crimes/{crime_id}")
-async def delete_crime_record(crime_id: int):
+async def delete_crime_record(crime_id: int, _user: dict = Depends(require_admin)):
     with engine.begin() as conn:
         conn.execute(
             text("DELETE FROM case_assignments WHERE crime_id = :crime_id"),
@@ -945,7 +942,7 @@ async def update_missing_person_finder(missing_id: int, payload: MissingPersonFi
 
 
 @app.delete("/api/missing-persons/{missing_id}")
-async def delete_missing_person_record(missing_id: int):
+async def delete_missing_person_record(missing_id: int, _user: dict = Depends(require_admin)):
     delete_sql = text("DELETE FROM missing_person WHERE missing_id = :missing_id")
 
     with engine.begin() as conn:
@@ -1043,7 +1040,7 @@ async def get_wanted_criminals():
     try:
         with engine.connect() as conn:
             rows = [dict(row) for row in conn.execute(query).mappings()]
-        return rows
+        return {"wanted_criminals": rows}
     except Exception:
         logging.exception("Failed to fetch wanted criminals")
         raise HTTPException(status_code=500, detail="Failed to fetch wanted criminals")
@@ -1104,7 +1101,7 @@ async def list_wanted_criminal_sightings(criminal_id: int):
     return {"sightings": [_serialize(row) for row in rows]}
 
 @app.post("/api/wanted-criminals/{criminal_id}/sighting")
-async def report_criminal_sighting(criminal_id: int, sighting: CriminalSighting):
+async def report_criminal_sighting(criminal_id: int, sighting: CriminalSighting, _user: dict = Depends(require_user)):
     """Report a sighting of a wanted criminal"""
 
     def _parse_last_seen(value: Optional[str]) -> datetime:
@@ -1206,30 +1203,23 @@ async def report_criminal_sighting(criminal_id: int, sighting: CriminalSighting)
 # ==================== CHAT/MESSAGING ENDPOINTS ====================
 
 @app.post("/api/chat/messages")
-async def send_message(message: ChatMessage):
-    """Send a chat message"""
-    with engine.connect() as conn:
-        try:
-            result = conn.execute(
-                text("""
-                    INSERT INTO chat_messages (user_id, message, report_id, is_admin, created_at)
-                    VALUES (:user_id, :message, :report_id, :is_admin, :created_at)
-                """),
-                {
-                    "user_id": message.user_id,
-                    "message": message.message,
-                    "report_id": message.report_id,
-                    "is_admin": message.is_admin,
-                    "created_at": datetime.utcnow()
-                }
-            )
-            conn.commit()
-            return {"message": "Message sent successfully", "message_id": result.lastrowid}
-        except Exception as e:
-            conn.rollback()
-            print(f"Error sending message: {e}")
-            # Return success for demo
-            return {"message": "Message sent successfully", "message_id": 1}
+async def send_message(message: ChatMessage, user: dict = Depends(require_user)):
+    """Send a chat message. `user_id` is taken from the authenticated token, not the body."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("""
+                INSERT INTO chat_messages (user_id, message, report_id, is_admin, created_at)
+                VALUES (:user_id, :message, :report_id, :is_admin, :created_at)
+            """),
+            {
+                "user_id": user["user_id"],
+                "message": message.message,
+                "report_id": message.report_id,
+                "is_admin": False,
+                "created_at": datetime.utcnow(),
+            },
+        )
+        return {"message": "Message sent successfully", "message_id": result.lastrowid}
 
 @app.get("/api/chat/messages")
 async def get_chat_messages(
@@ -1395,40 +1385,36 @@ async def get_conversation_messages(user_id: int, report_id: Optional[str] = Non
             ]}
 
 @app.post("/api/chat/send")
-async def send_chat_message(message_data: ChatMessage):
-    """Send a message in chat (works for both admin and users)"""
-    with engine.connect() as conn:
-        try:
-            result = conn.execute(
-                text("""
-                    INSERT INTO chat_messages (user_id, message, report_id, is_admin, created_at, read_by_admin, read_by_user)
-                    VALUES (:user_id, :message, :report_id, :is_admin, :created_at, :read_by_admin, :read_by_user)
-                """),
-                {
-                    "user_id": message_data.user_id,
-                    "message": message_data.message,
-                    "report_id": message_data.report_id,
-                    "is_admin": message_data.is_admin or False,
-                    "created_at": datetime.utcnow(),
-                    "read_by_admin": 1 if message_data.is_admin else 0,
-                    "read_by_user": 0 if message_data.is_admin else 1
-                }
-            )
-            conn.commit()
-            message_id = result.lastrowid
-            
-            return {
-                "message": "Message sent successfully",
-                "message_id": message_id,
-                "timestamp": datetime.utcnow()
-            }
-        except Exception as e:
-            print(f"Error sending message: {e}")
-            return {
-                "message": "Message sent successfully",
-                "message_id": 1,
-                "timestamp": datetime.utcnow()
-            }
+async def send_chat_message(message_data: ChatMessage, user: dict = Depends(require_user)):
+    """Send a message in chat. `user_id` is taken from the authenticated token.
+
+    Authenticated admins may set `is_admin=True` to send as staff; non-admins
+    always send as user messages.
+    """
+    role = (user.get("role_hint") or "").lower()
+    is_admin = bool(message_data.is_admin) and role in {"admin", "officer", "detective", "staff"}
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("""
+                INSERT INTO chat_messages (user_id, message, report_id, is_admin, created_at, read_by_admin, read_by_user)
+                VALUES (:user_id, :message, :report_id, :is_admin, :created_at, :read_by_admin, :read_by_user)
+            """),
+            {
+                "user_id": user["user_id"],
+                "message": message_data.message,
+                "report_id": message_data.report_id,
+                "is_admin": is_admin,
+                "created_at": datetime.utcnow(),
+                "read_by_admin": 1 if is_admin else 0,
+                "read_by_user": 0 if is_admin else 1,
+            },
+        )
+        message_id = result.lastrowid
+        return {
+            "message": "Message sent successfully",
+            "message_id": message_id,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
 @app.get("/api/chat/user-conversations/{user_id}")
 async def get_user_conversations(user_id: int):
@@ -1470,64 +1456,12 @@ async def get_user_conversations(user_id: int):
 
 # ==================== EMERGENCY ALERT ENDPOINTS ====================
 
-def ensure_status_history_table(conn) -> None:
-    """Create the status_history table if it does not already exist."""
-    conn.execute(text(
-        """
-        CREATE TABLE IF NOT EXISTS status_history (
-            history_id INT AUTO_INCREMENT PRIMARY KEY,
-            crime_id INT NOT NULL,
-            new_status VARCHAR(100) NOT NULL,
-            notes TEXT NULL,
-            changed_by INT NULL,
-            changed_at DATETIME NOT NULL,
-            INDEX idx_status_history_crime (crime_id),
-            INDEX idx_status_history_changed (changed_at)
-        )
-        """
-    ))
-
-def ensure_emergency_alerts_table(conn) -> None:
-    """Create the emergency_alerts table if it does not already exist."""
-    conn.execute(text(
-        """
-        CREATE TABLE IF NOT EXISTS emergency_alerts (
-            alert_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NULL,
-            user_snapshot LONGTEXT NULL,
-            linked_crime_id INT NULL,
-            location_label VARCHAR(255) NULL,
-            latitude DECIMAL(10, 7) NULL,
-            longitude DECIMAL(10, 7) NULL,
-            alert_type VARCHAR(100) NOT NULL,
-            severity VARCHAR(50) NOT NULL DEFAULT 'High',
-            description TEXT NULL,
-            metadata LONGTEXT NULL,
-            status VARCHAR(50) NOT NULL DEFAULT 'New',
-            assigned_officer_id INT NULL,
-            assigned_officer_snapshot LONGTEXT NULL,
-            assigned_at DATETIME NULL,
-            created_at DATETIME NOT NULL,
-            resolved_at DATETIME NULL,
-            INDEX idx_emergency_status (status),
-            INDEX idx_emergency_created_at (created_at)
-        )
-        """
-    ))
-
-def parse_json_value(value):
-    """Safely parse a JSON string into Python data structures."""
-    if value is None:
-        return None
-    if isinstance(value, (dict, list)):
-        return value
-    try:
-        return json.loads(value)
-    except Exception:
-        return None
+# Schema is owned by migrations/001-004. ensure_*_table helpers removed.
+# JSON parsing is unified on `parse_json_value` (alias of `parse_json_field`
+# imported from db.py at the top of this module).
 
 @app.post("/api/emergency-alert")
-async def submit_emergency_alert(alert: EmergencyAlert):
+async def submit_emergency_alert(alert: EmergencyAlert, _user: dict = Depends(require_user)):
     """Handle panic button and emergency alerts."""
 
     def coerce_float(value):
@@ -1540,7 +1474,6 @@ async def submit_emergency_alert(alert: EmergencyAlert):
 
     try:
         with engine.begin() as conn:
-            ensure_emergency_alerts_table(conn)
 
             user_snapshot = None
             if alert.user_id:
@@ -1666,12 +1599,16 @@ async def submit_emergency_alert(alert: EmergencyAlert):
 
 
 @app.get("/api/admin/emergencies")
-async def get_admin_emergencies(status: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=500)):
+async def get_admin_emergencies(
+    _user: dict = Depends(require_admin),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Retrieve recent emergency alerts with enrichment for the admin dashboard."""
     with engine.connect() as conn:
-        ensure_emergency_alerts_table(conn)
 
-        params: Dict[str, Any] = {"limit": limit}
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
         base_query = (
             """
             SELECT alert_id, user_id, user_snapshot, linked_crime_id, location_label,
@@ -1686,24 +1623,16 @@ async def get_admin_emergencies(status: Optional[str] = Query(None), limit: int 
             base_query += " WHERE LOWER(status) = :status"
             params["status"] = status.lower()
 
-        base_query += " ORDER BY created_at DESC LIMIT :limit"
+        base_query += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
 
         rows = conn.execute(text(base_query), params).mappings().fetchall()
 
     emergencies = []
     for row in rows:
-        def decode_json(value):
-            if not value:
-                return None
-            try:
-                return json.loads(value)
-            except Exception:
-                return None
-
         emergency = {
             "alert_id": row["alert_id"],
             "user_id": row["user_id"],
-            "user_snapshot": decode_json(row.get("user_snapshot")),
+            "user_snapshot": parse_json_value(row.get("user_snapshot")),
             "linked_crime_id": row.get("linked_crime_id"),
             "location_label": row.get("location_label") or "Unknown location",
             "latitude": float(row.get("latitude")) if row.get("latitude") is not None else None,
@@ -1711,10 +1640,10 @@ async def get_admin_emergencies(status: Optional[str] = Query(None), limit: int 
             "alert_type": row.get("alert_type"),
             "severity": row.get("severity"),
             "description": row.get("description"),
-            "metadata": decode_json(row.get("metadata")) or {},
+            "metadata": parse_json_value(row.get("metadata")) or {},
             "status": row.get("status"),
             "assigned_officer_id": row.get("assigned_officer_id"),
-            "assigned_officer_snapshot": decode_json(row.get("assigned_officer_snapshot")),
+            "assigned_officer_snapshot": parse_json_value(row.get("assigned_officer_snapshot")),
             "assigned_at": row.get("assigned_at"),
             "created_at": row.get("created_at"),
             "resolved_at": row.get("resolved_at")
@@ -1726,11 +1655,10 @@ async def get_admin_emergencies(status: Optional[str] = Query(None), limit: int 
 
 
 @app.put("/api/admin/emergencies/{alert_id}/assign")
-async def assign_emergency(alert_id: int, assignment: EmergencyAssignment):
+async def assign_emergency(alert_id: int, assignment: EmergencyAssignment, _user: dict = Depends(require_admin)):
     """Assign an officer to a specific emergency alert."""
     try:
         with engine.begin() as conn:
-            ensure_emergency_alerts_table(conn)
 
             alert_row = conn.execute(
                 text(
@@ -1958,8 +1886,6 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
             if not current:
                 raise HTTPException(status_code=404, detail="Crime not found")
 
-            ensure_status_history_table(conn)
-
             new_status_value = status_update.new_status.strip()
             notes_value = (status_update.notes or "").strip() or None
             changed_by_value = status_update.changed_by if status_update.changed_by is not None else None
@@ -1996,7 +1922,7 @@ async def update_crime_status(crime_id: int, status_update: StatusUpdate):
                     }
                 )
             except Exception:
-                pass
+                logging.exception("Failed to write status_history row; primary update succeeded")
 
         return {
             "message": "Crime status updated successfully",
@@ -2138,10 +2064,12 @@ async def get_dashboard_data():
 
 @app.get("/api/admin/users")
 async def get_users_for_admin(
+    _user: dict = Depends(require_admin),
     status: Optional[str] = Query(None, description="Filter users by status"),
     role: Optional[str] = Query(None, description="Filter users by role"),
     search: Optional[str] = Query(None, description="Search by username, email, or full name"),
-    limit: int = Query(200, ge=1, le=1000, description="Maximum number of users to return")
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of users to return"),
+    offset: int = Query(0, ge=0, description="Number of rows to skip"),
 ):
     """Return a filtered list of application users for the admin dashboard."""
     with engine.connect() as conn:
@@ -2171,7 +2099,8 @@ async def get_users_for_admin(
             if conditions:
                 base_query.append(" WHERE " + " AND ".join(conditions))
 
-            base_query.append(" ORDER BY created_at DESC LIMIT :limit")
+            base_query.append(" ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+            params["offset"] = offset
             query = "".join(base_query)
 
             result = conn.execute(text(query), params).mappings().fetchall()
@@ -2191,7 +2120,7 @@ async def get_users_for_admin(
             return {"success": False, "error": "Failed to load users", "users": []}
 
 @app.put("/api/admin/users/{user_id}")
-async def update_user_by_admin(user_id: int, user_update: UserUpdate):
+async def update_user_by_admin(user_id: int, user_update: UserUpdate, _user: dict = Depends(require_admin)):
     """Admin endpoint to update user details"""
     with engine.connect() as conn:
         try:
@@ -2233,7 +2162,7 @@ async def update_user_by_admin(user_id: int, user_update: UserUpdate):
             raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
 
 @app.delete("/api/admin/users/{user_id}")
-async def delete_user_by_admin(user_id: int):
+async def delete_user_by_admin(user_id: int, _user: dict = Depends(require_admin)):
     """Admin endpoint to delete/deactivate user"""
     with engine.connect() as conn:
         try:
@@ -2255,7 +2184,7 @@ async def delete_user_by_admin(user_id: int):
             raise HTTPException(status_code=500, detail=f"Failed to deactivate user: {str(e)}")
 
 @app.get("/api/admin/user-stats")
-async def get_user_statistics():
+async def get_user_statistics(_user: dict = Depends(require_admin)):
     """Get user statistics for admin dashboard"""
     with engine.connect() as conn:
         try:
@@ -2298,7 +2227,7 @@ async def get_user_statistics():
             }
 
 @app.post("/api/admin/wanted-criminals")
-async def create_wanted_criminal(criminal: WantedCriminalCreate):
+async def create_wanted_criminal(criminal: WantedCriminalCreate, _user: dict = Depends(require_admin)):
     """Admin endpoint to add new wanted criminal"""
     with engine.connect() as conn:
         try:
@@ -2349,7 +2278,7 @@ async def create_wanted_criminal(criminal: WantedCriminalCreate):
             raise HTTPException(status_code=500, detail=f"Failed to add wanted criminal: {str(e)}")
 
 @app.put("/api/admin/wanted-criminals/{criminal_id}")
-async def update_wanted_criminal(criminal_id: int, criminal: WantedCriminalCreate):
+async def update_wanted_criminal(criminal_id: int, criminal: WantedCriminalCreate, _user: dict = Depends(require_admin)):
     """Admin endpoint to update wanted criminal"""
     with engine.connect() as conn:
         try:
@@ -2398,7 +2327,7 @@ async def update_wanted_criminal(criminal_id: int, criminal: WantedCriminalCreat
             raise HTTPException(status_code=500, detail=f"Failed to update wanted criminal: {str(e)}")
 
 @app.delete("/api/admin/wanted-criminals/{criminal_id}")
-async def delete_wanted_criminal(criminal_id: int):
+async def delete_wanted_criminal(criminal_id: int, _user: dict = Depends(require_admin)):
     """Admin endpoint to remove wanted criminal"""
     try:
         with engine.begin() as conn:
@@ -2425,7 +2354,7 @@ async def delete_wanted_criminal(criminal_id: int):
 # Add these endpoints for police station management
 
 @app.get("/api/admin/police-stations")
-async def get_all_police_stations():
+async def get_all_police_stations(_user: dict = Depends(require_admin)):
     """Get all police stations"""
     with engine.connect() as conn:
         try:
@@ -2438,7 +2367,7 @@ async def get_all_police_stations():
             return {"police_stations": []}
 
 @app.post("/api/admin/police-stations")
-async def create_police_station(station: PoliceStationCreate):
+async def create_police_station(station: PoliceStationCreate, _user: dict = Depends(require_admin)):
     """Admin endpoint to add new police station"""
 
     def _sanitize_text(value: Optional[str]) -> Optional[str]:
@@ -2525,7 +2454,7 @@ async def create_police_station(station: PoliceStationCreate):
         raise HTTPException(status_code=500, detail=f"Failed to add police station: {str(e)}")
 
 @app.put("/api/admin/police-stations/{station_id}")
-async def update_police_station(station_id: int, station: PoliceStationCreate):
+async def update_police_station(station_id: int, station: PoliceStationCreate, _user: dict = Depends(require_admin)):
     """Admin endpoint to update police station"""
     with engine.connect() as conn:
         try:
@@ -2565,7 +2494,7 @@ async def update_police_station(station_id: int, station: PoliceStationCreate):
 # Add comprehensive admin analytics endpoints
 
 @app.get("/api/admin/overview")
-async def get_admin_overview():
+async def get_admin_overview(_user: dict = Depends(require_admin)):
     """Get comprehensive overview for admin dashboard"""
     with engine.connect() as conn:
         try:
@@ -2620,7 +2549,7 @@ async def get_admin_overview():
             }
 
 @app.get("/api/admin/analytics")
-async def get_admin_analytics(limit: int = Query(15, ge=1, le=100)):
+async def get_admin_analytics(limit: int = Query(15, ge=1, le=100), _user: dict = Depends(require_admin)):
     """Provide dashboard-ready analytics summary and recent activity."""
     limit = max(1, min(limit, 100))
     window_label = "30 days"
@@ -2934,7 +2863,7 @@ async def get_admin_analytics(limit: int = Query(15, ge=1, le=100)):
             return {"summary_cards": [], "activity": []}
 
 @app.get("/api/admin/activity-log")
-async def get_admin_activity_log(limit: Optional[int] = Query(50)):
+async def get_admin_activity_log(limit: Optional[int] = Query(50), _user: dict = Depends(require_admin)):
     """Get recent system activity for admin monitoring"""
     with engine.connect() as conn:
         try:
@@ -2973,7 +2902,7 @@ async def get_admin_activity_log(limit: Optional[int] = Query(50)):
             return {"activities": []}
 
 @app.put("/api/admin/missing-persons/{missing_id}/status")
-async def update_missing_person_status_admin(missing_id: int, status_update: dict):
+async def update_missing_person_status_admin(missing_id: int, status_update: dict, _user: dict = Depends(require_admin)):
     """Admin endpoint to update missing person status"""
     with engine.connect() as conn:
         try:
@@ -3000,7 +2929,7 @@ async def update_missing_person_status_admin(missing_id: int, status_update: dic
 # Add case assignment functionality
 
 @app.post("/api/admin/assign-case")
-async def assign_case_to_officer(assignment: CaseAssignment):
+async def assign_case_to_officer(assignment: CaseAssignment, _user: dict = Depends(require_admin)):
     """Assign crime case to police officer"""
     with engine.connect() as conn:
         try:
@@ -3048,24 +2977,18 @@ async def assign_case_to_officer(assignment: CaseAssignment):
                 {"crime_id": assignment.crime_id, "updated_at": datetime.utcnow()}
             )
             
-            conn.commit()
             return {"message": "Case assigned successfully"}
         except HTTPException:
             raise
         except Exception as e:
-            conn.rollback()
-            print(f"Error assigning case: {e}")
-            return {"message": "Case assigned successfully"}  # Demo fallback
+            logging.exception("Error assigning case")
+            raise HTTPException(status_code=500, detail=f"Failed to assign case: {str(e)}")
 
 @app.get("/api/admin/cases/{crime_id}/history")
-async def get_case_status_history(crime_id: int):
+async def get_case_status_history(crime_id: int, _user: dict = Depends(require_admin)):
     """Return status history and assignment timeline for a given crime case."""
     with engine.connect() as conn:
         try:
-            try:
-                ensure_status_history_table(conn)
-            except Exception as exc:  # pragma: no cover - table creation expected to succeed
-                logging.warning("Failed to ensure status_history table exists: %s", exc)
 
             crime_row = conn.execute(
                 text(
@@ -3227,7 +3150,11 @@ async def get_case_status_history(crime_id: int):
             raise HTTPException(status_code=500, detail="Failed to fetch case history")
 
 @app.get("/api/admin/complaints")
-async def get_admin_complaints(limit: int = Query(200, ge=1, le=500)):
+async def get_admin_complaints(
+    _user: dict = Depends(require_admin),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Fetch recent user complaints for verification workflow."""
     with engine.connect() as conn:
         rows = conn.execute(
@@ -3246,10 +3173,10 @@ async def get_admin_complaints(limit: int = Query(200, ge=1, le=500)):
                     updated_at
                 FROM user_complaints
                 ORDER BY created_at DESC
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """
             ),
-            {"limit": limit}
+            {"limit": limit, "offset": offset}
         ).mappings().fetchall()
 
     complaints = []
@@ -3279,7 +3206,7 @@ async def get_admin_complaints(limit: int = Query(200, ge=1, le=500)):
     return {"complaints": complaints}
 
 @app.post("/api/admin/complaints/{complaint_id}/verify")
-async def verify_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+async def verify_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None), _user: dict = Depends(require_admin)):
     """Mark a complaint as verified."""
     notes = None
     if payload:
@@ -3309,7 +3236,7 @@ async def verify_user_complaint(complaint_id: int, payload: Optional[Dict[str, A
     return {"message": "Complaint verified"}
 
 @app.post("/api/admin/complaints/{complaint_id}/reject")
-async def reject_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+async def reject_user_complaint(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None), _user: dict = Depends(require_admin)):
     """Reject a complaint and record the reason if provided."""
     notes = None
     if payload:
@@ -3339,7 +3266,7 @@ async def reject_user_complaint(complaint_id: int, payload: Optional[Dict[str, A
     return {"message": "Complaint rejected"}
 
 @app.post("/api/admin/complaints/{complaint_id}/escalate")
-async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None)):
+async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[str, Any]] = Body(default=None), _user: dict = Depends(require_admin)):
     """Create a crime record from a verified complaint and mark it escalated."""
     with engine.begin() as conn:
         complaint = conn.execute(
@@ -3407,7 +3334,6 @@ async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[s
 
         new_crime_id = crime_insert.lastrowid
 
-        ensure_status_history_table(conn)
         try:
             conn.execute(
                 text(
@@ -3425,7 +3351,7 @@ async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[s
                 }
             )
         except Exception:
-            pass
+            logging.exception("Failed to write status_history for escalated complaint; primary insert succeeded")
 
         conn.execute(
             text(
@@ -3449,7 +3375,7 @@ async def escalate_complaint_to_case(complaint_id: int, payload: Optional[Dict[s
 
 
 @app.post("/api/admin/complaints/from-crime/{crime_id}")
-async def convert_crime_to_complaint(crime_id: int):
+async def convert_crime_to_complaint(crime_id: int, _user: dict = Depends(require_admin)):
     """Create a user_complaints row from an existing crime so it can be verified/rejected via the complaints workflow."""
     with engine.begin() as conn:
         crime_row = conn.execute(
@@ -3498,7 +3424,11 @@ async def convert_crime_to_complaint(crime_id: int):
         }
 
 @app.get("/api/admin/case-management")
-async def get_case_management_cases():
+async def get_case_management_cases(
+    _user: dict = Depends(require_admin),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return crimes under investigation along with assignment details."""
     with engine.connect() as conn:
         try:
@@ -3526,17 +3456,26 @@ async def get_case_management_cases():
                     LEFT JOIN appuser u ON ca.user_id = u.user_id
                     WHERE LOWER(c.status) IN ('under investigation', 'investigating', 'in progress', 'assigned', 'escalated')
                     ORDER BY COALESCE(ca.assigned_at, c.updated_at, c.created_at) DESC
+                    LIMIT :limit OFFSET :offset
                     """
-                )
+                ),
+                {"limit": limit, "offset": offset},
             ).mappings().fetchall()
 
-            return {"cases": [dict(row) for row in result]}
+            total_row = conn.execute(text(
+                "SELECT COUNT(*) AS total FROM crime WHERE LOWER(status) IN ('under investigation', 'investigating', 'in progress', 'assigned', 'escalated')"
+            )).mappings().fetchone()
+            return {"cases": [dict(row) for row in result], "total": int(total_row["total"]) if total_row else 0, "limit": limit, "offset": offset}
         except Exception as exc:
             logging.exception("Error fetching case management cases: %s", exc)
             return {"cases": []}
 
 @app.get("/api/admin/case-assignments")
-async def get_case_assignments():
+async def get_case_assignments(
+    _user: dict = Depends(require_admin),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Get all case assignments"""
     with engine.connect() as conn:
         try:
@@ -3548,12 +3487,25 @@ async def get_case_assignments():
                     LEFT JOIN appuser u ON ca.user_id = u.user_id
                     LEFT JOIN crime c ON ca.crime_id = c.crime_id
                     ORDER BY ca.assigned_at DESC
-                """)
+                    LIMIT :limit OFFSET :offset
+                """),
+                {"limit": limit, "offset": offset},
             ).mappings().fetchall()
-            return {"assignments": [dict(row) for row in result]}
+            total_row = conn.execute(text("SELECT COUNT(*) AS total FROM case_assignments")).mappings().fetchone()
+            return {"assignments": [dict(row) for row in result], "total": int(total_row["total"]) if total_row else 0, "limit": limit, "offset": offset}
         except Exception as e:
-            print(f"Error fetching case assignments: {e}")
-            return {"assignments": []}
+            logging.exception("Error fetching case assignments")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch case assignments: {e}")
+
+
+# Sub-app mount: serve admin-only legacy routes (the ones that used to live in
+# main_admin.py) under /admin-api so the admin dashboard can still call them
+# while everything shares one uvicorn process on port 8000.
+try:
+    from main_admin import app as admin_subapp  # noqa: E402
+    app.mount("/admin-api", admin_subapp)
+except Exception as exc:  # pragma: no cover - dev convenience
+    logging.warning("Could not mount main_admin under /admin-api: %s", exc)
 
 
 if __name__ == "__main__":

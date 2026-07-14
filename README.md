@@ -128,12 +128,34 @@ My-Safety-App/
    ```
 
 ### Quick Start
-1. Run `python main.py` to start the backend server
-2. Open http://localhost:8000 in your browser
-3. Create an account or login
-4. Explore the interactive map
-5. Report incidents or search for missing persons
-6. Use the panic button for emergencies
+1. Copy `.env.example` to `.env` and set a real `JWT_SECRET` (≥32 random bytes).
+2. Run `python scripts/run_migration_and_db_test.py` to apply migrations 001–004 and verify the schema.
+3. Run `python main.py` to start the backend server
+4. Open http://localhost:8000 in your browser
+5. Create an account or login
+6. Explore the interactive map
+7. Report incidents or search for missing persons
+8. Use the panic button for emergencies
+
+## 🔐 Authentication
+
+All write endpoints (POST/PUT/DELETE on `/api/admin/*`, `/api/chat/*`, panic button, etc.) require a JWT bearer token. Public read endpoints (e.g. `GET /api/crimes`, `GET /api/wanted-criminals`, `GET /api/missing-persons`) are still open.
+
+Tokens are HS256-signed with `JWT_SECRET` and expire after `JWT_EXPIRES_MINUTES` (default 120). The login response includes the token; the frontend stores it in `localStorage.auth_token` and the shared `static/assets/js/api-base.js` wrapper attaches it to every fetch automatically.
+
+### Token usage
+```
+curl -X POST http://localhost:8000/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"hunter2"}'
+
+curl http://localhost:8000/api/admin/users \
+  -H "Authorization: Bearer <token>"
+```
+
+## 📄 Admin sub-app (`/admin-api`)
+
+`main_admin.py` is mounted under `/admin-api`. Legacy CRUD paths that live only in that file (e.g. `/api/admin/admin-activity-log`, `/api/admin/api-logs`) are reachable as `/admin-api/api/admin/...`. The default admin dashboard calls only endpoints that exist in `main.py`, so no client changes are required.
 
 ## 🔧 Backend API
 
@@ -171,6 +193,14 @@ async def read_root():
 async def report_crime(crime_data: dict):
     # Process crime report
     return {"status": "success"}
+```
+
+### Pagination
+
+List endpoints (`GET /api/crimes`, `/api/admin/users`, `/api/admin/complaints`, `/api/admin/case-assignments`, `/api/admin/case-management`, `/api/admin/emergencies`, `/api/admin/activity-log`) accept `?limit=N&offset=M`. Default `limit=50`, max `200`. Responses include `total`, `limit`, and `offset`:
+
+```json
+{ "crimes": [...], "total": 137, "limit": 50, "offset": 0 }
 ```
 
 ## 🎨 Themes
@@ -297,7 +327,9 @@ If you need help or have questions:
 - [ ] Multi-language support
 - [ ] Integration with emergency services APIs
 - [ ] Offline functionality
-- [ ] Database integration (PostgreSQL/MongoDB)
+- [x] JWT auth + bcrypt password hashing
+- [x] Pagination on list endpoints
+- [x] DB schema documented as migrations (002/003/004)
 - [ ] User authentication with OAuth
 
 ### Version History

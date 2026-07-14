@@ -9,6 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -290,17 +292,17 @@ const card = (item) => {
       : "bg-gray-200 text-gray-700";
   const finderBadgeText = item.still_with_finder ? "With finder" : "Not with finder";
   el.innerHTML = `
-    <img src="${item.photo_url}" alt="${item.name}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name)}/600/400'">
+    <img src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
     <div class="p-4">
       <div class="flex justify-between items-center mb-2">
-        <div class="font-semibold">${item.name} <span class="text-sm text-gray-500">(${item.nickname || "—"})</span></div>
+        <div class="font-semibold">${escapeHtml(item.name || '')} <span class="text-sm text-gray-500">(${escapeHtml(item.nickname || "—")})</span></div>
         <span class="px-2 py-0.5 text-xs ${statusClass} rounded-full">
-          ${item.status || "Unknown"}
+          ${escapeHtml(item.status || "Unknown")}
         </span>
       </div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Hometown: ${item.hometown || "—"}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${item.last_seen_location} · ${fmt(item.last_seen_time)}</div>
-      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Finder status: ${finderBadgeText}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Hometown: ${escapeHtml(item.hometown || "—")}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${escapeHtml(item.last_seen_location || '')} · ${escapeHtml(fmt(item.last_seen_time))}</div>
+      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Finder status: ${escapeHtml(finderBadgeText)}</div>
       <div class="mt-2">
         <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
       </div>
@@ -328,7 +330,7 @@ const openModal = (item) => {
   $("#modalTitle").textContent = `${item.name} — Details`;
   $("#modalBody").innerHTML = `
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <img src="${item.photo_url}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${item.name}" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name)}/600/400'">
+      <img src="${escapeHtml(item.photo_url || '')}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${escapeHtml(item.name || '')}" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
       <div class="md:col-span-2 text-sm space-y-1">
         <p><b>Nickname:</b> ${escapeHtml(item.nickname || "—")}</p>
         <p><b>Age:</b> ${escapeHtml(item.age ?? "—")} yrs | <b>Weight:</b> ${escapeHtml(item.weight_kg ?? "—")} kg | <b>Hair:</b> ${escapeHtml(item.hair_color || "—")}</p>
