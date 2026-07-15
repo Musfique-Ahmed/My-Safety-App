@@ -401,18 +401,27 @@
   // ---------------------------------------------------------------------------
   function _runRoleGuard() {
     var path = (window.location.pathname || '').toLowerCase();
+
+    // Admin-only routes — privileged users only.
     var adminPaths = ['/admin', '/admin-dashboard'];
-    var onAdmin = adminPaths.indexOf(path) !== -1;
-    if (!onAdmin) return;
-    if (!_user) {
-      // Anonymous admin page hit → force login. Preserve where they were
-      // trying to go so login can send them back after auth.
-      try { sessionStorage.setItem('post_login_redirect', path); } catch (e) {}
-      window.location.replace('/login');
+    if (adminPaths.indexOf(path) !== -1) {
+      if (!_user) {
+        try { sessionStorage.setItem('post_login_redirect', path); } catch (e) {}
+        window.location.replace('/login');
+        return;
+      }
+      if (!isPrivileged()) {
+        window.location.replace('/dashboard');
+      }
       return;
     }
-    if (!isPrivileged()) {
-      window.location.replace('/dashboard');
+
+    // Auth-required routes — any logged-in user (citizen or staff).
+    // Anonymous visitors get bounced to /login with a return-to path.
+    var authRequiredPaths = ['/report-crime', '/report-missing', '/chatbox'];
+    if (authRequiredPaths.indexOf(path) !== -1 && !_user) {
+      try { sessionStorage.setItem('post_login_redirect', path); } catch (e) {}
+      window.location.replace('/login');
     }
   }
 

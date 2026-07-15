@@ -28,19 +28,25 @@
   'use strict';
 
   // Geographic anchors.
-  // Centroid of Bangladesh (rough centroid of the bounding box).
-  var CENTROID_LAT = 23.65;
-  var CENTROID_LNG = 90.35;
+  // Centroid of Bangladesh — derived from the polygon's bounding box
+  // (lng 87.95..92.30 → 90.125, lat 21.25..26.45 → 23.85). Setting the
+  // projection centre to the polygon centroid means the country fills
+  // the disc symmetrically.
+  var CENTROID_LAT = 23.85;
+  var CENTROID_LNG = 90.13;
 
   // The Dhaka capital — drawn as the brightest hub on top of the map.
+  // Slightly south-east of the geometric centroid so the country looks
+  // centred while Dhaka sits where it actually is.
   var DHAKA_LAT = 23.8103;
   var DHAKA_LNG = 90.4125;
 
-  // The canvas extent we map onto: enough to comfortably contain the country.
-  // Bangladesh spans roughly 4.7° lng × 6.0° lat. We use slightly more so the
-  // outline has breathing room inside the disc.
-  var LNG_SPAN = 6.0;
-  var LAT_SPAN = 7.5;
+  // The canvas extent we map onto: tight fit to the actual country outline
+  // with a small visual margin. Bangladesh spans roughly 4.35° lng ×
+  // 5.20° lat. We size the projection so the country fills most of the
+  // disc (not floats in the middle of an oversized buffer).
+  var LNG_SPAN = 5.4;
+  var LAT_SPAN = 6.5;
 
   // Default alert hot-spots. Real coordinates of major cities / district
   // seats across all of Bangladesh, so the radar shows nationwide activity
@@ -72,37 +78,41 @@
     { lat: 24.7471, lng: 90.4203, sev: 'green', label: 'Mymensingh' }
   ];
 
-  // Stylised Bangladesh landmass. Hand-traced from the country shape: tall
-  // narrow body, wide Ganges delta in the south, Sylhet lobe in the
-  // north-east, Chittagong Hill Tracts in the south-east, and the
-  // Sundarbans mangrove belt along the south-west coast. Coordinates are
-  // deliberately smoothed — it's a brand element, not a navigation chart.
+  // Stylised Bangladesh landmass. Hand-traced from the country's actual
+  // fish-shape silhouette: narrow head in the north, central waist (Dhaka
+  // division), wide Ganges delta bulging south across the Bay of Bengal
+  // coast (Khulna / Barisal / Noakhali), the Sundarbans mangrove belt in
+  // the south-west, the Sylhet lobe bulging east, and the long south-east
+  // tail of Chittagong → Cox's Bazar. Coordinates are deliberately
+  // smoothed — it's a brand element, not a navigation chart.
   // Each entry is [lng, lat]; lat/lng are mapped to canvas via the same
-  // projection as the hot-spots below.
+  // projection as the hot-spots below. Tracing order: clockwise from the
+  // north-west corner.
   var LANDMASS = [
-    // North-west corner
-    [88.55, 26.45], [88.60, 26.20], [88.65, 25.85], [88.70, 25.55],
-    // North edge
-    [89.10, 26.10], [89.55, 26.05], [89.95, 25.85], [90.30, 25.65],
-    // North-east edge (Mymensingh / Netrokona)
-    [90.70, 25.55], [91.05, 25.40], [91.30, 25.30], [91.45, 25.20],
-    // Sylhet lobe (NE)
-    [91.85, 25.05], [92.10, 24.85], [92.35, 24.95], [92.20, 25.15],
-    [91.95, 25.30], [91.80, 25.05], [91.95, 24.80], [92.20, 24.60],
-    // East edge dipping south
-    [92.20, 24.20], [92.10, 23.80], [91.90, 23.40], [91.85, 22.95],
-    // South-east (Chittagong / Cox's Bazar / Hill Tracts)
-    [91.95, 22.55], [92.05, 22.20], [91.95, 21.90], [91.65, 21.95],
-    // Bay of Bengal (south coast — Khulna → Sundarbans → Barisal → Noakhali)
-    [91.30, 22.05], [91.10, 22.15], [90.85, 22.20], [90.55, 22.25],
-    [90.25, 22.15], [89.95, 22.20], [89.70, 22.15], [89.50, 22.30],
-    [89.30, 22.25], [89.20, 21.95], [89.00, 22.10],
-    // Sundarbans (south-west)
-    [88.85, 21.75], [88.70, 21.80], [88.55, 22.05], [88.40, 22.30],
-    // West edge (going north)
-    [88.20, 22.55], [88.05, 23.00], [88.05, 23.55], [88.10, 24.10],
-    [88.20, 24.60], [88.25, 25.10], [88.40, 25.55], [88.55, 26.00],
-    // Close
+    // ─ North-west corner (Panchagarh / Thakurgaon)
+    [88.55, 26.45],
+    // ─ North edge running east (Dinajpur, Rangpur, Kurigram)
+    [88.85, 26.30], [89.20, 26.10], [89.55, 25.95], [89.85, 25.85], [90.15, 25.75],
+    // ─ North-east: Mymensingh / Netrokona dipping toward Sylhet basin
+    [90.55, 25.60], [90.95, 25.45], [91.30, 25.30], [91.60, 25.10],
+    // ─ Sylhet lobe (NE bulge — only ~50km east of the rest)
+    [91.85, 24.95], [92.05, 24.85], [92.25, 24.95], [92.30, 25.15],
+    [92.10, 25.25], [91.90, 25.20], [91.75, 25.10],
+    // ─ East edge going south (Comilla, Feni, Chittagong outskirts)
+    [91.85, 24.55], [91.95, 24.05], [92.00, 23.50], [91.95, 23.00],
+    // ─ Chittagong port bulge
+    [91.80, 22.65], [91.85, 22.35], [92.05, 22.10],
+    // ─ Cox's Bazar / Teknaf — the long south-east tail
+    [92.20, 21.75], [92.30, 21.45], [92.25, 21.25],
+    // ─ South coast sweeping west (Noakhali, Barisal, Khulna — wide delta bulge)
+    [91.80, 22.05], [91.40, 22.30], [91.00, 22.45], [90.60, 22.55], [90.20, 22.55],
+    [89.85, 22.45], [89.50, 22.30], [89.20, 22.10],
+    // ─ Sundarbans (south-west, gently dipping south)
+    [88.95, 21.85], [88.75, 21.70], [88.55, 21.85], [88.40, 22.10],
+    // ─ West edge going north (Jessore, Rajshahi side)
+    [88.20, 22.50], [88.05, 23.00], [87.95, 23.55], [87.95, 24.10],
+    [88.05, 24.65], [88.15, 25.15], [88.30, 25.65], [88.45, 26.10],
+    // Close back to start
     [88.55, 26.45]
   ];
 
@@ -223,7 +233,27 @@
       ctx.fillText('S', cx, cy + maxR - 12);
 
       // ---- Bangladesh landmass silhouette ----
+      // Filled first (so the sweep / hot-spots overlay on top), with a
+      // bright outline so the country shape reads at a glance. We do an
+      // outer glow pass before the inner fill to lift it off the disc.
       ctx.save();
+      // Soft outer glow (drawn wider, semi-transparent).
+      ctx.beginPath();
+      var startedGlow = false;
+      LANDMASS.forEach(function (pt) {
+        var p = project(pt[1], pt[0], cx, cy, maxR);
+        if (!startedGlow) { ctx.moveTo(p.x, p.y); startedGlow = true; }
+        else { ctx.lineTo(p.x, p.y); }
+      });
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(124, 200, 255, 0.35)';
+      ctx.lineWidth = 6;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      // Inner filled polygon.
       ctx.beginPath();
       var started = false;
       LANDMASS.forEach(function (pt) {
@@ -233,12 +263,14 @@
       });
       ctx.closePath();
       var landGrad = ctx.createLinearGradient(cx, cy - maxR, cx, cy + maxR);
-      landGrad.addColorStop(0, 'rgba(124, 155, 255, 0.22)');
-      landGrad.addColorStop(1, 'rgba(91, 124, 250, 0.14)');
+      landGrad.addColorStop(0,   'rgba(124, 155, 255, 0.30)');
+      landGrad.addColorStop(1,   'rgba(91, 124, 250, 0.20)');
       ctx.fillStyle = landGrad;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(124, 155, 255, 0.45)';
-      ctx.lineWidth = 1.3;
+      // Bright outline on top.
+      ctx.strokeStyle = 'rgba(180, 215, 255, 0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round';
       ctx.stroke();
       ctx.restore();
 
