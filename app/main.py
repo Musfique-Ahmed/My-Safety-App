@@ -102,57 +102,57 @@ from app.schemas import (  # noqa: F401  (re-exports for in-module use)
 async def read_root():
     """Serve the main landing page (home.html)"""
     try:
-        return HTMLResponse(content=_read_html("static/home.html"))
+        return HTMLResponse(content=_read_html("static/templates/home.html"))
     except FileNotFoundError:
         # Fallback to index.html if home.html doesn't exist
-        return HTMLResponse(content=_read_html("static/index.html"))
+        return HTMLResponse(content=_read_html("static/templates/index.html"))
 
 # ==================== STATIC PAGE ENDPOINTS ====================
 
 @app.get("/dashboard")
 async def get_dashboard_page():
     """Serve the main dashboard page (index.html)"""
-    return HTMLResponse(content=_read_html("static/index.html"))
+    return HTMLResponse(content=_read_html("static/templates/index.html"))
 
 @app.get("/home")
 async def get_home_page():
     """Alternative route to home page"""
-    return HTMLResponse(content=_read_html("static/home.html"))
+    return HTMLResponse(content=_read_html("static/templates/home.html"))
 
 @app.get("/report-crime")
 async def get_report_crime_page():
     """Serve the crime reporting page"""
-    return HTMLResponse(content=_read_html("static/report_crime.html"))
+    return HTMLResponse(content=_read_html("static/templates/report_crime.html"))
 
 @app.get("/missing-person")
 async def get_missing_person_page():
     """Serve the missing persons page"""
-    return HTMLResponse(content=_read_html("static/missing_person.html"))
+    return HTMLResponse(content=_read_html("static/templates/missing_person.html"))
 
 @app.get("/wanted-criminals")
 async def get_wanted_criminals_page():
     """Serve the wanted criminals page"""
-    return HTMLResponse(content=_read_html("static/wanted_criminal.html"))
+    return HTMLResponse(content=_read_html("static/templates/wanted_criminal.html"))
 
 @app.get("/chatbox")
 async def get_chatbox_page():
     """Serve the community chatbox page"""
-    return HTMLResponse(content=_read_html("static/user_chatbox.html"))
+    return HTMLResponse(content=_read_html("static/templates/user_chatbox.html"))
 
 @app.get("/report-missing")
 async def get_report_missing_page():
     """Serve the missing person report form"""
-    return HTMLResponse(content=_read_html("static/report_missing_person.html"))
+    return HTMLResponse(content=_read_html("static/templates/report_missing_person.html"))
 
 @app.get("/login")
 async def get_login_page():
     """Serve the login page"""
-    return HTMLResponse(content=_read_html("static/login.html"))
+    return HTMLResponse(content=_read_html("static/templates/login.html"))
 
 @app.get("/signup")
 async def get_signup_page():
     """Serve the signup page"""
-    return HTMLResponse(content=_read_html("static/signup.html"))
+    return HTMLResponse(content=_read_html("static/templates/signup.html"))
 
 @app.get("/admin")
 async def get_admin_dashboard_page():
@@ -162,12 +162,12 @@ async def get_admin_dashboard_page():
     `/admin-dashboard`. The real dashboard lives in
     `static/admin_dashboard21.html`; serving the stub here would loop.
     """
-    return HTMLResponse(content=_read_html("static/admin_dashboard21.html"))
+    return HTMLResponse(content=_read_html("static/templates/admin_dashboard21.html"))
 
 @app.get("/admin-dashboard")
 async def get_admin_dashboard_alt():
     """Alternative route to admin dashboard (same target as /admin)."""
-    return HTMLResponse(content=_read_html("static/admin_dashboard21.html"))
+    return HTMLResponse(content=_read_html("static/templates/admin_dashboard21.html"))
 
 # ---- Compatibility redirects -------------------------------------------------
 # Several templates still link to underscore filenames like
