@@ -3,221 +3,214 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Safety — Public Safety Register · Dhaka Metropolitan</title>
-
-  <!-- Type -->
+  <title>Citizen Dashboard · MySafety</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Map -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-
-  <!-- App (auth header injection + escape helper) -->
-  <script src="/static/assets/js/api-base.js"></script>
-  <script src="/static/assets/js/escape.js"></script>
-
-  <!-- Design system (replaces Tailwind + Lucide + ~150 lines of inline CSS) -->
-  <link rel="stylesheet" href="/static/assets/css/bulletin.css">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
 </head>
 <body>
+  <div id="ms-root"></div>
 
-  <!-- ============ REGISTRY HEADER ============ -->
-  <header class="registry-header">
-    <div class="registry-header__brand">
-      <div style="display:flex; align-items:center; gap: var(--s-3);">
-        <div class="registry-header__seal" aria-hidden="true">MS</div>
+  <!-- Page-specific content lives inside the shared shell. -->
+  <template id="ms-page-template">
+    <section class="ms-section">
+      <header class="ms-page-header">
         <div>
-          <div class="registry-header__title">My Safety</div>
-          <div class="registry-header__sub">Public Safety Register · Dhaka Metropolitan</div>
+          <p class="ms-eyebrow">Citizen Dashboard</p>
+          <h1 class="ms-page-header__title">A live view of safety in your area.</h1>
+          <p class="ms-page-header__sub">Cross-referenced with the last 90 days of filed incidents across Dhaka Metropolitan.</p>
         </div>
-      </div>
-      <nav class="registry-header__nav" aria-label="Primary">
-        <a href="index.html" class="is-active">Register</a>
-        <a href="report_crime.html"><span class="tag-glyph tag-glyph--r">R</span>Report Crime</a>
-        <a href="report_missing_person.html"><span class="tag-glyph tag-glyph--m">M</span>Missing Persons</a>
-        <a href="wanted_criminal.html"><span class="tag-glyph tag-glyph--w">W</span>Wanted</a>
-        <a href="user_chatbox.html"><span class="tag-glyph tag-glyph--alert">!</span>Chat</a>
-      </nav>
-    </div>
-    <div class="registry-header__stamp" id="reg-stamp" aria-live="off">REGISTERED —</div>
-  </header>
-
-  <main>
-
-    <!-- ============ HERO STAT ============ -->
-    <section class="section">
-      <div class="eyebrow" role="presentation">
-        <span class="eyebrow__no">N° 0001</span>
-        <span class="eyebrow__title">MONTHLY DIGEST · DHAKA METROPOLITAN</span>
-        <span class="eyebrow__meta">30 JUN 2026 — 14 JUL 2026</span>
-      </div>
-
-      <div class="hero-stat">
-        <div class="hero-stat__number" id="hero-stat-number" aria-label="427 incidents this month">0</div>
-        <div class="hero-stat__caption">
-          INCIDENTS FILED THIS MONTH<br>
-          across <strong>18 sub-areas</strong> in 8 thanas.<br>
-          <strong>3</strong> active station alerts.
+        <div class="ms-page-header__actions">
+          <a href="/report-crime" class="ms-btn ms-btn--primary">
+            <svg class="ms-icon" aria-hidden="true"><use href="#ms-alert-triangle"/></svg>
+            <span>File a report</span>
+          </a>
+          <a href="/chatbox" class="ms-btn ms-btn--ghost">
+            <svg class="ms-icon" aria-hidden="true"><use href="#ms-message-circle"/></svg>
+            <span>Chat with the station</span>
+          </a>
         </div>
+      </header>
+
+      <div class="ms-stats">
+        <article class="ms-card ms-card--accent-green">
+          <header class="ms-card__head">
+            <span class="ms-stat__icon ms-stat__icon--green">
+              <svg class="ms-icon" aria-hidden="true"><use href="#ms-check"/></svg>
+            </span>
+            <div>
+              <p class="ms-card__eyebrow">Resolved this month</p>
+              <p class="ms-card__title">186 cases cleared</p>
+            </div>
+          </header>
+          <div class="ms-stat__figure" id="stat-resolved">186</div>
+          <div class="ms-card__bar" style="--w:62%"></div>
+        </article>
+        <article class="ms-card ms-card--accent-amber">
+          <header class="ms-card__head">
+            <span class="ms-stat__icon ms-stat__icon--amber">
+              <svg class="ms-icon" aria-hidden="true"><use href="#ms-bell"/></svg>
+            </span>
+            <div>
+              <p class="ms-card__eyebrow">Pending investigation</p>
+              <p class="ms-card__title">214 active reports</p>
+            </div>
+          </header>
+          <div class="ms-stat__figure" id="stat-pending">214</div>
+          <div class="ms-card__bar" style="--w:71%"></div>
+        </article>
+        <article class="ms-card ms-card--accent-red">
+          <header class="ms-card__head">
+            <span class="ms-stat__icon ms-stat__icon--red">
+              <svg class="ms-icon" aria-hidden="true"><use href="#ms-shield-alert"/></svg>
+            </span>
+            <div>
+              <p class="ms-card__eyebrow">Active station alerts</p>
+              <p class="ms-card__title">3 in the last hour</p>
+            </div>
+          </header>
+          <div class="ms-stat__figure" id="stat-alerts">3</div>
+          <div class="ms-card__bar" style="--w:9%; background: var(--status-red);"></div>
+        </article>
+        <article class="ms-card ms-card--accent-blue">
+          <header class="ms-card__head">
+            <span class="ms-stat__icon ms-stat__icon--blue">
+              <svg class="ms-icon" aria-hidden="true"><use href="#ms-globe-icon"/></svg>
+            </span>
+            <div>
+              <p class="ms-card__eyebrow">Coverage</p>
+              <p class="ms-card__title">18 sub-areas · 8 thanas</p>
+            </div>
+          </header>
+          <div class="ms-stat__figure">427</div>
+          <p class="ms-card__meta">incidents filed in 30 days</p>
+        </article>
       </div>
     </section>
 
-    <!-- ============ ROUTE PLANNER + MAP ============ -->
-    <section class="section">
-      <div class="eyebrow">
-        <span class="eyebrow__no">N° 0002</span>
-        <span class="eyebrow__title">SAFEST ROUTE PLANNER</span>
-        <span class="eyebrow__meta">LIVE HEATMAP · 90-DAY WINDOW</span>
-      </div>
+    <section class="ms-section">
+      <header class="ms-section-header">
+        <div>
+          <p class="ms-eyebrow">Safest route planner</p>
+          <h2 class="ms-section-header__title">Tell us where you're going. We'll cross-check the heatmap.</h2>
+        </div>
+        <span class="ms-pill ms-pill--green"><span class="ms-pill__dot"></span>Live feed</span>
+      </header>
 
-      <div class="split">
+      <div class="ms-grid ms-grid--2">
+        <article class="ms-card">
+          <h3 class="ms-card__title">Plan your route</h3>
+          <p class="ms-card__lede">No account required to plan a route. We compare your destination to filed incidents in the last 90 days.</p>
 
-        <!-- Register card (form) -->
-        <div class="register-card">
-          <h2 class="register-card__title">Plan your route</h2>
-          <p class="register-card__lede">
-            We cross-reference your destination against the last 90 days of filed incidents
-            across Dhaka thanas. No account required.
-          </p>
-
-          <form id="route-form" autocomplete="off" novalidate>
-            <div class="field">
-              <label class="field__label" for="start">
-                <span class="tag">01</span>FROM · CURRENT LOCATION
+          <form id="route-form" class="ms-stack" autocomplete="off" novalidate>
+            <label class="ms-field">
+              <span class="ms-field__label">From</span>
+              <span class="ms-field__control">
+                <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-map-pin"/></svg>
+                <input id="start" type="text" class="ms-input" placeholder="e.g. Banani, Dhaka">
+                <button type="button" id="get-location" class="ms-btn ms-btn--ghost ms-btn--sm" aria-label="Use my location">
+                  <svg class="ms-icon" aria-hidden="true"><use href="#ms-map-pin"/></svg>
+                </button>
+              </span>
+            </label>
+            <label class="ms-field">
+              <span class="ms-field__label">To · destination</span>
+              <span class="ms-field__control">
+                <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-map-pin"/></svg>
+                <input id="destination" type="text" class="ms-input" placeholder="e.g. Gulshan, Dhaka" required>
+              </span>
+            </label>
+            <div class="ms-row">
+              <label class="ms-field">
+                <span class="ms-field__label">Time of visit</span>
+                <input id="time" type="time" class="ms-input" required>
               </label>
-              <div class="field-with-action">
-                <input id="start" type="text" placeholder="e.g., Banani, Dhaka" />
-                <button type="button" id="get-location" class="btn-icon" title="Use my location" aria-label="Use my location">⚲</button>
-              </div>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="destination">
-                <span class="tag">02</span>TO · DESTINATION
+              <label class="ms-field">
+                <span class="ms-field__label">Age</span>
+                <input id="age" type="number" class="ms-input" min="10" max="100" placeholder="25" required>
               </label>
-              <input id="destination" type="text" placeholder="e.g., Gulshan, Dhaka" required />
             </div>
-
-            <div class="field-row">
-              <div class="field">
-                <label class="field__label" for="time">
-                  <span class="tag">03</span>TIME OF VISIT
-                </label>
-                <input id="time" type="time" required />
-              </div>
-              <div class="field">
-                <label class="field__label" for="age">
-                  <span class="tag">04</span>AGE
-                </label>
-                <input id="age" type="number" min="10" max="100" placeholder="25" required />
-              </div>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="gender">
-                <span class="tag">05</span>GENDER (OPTIONAL)
-              </label>
-              <select id="gender">
+            <label class="ms-field">
+              <span class="ms-field__label">Gender (optional)</span>
+              <select id="gender" class="ms-select">
                 <option value="">— Select —</option>
                 <option>Male</option>
                 <option>Female</option>
                 <option>Other</option>
               </select>
-            </div>
+            </label>
 
-            <button type="submit" class="btn-stamp">
-              <span class="btn-stamp__chevron">→</span>
-              FIND SAFEST ROUTE
-            </button>
+            <div class="ms-row ms-row--between">
+              <button type="submit" class="ms-btn ms-btn--primary">
+                <span>Find safest route</span>
+                <svg class="ms-icon" aria-hidden="true"><use href="#ms-arrow-right"/></svg>
+              </button>
+              <button type="button" id="panic-btn" class="ms-btn ms-btn--danger" aria-label="Send panic alert">
+                <svg class="ms-icon" aria-hidden="true"><use href="#ms-megaphone"/></svg>
+                <span>Panic</span>
+              </button>
+            </div>
           </form>
+        </article>
 
-          <div style="margin-top: var(--s-5); display:flex; gap: var(--s-3); align-items:center; justify-content: space-between;">
-            <span class="status-line is-live">
-              <span class="status-line__dot"></span>
-              FEED · LIVE
-            </span>
-            <button type="button" id="panic-btn" class="panic-btn" title="Send panic alert" aria-label="Send panic alert">
-              !
-            </button>
-          </div>
-        </div>
-
-        <!-- Map pane + dossier under it -->
-        <div>
-          <div class="map-pane">
-            <div class="map-pane__head">
-              <span>DHAKA · OSM TILES</span>
-              <span class="legend">
-                <span><span class="legend-dot legend-dot--heat-low"></span>LOW</span>
-                <span><span class="legend-dot legend-dot--heat-mid"></span>MID</span>
-                <span><span class="legend-dot legend-dot--heat-hi"></span>HIGH</span>
+        <div class="ms-stack">
+          <article class="ms-card ms-card--no-pad">
+            <header class="ms-card__head ms-card__head--row">
+              <div>
+                <p class="ms-card__eyebrow">Heatmap</p>
+                <p class="ms-card__title">Dhaka · 90-day window</p>
+              </div>
+              <span class="ms-card__legend">
+                <span class="ms-legend-dot ms-legend-dot--blue"></span>Low
+                <span class="ms-legend-dot ms-legend-dot--amber"></span>Mid
+                <span class="ms-legend-dot ms-legend-dot--red"></span>High
               </span>
-            </div>
-            <div id="map" class="map" role="application" aria-label="Crime heatmap of Dhaka"></div>
-          </div>
+            </header>
+            <div id="map" class="ms-map" role="application" aria-label="Crime heatmap of Dhaka"></div>
+          </article>
 
-          <!-- Dossier: filtered zones -->
-          <div id="dossier" class="dossier" aria-live="polite">
-            <div class="dossier__head">
-              <span>ENTRY · LOCAL REGISTER</span>
-              <span id="dossier-status">— · —</span>
-            </div>
-            <div class="dossier__status" id="dossier-default-status">
-              Filing default register at Dhaka centroid. Enter a destination above to filter by area.
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ============ COMMUNITY COUNTERS ============ -->
-    <section class="section">
-      <div class="eyebrow">
-        <span class="eyebrow__no">N° 0003</span>
-        <span class="eyebrow__title">DHK · JUL 2026 · SUMMARY OF RETURNS</span>
-        <span class="eyebrow__meta">RESOLVED · PENDING · CRITICAL</span>
-      </div>
-
-      <div class="counters">
-        <div class="counter">
-          <div class="counter__no">CASE N° 03·A</div>
-          <div class="counter__figure">186</div>
-          <div class="counter__label">RESOLVED THIS MONTH</div>
-          <div class="counter__bar" style="--w:62%"></div>
-        </div>
-        <div class="counter">
-          <div class="counter__no">CASE N° 03·B</div>
-          <div class="counter__figure">214</div>
-          <div class="counter__label">PENDING INVESTIGATION</div>
-          <div class="counter__bar" style="--w:71%"></div>
-        </div>
-        <div class="counter">
-          <div class="counter__no">CASE N° 03·C</div>
-          <div class="counter__figure">27</div>
-          <div class="counter__label">ACTIVE STATION ALERTS</div>
-          <div class="counter__bar" style="--w:9%; background: var(--ink-red);"></div>
+          <article id="dossier" class="ms-card ms-card--accent-blue">
+            <header class="ms-card__head">
+              <span class="ms-stat__icon ms-stat__icon--blue">
+                <svg class="ms-icon" aria-hidden="true"><use href="#ms-file-text"/></svg>
+              </span>
+              <div>
+                <p class="ms-card__eyebrow">Local register</p>
+                <p class="ms-card__title" id="dossier-status">— · —</p>
+              </div>
+            </header>
+            <p class="ms-card__lede" id="dossier-default-status">Filing default register at Dhaka centroid. Enter a destination above to filter by area.</p>
+          </article>
         </div>
       </div>
     </section>
+  </template>
 
-  </main>
-
-  <!-- ============ LIGHTBOX (evidence modal) ============ -->
-  <div id="lightbox" class="lightbox" aria-hidden="true" role="dialog" aria-modal="true">
-    <button class="lightbox__close" type="button" data-close>✕</button>
-    <button class="lightbox__nav lightbox__nav--prev" type="button" data-nav="-1">‹</button>
-    <button class="lightbox__nav lightbox__nav--next" type="button" data-nav="1">›</button>
-    <div class="lightbox__inner">
-      <div class="lightbox__media" id="lightbox-media"></div>
-      <div class="lightbox__caption" id="lightbox-caption">—</div>
+  <!-- Lightbox (kept for evidence popups from the bulletin driver) -->
+  <div id="lightbox" class="ms-lightbox" aria-hidden="true" role="dialog" aria-modal="true" hidden>
+    <button class="ms-lightbox__close" type="button" data-close aria-label="Close">
+      <svg class="ms-icon" aria-hidden="true"><use href="#ms-x"/></svg>
+    </button>
+    <button class="ms-lightbox__nav ms-lightbox__nav--prev" type="button" data-nav="-1" aria-label="Previous">
+      <svg class="ms-icon" aria-hidden="true"><use href="#ms-chevron-left"/></svg>
+    </button>
+    <button class="ms-lightbox__nav ms-lightbox__nav--next" type="button" data-nav="1" aria-label="Next">
+      <svg class="ms-icon" aria-hidden="true"><use href="#ms-chevron-right"/></svg>
+    </button>
+    <div class="ms-lightbox__inner">
+      <div class="ms-lightbox__media" id="lightbox-media"></div>
+      <div class="ms-lightbox__caption" id="lightbox-caption">—</div>
     </div>
   </div>
 
-  <!-- App driver (Leaflet, form, dossier) -->
-  <script src="/static/assets/js/bulletin.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script src="/static/assets/js/bulletin-stub.js"></script>
 </body>
 </html>

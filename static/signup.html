@@ -3,322 +3,139 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign Up - My Safety</title>
-  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      /* Update color variables */
-      --main-blue: #3b82f6;
-      --main-green: #10b981;
-      --main-cyan: #8b5cf6;
-      --main-dark: #111827;
-      --main-light: #1f2937;
-      --main-gradient: linear-gradient(135deg, #111827 0%, #1f2937 100%);
-      --accent-gradient: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      font-family: 'Montserrat', Arial, sans-serif;
-      background: var(--main-gradient);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    .container {
-      background: #1a1a1a;
-      border-radius: 20px;
-      box-shadow: 0 8px 32px 0 rgba(27, 78, 138, 0.18);
-      display: flex;
-      width: 800px;
-      max-width: 95vw;
-      min-height: 450px;
-      overflow: hidden;
-    }
-    .signup-section {
-      flex: 1;
-      padding: 40px 30px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: rgba(26, 26, 26, 0.97);
-    }
-    .signup-section .logo {
-      display: flex;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-    .signup-section .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 10px;
-      border: 2px solid var(--main-blue);
-    }
-    .signup-section .logo-text {
-      color: #ffffff;
-      font-weight: bold;
-      font-size: 1.2rem;
-      letter-spacing: 1px;
-    }
-    .signup-section .avatar {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: var(--main-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 25px;
-      border: 2px solid var(--main-blue);
-    }
-    .signup-section .avatar svg {
-      width: 40px;
-      height: 40px;
-      fill: var(--main-blue);
-    }
-    .signup-section form {
-      width: 100%;
-      max-width: 280px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-    .input-group {
-      position: relative;
-    }
-    .input-group input {
-      width: 100%;
-      padding: 12px 16px 12px 42px;
-      border-radius: 25px;
-      border: 1.5px solid var(--main-cyan);
-      background: #ffffff;
-      color: #333333;
-      font-size: 1rem;
-      outline: none;
-      transition: border 0.2s, background 0.2s;
-      box-sizing: border-box;
-    }
-    .input-group input:focus {
-      background: #f8f8f8;
-      border: 1.5px solid var(--main-green);
-    }
-    .input-group .icon {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--main-cyan);
-      font-size: 1.1rem;
-      pointer-events: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .signup-section button {
-      width: 100%;
-      padding: 12px;
-      background: var(--accent-gradient);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background 0.2s;
-    }
-    .signup-section button:hover {
-      background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
-    }
-    .signup-section .options {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      margin-top: 10px;
-      font-size: 0.95rem;
-      color: #a0a0a0;
-    }
-    .signup-section .options a {
-      color: var(--main-green);
-      text-decoration: none;
-      transition: color 0.2s;
-      margin-left: 5px;
-    }
-    .signup-section .options a:hover {
-      color: var(--main-blue);
-      text-decoration: underline;
-    }
-    .signup-section .login-link {
-      text-align: center;
-      margin-top: 25px;
-      color: var(--main-blue);
-      font-size: 0.97rem;
-    }
-    .signup-section .login-link a {
-      color: var(--main-cyan);
-      font-weight: bold;
-      text-decoration: none;
-      margin-left: 5px;
-      transition: color 0.2s;
-    }
-    .signup-section .login-link a:hover {
-      color: var(--main-green);
-      text-decoration: underline;
-    }
-    .error-message {
-      color: #ff4d6d;
-      text-align: center;
-      margin-top: 10px;
-      font-size: 0.98rem;
-    }
-    .welcome-section {
-      flex: 1.3;
-      background: linear-gradient(120deg, #111827 0%, #1f2937 100%);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 60px 50px;
-      position: relative;
-      overflow: hidden;
-    }
-    .welcome-section .welcome-title {
-      color: #fff;
-      font-size: 2.7rem;
-      font-weight: bold;
-      margin-bottom: 18px;
-      margin-top: 60px;
-      letter-spacing: 1px;
-      background: var(--accent-gradient);
-      padding: 12px 32px;
-      border-radius: 18px;
-      display: inline-block;
-      box-shadow: 0 4px 24px 0 rgba(27,78,138,0.10);
-    }
-    .welcome-section .welcome-desc {
-      color: #a0a0a0;
-      font-size: 1.1rem;
-      max-width: 350px;
-      margin-bottom: 30px;
-      line-height: 1.6;
-    }
-    .welcome-section .login-now {
-      color: #a0a0a0;
-      font-size: 1rem;
-      margin-top: 20px;
-    }
-    .welcome-section .login-now a {
-      color: var(--main-green);
-      font-weight: bold;
-      text-decoration: none;
-      margin-left: 5px;
-      transition: color 0.2s;
-    }
-    .welcome-section .login-now a:hover {
-      color: var(--main-blue);
-      text-decoration: underline;
-    }
-  </style>
+  <title>Sign up · MySafety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
 </head>
 <body>
-  <div class="container">
-    <div class="signup-section">
-      <div class="logo">
-        <div class="logo-icon">
-          <img src="contents/image.png" alt="User Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
-        </div>
-        <span class="logo-text" style="font-size:2rem;">My Safety</span>
-      </div>
-      <div class="avatar">
-        <!-- User icon SVG -->
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/></svg>
-      </div>
-      <form id="signupForm" autocomplete="off" style="width:100%;display:flex;flex-direction:column;align-items:center;">
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/username.png" alt="Username Icon" style="width:18px; height:18px; object-fit:contain;">
+  <div id="ms-root" class="ms-auth">
+    <div class="ms-auth__panel">
+      <a href="/" class="ms-auth__brand">
+        <svg class="ms-icon" aria-hidden="true"><use href="#ms-shield"/></svg>
+        <span>My<strong>Safety</strong></span>
+      </a>
+      <h1 class="ms-auth__title">Create your account</h1>
+      <p class="ms-auth__sub">Join the console to file reports, follow cases, and chat with your local station.</p>
+
+      <form id="signupForm" class="ms-auth__form" autocomplete="on" novalidate>
+        <label class="ms-field">
+          <span class="ms-field__label">Full name</span>
+          <span class="ms-field__control">
+            <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-user"/></svg>
+            <input type="text" id="name" name="name" class="ms-input" placeholder="Your name" required autocomplete="name">
           </span>
-          <input type="text" id="username" name="username" placeholder="Username" required>
-        </div>
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/email.jpg" alt="Email Icon" style="width:18px; height:18px; object-fit:contain;">
+        </label>
+        <label class="ms-field">
+          <span class="ms-field__label">Display username</span>
+          <span class="ms-field__control">
+            <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-users"/></svg>
+            <input type="text" id="username" name="username" class="ms-input" placeholder="e.g. ahmed_dhaka" required autocomplete="username">
           </span>
-          <input type="email" id="email" name="email" placeholder="Email" required>
-        </div>
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/password.jpeg" alt="Password Icon" style="width:18px; height:18px; object-fit:contain;">
+        </label>
+        <label class="ms-field">
+          <span class="ms-field__label">Email</span>
+          <span class="ms-field__control">
+            <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-message-circle"/></svg>
+            <input type="email" id="email" name="email" class="ms-input" placeholder="you@example.com" required autocomplete="email">
           </span>
-          <input type="password" id="password" name="password" placeholder="Password" required>
+        </label>
+        <div class="ms-row">
+          <label class="ms-field ms-field--grow">
+            <span class="ms-field__label">Password</span>
+            <span class="ms-field__control">
+              <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-shield"/></svg>
+              <input type="password" id="password" name="password" class="ms-input" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+            </span>
+          </label>
+          <label class="ms-field ms-field--grow">
+            <span class="ms-field__label">Confirm</span>
+            <span class="ms-field__control">
+              <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-check"/></svg>
+              <input type="password" id="confirm_password" name="confirm_password" class="ms-input" placeholder="Repeat" required minlength="8" autocomplete="new-password">
+            </span>
+          </label>
         </div>
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/confirm.webp" alt="Confirm Password Icon" style="width:18px; height:18px; object-fit:contain;">
-          </span>
-          <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
-        </div>
-        <button type="submit" style="max-width:260px;">SIGN UP</button>
-        <div class="options" style="max-width:260px;">
-          Already have an account?
-          <a href="login.html">Login</a>
-        </div>
-        <div class="error-message" id="error-message"></div>
+        <button type="submit" class="ms-btn ms-btn--primary ms-btn--block" id="signup-submit">Create account</button>
+        <div class="ms-auth__error" id="error-message" role="alert" hidden></div>
       </form>
-    </div>
-    <div class="welcome-section">
-      <div class="welcome-title">Welcome</div>
-      <div class="welcome-desc">
-        Join My Safety to access safe routes and city crime records. Sign up to get started!
-      </div>
-      <div class="login-now">
+
+      <div class="ms-auth__divider"><span>or</span></div>
+      <p class="ms-auth__alt">
         Already a member?
-        <a href="login.html">Login now</a>
-      </div>
+        <a href="/login" class="ms-auth__link">Log in</a>
+      </p>
     </div>
+
+    <aside class="ms-auth__side">
+      <div class="ms-auth__side-glow" aria-hidden="true"></div>
+      <div class="ms-auth__side-content">
+        <p class="ms-eyebrow">What you get</p>
+        <h2 class="ms-auth__side-title">Stay close to what's happening, where you live.</h2>
+        <ul class="ms-auth__list">
+          <li><span class="ms-pill ms-pill--blue">Live</span> Real-time alerts in your area</li>
+          <li><span class="ms-pill ms-pill--amber">File</span> Report incidents in under a minute</li>
+          <li><span class="ms-pill ms-pill--green">Track</span> Follow your case from FIR to closure</li>
+        </ul>
+        <p class="ms-auth__fineprint">Free for citizens · No tracking, no ads</p>
+      </div>
+    </aside>
   </div>
-    <script src="/static/assets/js/api-base.js"></script>
-    <script>
-    document.getElementById('signupForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    const username = document.getElementById('username').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const confirm = document.getElementById('confirm_password').value.trim();
-    const errorMsg = document.getElementById('error-message');
 
-    if (password !== confirm) {
-        errorMsg.textContent = "Passwords do not match.";
-        return;
-    }
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  (function () {
+    var form = document.getElementById('signupForm');
+    var errEl = document.getElementById('error-message');
+    var submit = document.getElementById('signup-submit');
 
-    try {
-        const response = await fetch(resolveApiUrl('/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password })
+    function showError(msg) { errEl.textContent = msg; errEl.hidden = false; }
+    function clearError() { errEl.hidden = true; errEl.textContent = ''; }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError();
+      var name = document.getElementById('name').value.trim();
+      var username = document.getElementById('username').value.trim();
+      var email = document.getElementById('email').value.trim();
+      var password = document.getElementById('password').value;
+      var confirm = document.getElementById('confirm_password').value;
+      if (password !== confirm) { showError('Passwords do not match.'); return; }
+      if (password.length < 8) { showError('Password must be at least 8 characters.'); return; }
+
+      submit.disabled = true;
+      submit.textContent = 'Creating account…';
+
+      try {
+        var resp = await fetch(resolveApiUrl('/register'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, username: username, email: email, password: password })
         });
-        const result = await response.json();
-        if (response.ok) {
-        try {
+        var result = await resp.json().catch(function () { return {}; });
+        if (resp.ok) {
+          try {
             if (result.token) localStorage.setItem('auth_token', result.token);
-            if (result.user) localStorage.setItem('currentUser', JSON.stringify(result.user));
-        } catch (e) {}
-        window.location.href = "/login";
+            if (result.user)  localStorage.setItem('currentUser', JSON.stringify(result.user));
+            if (window.MS && window.MS.setUser) window.MS.setUser(result.user || null);
+          } catch (_) {}
+          window.location.href = '/dashboard';
         } else {
-        errorMsg.textContent = result.detail || "Signup failed";
+          showError(result.detail || ('Sign-up failed (' + resp.status + ')'));
+          submit.disabled = false;
+          submit.textContent = 'Create account';
         }
-    } catch (err) {
-        errorMsg.textContent = "Server error";
-    }
+      } catch (err) {
+        showError('Network error. Check your connection and try again.');
+        submit.disabled = false;
+        submit.textContent = 'Create account';
+      }
     });
-    </script>
+  })();
+  </script>
 </body>
 </html>

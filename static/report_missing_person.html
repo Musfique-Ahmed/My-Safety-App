@@ -1,132 +1,43 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Safety – Report Missing Person</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/static/assets/js/api-base.js"></script>
-  <script src="/static/assets/js/escape.js"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Missing Person · MySafety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
   <style>
-    body {font-family: 'Inter', sans-serif;}
-
-    /* Shadow button style */
-    .shadow-button {
-        border-radius: 9999px;
-        padding: 0.75rem 1.5rem;
-        background-color: #fff;
-        color: #4c1d95;
-        font-weight: 600;
-        box-shadow:
-            -4px -4px 8px rgb(255, 255, 255),
-            4px 4px 8px rgba(255, 255, 255, 0.5);
-        transition: all 0.2s ease-in-out;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
+    .ms-form-card { padding: 1.5rem 2rem; }
+    .ms-form-card fieldset { border: 0; padding: 0; margin: 0 0 1.5rem 0; }
+    .ms-form-card legend { font-size: 1.125rem; font-weight: 600; padding: 0; margin: 0 0 0.75rem 0; color: var(--ink-1); }
+    .ms-form-card .ms-grid--form { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+    @media (min-width: 768px) { .ms-form-card .ms-grid--form { grid-template-columns: 1fr 1fr; } }
+    .ms-form-card .ms-grid--form > .col-span-full { grid-column: 1 / -1; }
+    .ms-form-card label > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 0.4rem; }
+    .ms-form-card input[type=text], .ms-form-card input[type=number], .ms-form-card input[type=date], .ms-form-card input[type=time], .ms-form-card input[type=email], .ms-form-card input[type=tel], .ms-form-card select, .ms-form-card textarea {
+      width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;
+      background: var(--bg-canvas); color: var(--ink-1);
+      border: 1px solid var(--border-hair); font: inherit; outline: none;
+      transition: border-color 0.15s;
     }
-    .light .shadow-button {
-      background-color: #f3f4f6;
-      color: #4c1d95;
-      box-shadow: -4px -4px 8px rgba(255,255,255,1),
-                  4px 4px 8px rgba(0,0,0,0.1);
-    }
-    .shadow-button:hover {
-      box-shadow: -2px -2px 4px rgba(255,255,255,0.1),
-                  2px 2px 4px rgba(0,0,0,0.6);
-      transform: scale(0.98);
-    }
-    .light .shadow-button:hover {
-      box-shadow: -2px -2px 4px rgba(255,255,255,0.8),
-                  2px 2px 4px rgba(0,0,0,0.15);
-    }
+    .ms-form-card input:focus, .ms-form-card select:focus, .ms-form-card textarea:focus { border-color: var(--accent-hi); }
   </style>
 </head>
-<body class="bg-slate-900 text-white">
-
-<!-- Replaced Header -->
-<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
-    <div class="flex items-center space-x-4">
-        <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
-            <i data-lucide="shield-half" class="w-8 h-8"></i>
+<body>
+  <div id="ms-root"></div>
+  <template id="ms-page-template">
+    <section class="ms-section">
+      <header class="ms-page-header">
+        <div>
+          <p class="ms-eyebrow">File a report</p>
+          <h1 class="ms-page-header__title">Report a missing person</h1>
+          <p class="ms-page-header__sub">Time-critical. We push a citywide alert and notify nearby stations the moment you submit.</p>
         </div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
-    </div>
-
-    <nav class="hidden lg:flex items-center space-x-4">
-        <a href="index.html" class="shadow-button text-sm">
-            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
-        </a>
-        
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
-        <div id="report-dropdown" class="relative">
-            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
-            </button>
-            <div id="report-dropdown-menu" 
-                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
-                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
-                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
-                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Crime
-                </a>
-                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
-                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Missing Person
-                </a>
-            </div>
-        </div>
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
-        
-        <a href="wanted_criminal.html" class="shadow-button text-sm">
-            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
-        </a>
-        <a href="missing_person.html" class="shadow-button text-sm">
-            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
-        </a>
-    </nav>
-
-    <div class="flex items-center space-x-4 relative" style="z-index:105;">
-        <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg z-[106] relative" title="Send Panic Alert" style="margin-right:0.5rem;">
-            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-        </button>
-
-        <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-            <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
-            <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
-        </button>
-
-        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-[107] relative" style="position:relative;">
-            <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">U</div>
-            <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
-        </button>
-
-        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden z-[108]" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" style="position:absolute;">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p class="font-semibold text-gray-900 dark:text-white">Hi, User!</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">user@mysafety.com</p>
-            </div>
-        <!--
-        <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
-          Chat with Admin
-        </a>
-        -->
-            <button onclick="window.location.href='login.html'" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
-                <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
-                Logout
-            </button>
-        </div>
-    </div>
-</header>
-
-  <!-- Original Report Missing Form -->
-  <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6">Report Missing to Police</h1>
+      </header>
+      <article class="ms-card ms-form-card">
 
     <form id="reportForm" class="bg-slate-800 p-6 rounded-xl space-y-6">
       <!-- Person Details -->
@@ -218,17 +129,16 @@
       <p class="text-sm text-gray-400">By submitting, you consent to share these details with law enforcement.</p>
       
       <button class="w-full py-3 bg-green-500 hover:bg-green-600 rounded text-black font-semibold">Submit Report</button>
-    </form>
-  </div>
-
-<script>
-  lucide.createIcons();
-  const userMenuButton = document.getElementById("user-menu-button");
-  const userMenu = document.getElementById("user-menu");
-  userMenuButton.addEventListener("click", ()=>{userMenu.classList.toggle("hidden");});
-  document.addEventListener("click",(e)=>{if(!userMenuButton.contains(e.target)&&!userMenu.contains(e.target)){userMenu.classList.add("hidden");}});
-  const themeToggle = document.getElementById("theme-toggle");
-  themeToggle.addEventListener("click",()=>{document.documentElement.classList.toggle("dark"); lucide.createIcons();});
+      </article>
+    </section>
+  </template>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  /* User menu and theme toggle are owned by console.js (the redesigned chrome).
+     The legacy #user-menu-button / #user-menu / #theme-toggle wiring was removed. */
 
   function useMyLocation(){
     if (navigator.geolocation) {
@@ -374,34 +284,9 @@
     });
   })();
 
-// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
-const reportDropdownMenu = document.getElementById('report-dropdown-menu');
-const reportDropdown = document.getElementById('report-dropdown');
+// Reporting menu (#report-dropdown) is owned by console.js (the redesigned topbar).
+// The legacy wiring was removed because the elements no longer exist in the chrome.
 
-// 1. Event listener for clicking the button to TOGGLE the menu
-document.getElementById('report-button').addEventListener('click', (e) => {
-    e.preventDefault(); 
-    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
-    reportDropdownMenu.classList.toggle('hidden');
-});
-
-// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
-document.addEventListener('click', (e) => {
-    // If the menu is visible AND the click target is NOT inside the entire dropdown container
-    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
-        reportDropdownMenu.classList.add('hidden');
-    }
-});
-
-// 3. Add click listener to close menu when an item is selected 
-reportDropdownMenu.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-        reportDropdownMenu.classList.add('hidden');
-    });
-});
-// Removed mouseover and mouseout handlers as requested.
-// --- END UPDATED DROPDOWN LOGIC ---
-
-</script>
+  </script>
 </body>
 </html>

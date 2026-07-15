@@ -1,550 +1,243 @@
 <!DOCTYPE html>
-<html lang="en" class="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>My Safety – Wanted Criminals</title>
+  <title>Wanted List · MySafety</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
+</head>
+<body>
+  <div id="ms-root"></div>
 
-  <!-- Tailwind + Icons -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+  <template id="ms-page-template">
+    <section class="ms-section">
+      <header class="ms-page-header">
+        <div>
+          <p class="ms-eyebrow">Active warrants</p>
+          <h1 class="ms-page-header__title">Wanted list</h1>
+          <p class="ms-page-header__sub">Public roster of suspects with active warrants. Submit a sighting anonymously from any card.</p>
+        </div>
+        <div class="ms-page-header__actions">
+          <span class="ms-pill ms-pill--red"><span class="ms-pill__dot"></span>Do not approach — call 999</span>
+        </div>
+      </header>
+
+      <div id="wantedGrid" class="ms-grid ms-grid--3" aria-live="polite"></div>
+    </section>
+  </template>
+
+  <div id="backdrop" class="ms-modal-back" hidden>
+    <div class="ms-modal ms-modal--wide">
+      <header class="ms-modal__head">
+        <h2 id="modalTitle" class="ms-modal__title">Details</h2>
+        <button id="closeModal" class="ms-modal__close" aria-label="Close">
+          <svg class="ms-icon" aria-hidden="true"><use href="#ms-x"/></svg>
+        </button>
+      </header>
+      <div id="modalBody" class="ms-modal__body"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="/static/assets/js/api-base.js"></script>
   <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  "use strict";
 
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    /* Shadow button style */
-    .shadow-button {
-      border-radius: 9999px;
-      padding: 0.5rem 1rem;
-      background-color: rgba(147, 51, 234, 0.2);
-      color: #d8b4fe;
-      font-weight: 600;
-      box-shadow: 
-        -4px -4px 8px rgba(255, 255, 255, 0.05),
-        4px 4px 8px rgba(0, 0, 0, 0.5);
-      transition: all 0.2s ease-in-out;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-    }
-    .light .shadow-button {
-      background-color: #f3f4f6;
-      color: #4c1d95;
-      box-shadow: 
-        -4px -4px 8px rgba(255, 255, 255, 1),
-        4px 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    .shadow-button:hover {
-      box-shadow: 
-        -2px -2px 4px rgba(255, 255, 255, 0.1), 
-        2px 2px 4px rgba(0, 0, 0, 0.6);
-      transform: scale(0.98);
-    }
-    .light .shadow-button:hover {
-      box-shadow: 
-        -2px -2px 4px rgba(255, 255, 255, 0.8), 
-        2px 2px 4px rgba(0, 0, 0, 0.15);
-    }
-  </style>
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+  const API_BASE = window.location.origin.includes(':8000') ? '' : 'http://127.0.0.1:8000';
+  const $ = sel => document.querySelector(sel);
+  let wantedData = [];
 
-<!-- ===== FIXED HEADER ===== -->
-<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
-  <!-- Logo + Title -->
-  <div class="flex items-center space-x-3">
-    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
-      <i data-lucide="shield" class="w-8 h-8"></i>
-    </div>
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
-  </div>
-
-  <!-- Navigation -->
-  <nav class="hidden lg:flex items-center space-x-4">
-        <a href="index.html" class="shadow-button text-sm">
-            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
-        </a>
-        
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
-        <div id="report-dropdown" class="relative">
-            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
-            </button>
-            <div id="report-dropdown-menu" 
-                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
-                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
-                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
-                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Crime
-                </a>
-                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
-                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Missing Person
-                </a>
-            </div>
-        </div>
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
-        
-        <a href="wanted_criminal.html" class="shadow-button text-sm">
-            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
-        </a>
-        <a href="missing_person.html" class="shadow-button text-sm">
-            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
-        </a>
-    </nav>
-
-  <!-- Actions -->
-  <div class="flex items-center space-x-4 relative">
-    <!-- Panic Button -->
-    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
-      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-    </button>
-
-    <!-- Theme Toggle -->
-    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
-      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
-    </button>
-
-    <!-- User Menu -->
-    <div class="relative">
-      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
-        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">U</div>
-        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
-      </button>
-
-      <!-- Dropdown -->
-      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-          <p class="font-semibold text-gray-900 dark:text-white">Hi, User!</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">user@mysafety.com</p>
-        </div>
-        <!--
-        <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
-          Chat with Admin
-        </a>
-        -->
-        <button onclick="window.location.href='login.html'" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
-          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
-          Logout
-        </button>
-      </div>
-    </div>
-  </div>
-</header>
-<!-- ===== /HEADER ===== -->
-
-<!-- ===== MAIN PAGE (kept from your code) ===== -->
-<div class="container max-w-5xl mx-auto p-6">
-  <h1 class="text-2xl font-bold mb-4">Wanted Criminals</h1>
-  <div class="flex gap-2 mb-4">
-    <input id="searchWanted" placeholder="Search name, crime, area…" class="flex-1 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-    <button id="refreshWanted" class="px-4 py-2 rounded-lg bg-gray-800 dark:bg-gray-700 text-white">Refresh</button>
-  </div>
-  <div id="wantedGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
-</div>
-
-<!-- Modal -->
-<div id="backdrop" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50">
-  <div class="modal bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl max-w-2xl w-11/12">
-    <header class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 p-4">
-      <h2 id="modalTitle" class="text-lg font-bold">Details</h2>
-      <button id="closeModal" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-800">Close</button>
-    </header>
-    <div id="modalBody" class="p-4"></div>
-  </div>
-</div>
-
-<script>
-  // Lucide icons
-  lucide.createIcons();
-
-  // User menu toggle
-  const userMenuButton = document.getElementById("user-menu-button");
-  const userMenu = document.getElementById("user-menu");
-  userMenuButton.addEventListener("click", () => {
-    userMenu.classList.toggle("hidden");
-  });
-  document.addEventListener("click", (e) => {
-    if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
-      userMenu.classList.add("hidden");
-    }
-  });
-
-  // Theme toggle
-  const themeToggle = document.getElementById("theme-toggle");
-  themeToggle.addEventListener("click", () => {
-    document.documentElement.classList.toggle("dark");
-    if (document.documentElement.classList.contains("dark")) {
-      localStorage.theme = "dark";
-    } else {
-      localStorage.theme = "light";
-    }
-    lucide.createIcons(); // Refresh icons
-  });
-</script>
-
-<!-- ===== ORIGINAL SCRIPT (kept same, only layout adapted) ===== -->
-<script>
-"use strict";
-
-const API_BASE = window.location.origin.includes(':8000')
-  ? ''
-  : 'http://127.0.0.1:8000';
-
-let wantedData = [];
-const $ = sel => document.querySelector(sel);
-const fmt = dt => {
-  if (!dt) return "Unknown";
-  const parsed = typeof dt === "string" ? new Date(dt) : dt;
-  return isNaN(parsed.valueOf()) ? "Unknown" : parsed.toLocaleString();
-};
-
-const resolvePhoto = (url) => {
-  if (!url) return "contents/placeholder.jpg";
-  if (url.startsWith("http")) return url;
-  if (url.startsWith("/")) return url;
-  if (url.startsWith("static/")) return `/${url}`;
-  return `/static/${url}`;
-};
-
-function normalizeRow(row) {
-  const crimes = row.crimes_committed
-    ? String(row.crimes_committed).split(/\s*,\s*/).filter(Boolean)
-    : [];
-
-  const extractNumber = (value) => {
-    if (!value) return null;
-    const match = String(value).match(/(\d{2,3})/);
-    return match ? Number(match[1]) : null;
+  const fmt = dt => {
+    if (!dt) return "Unknown";
+    const parsed = typeof dt === "string" ? new Date(dt) : dt;
+    return isNaN(parsed.valueOf()) ? "Unknown" : parsed.toLocaleString();
+  };
+  const resolvePhoto = (url) => {
+    if (!url) return "contents/placeholder.jpg";
+    if (url.startsWith("http")) return url;
+    if (url.startsWith("/")) return url;
+    if (url.startsWith("static/")) return `/${url}`;
+    return `/static/${url}`;
   };
 
-  const lastSeenSource = row.last_seen_reported_at || row.wanted_since || row.created_at;
-  const lastSeenIso = lastSeenSource ? new Date(lastSeenSource).toISOString() : null;
-  const lastSeenLocation = row.last_seen_reported_location || row.last_known_location || "Unknown";
-  const withFinder = row.last_seen_with_finder || "No";
-
-  return {
-    id: row.criminal_id ?? row.id ?? null,
-    name: row.name ?? "Unknown",
-    photo_url: resolvePhoto(row.photo_url),
-    last_seen_location: lastSeenLocation,
-    last_seen_time: lastSeenIso,
-    crimes,
-    reward: Number(row.reward_amount ?? 0),
-    age: extractNumber(row.age_range),
-    height_cm: extractNumber(row.height),
-    complexion: row.hair_color ?? "",
-    note: [row.description ?? "", row.distinguishing_marks ?? ""].filter(Boolean).join(" "),
-    status: row.status || "Unseen",
-    with_finder: withFinder
-  };
-}
-
-async function loadWantedCriminals() {
-  try {
-    const res = await fetch(`${API_BASE || ""}/api/wanted-criminals`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json();
-    const rows = Array.isArray(payload) ? payload : payload.wanted_criminals || [];
-    wantedData = rows.map(normalizeRow);
-    render(wantedData);
-  } catch (error) {
-    console.error("Error loading wanted criminals:", error);
-    wantedData = [];
-    render([]);
-  }
-}
-
-function render(list) {
-  const grid = $("#wantedGrid");
-  grid.innerHTML = "";
-
-  if (!list.length) {
-    const empty = document.createElement("div");
-    empty.className = "col-span-full text-center text-gray-500 dark:text-gray-400 py-12";
-    empty.innerHTML = `
-      <i data-lucide="database-off" class="w-10 h-10 mx-auto mb-3"></i>
-      <p>No wanted criminals found.</p>
-    `;
-    grid.appendChild(empty);
-    lucide.createIcons();
-    return;
-  }
-
-  list.forEach(it => grid.appendChild(card(it)));
-}
-
-function card(item){
-  const el = document.createElement("div");
-  const crimesText = Array.isArray(item.crimes) && item.crimes.length ? item.crimes.join(", ") : "N/A";
-  const rewardText = Number.isFinite(item.reward) ? item.reward.toLocaleString() : "0";
-  const ageText = item.age ? `${item.age} yrs` : "N/A";
-  const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
-  const statusText = (item.status || "Unseen").toString();
-  const normalizedStatus = statusText.trim().toLowerCase();
-
-  let badgeClass = "bg-red-100 text-red-700";
-  let badgeLabel = "Unseen";
-  if (normalizedStatus === "seen") {
-    badgeClass = "bg-emerald-100 text-emerald-700";
-    badgeLabel = "Seen";
-  } else if (normalizedStatus === "captured") {
-    badgeClass = "bg-gray-200 text-gray-600";
-    badgeLabel = "Captured";
-  } else if (normalizedStatus) {
-    badgeLabel = statusText.replace(/_/g, " ");
-  }
-
-  el.className = "rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
-  el.innerHTML = `
-    <img src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
-    <div class="p-4">
-      <div class="flex justify-between items-center mb-2">
-        <div class="font-semibold">${escapeHtml(item.name || '')}</div>
-        <span class="px-2 py-0.5 text-xs ${escapeHtml(badgeClass)} rounded-full">${escapeHtml(badgeLabel)}</span>
-      </div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Crimes: ${escapeHtml(crimesText)}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Reward: ৳${escapeHtml(rewardText)}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${escapeHtml(item.last_seen_location || '')} · ${escapeHtml(fmt(item.last_seen_time))}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Age: ${escapeHtml(ageText)} · Height: ${escapeHtml(heightText)}</div>
-      <div class="mt-2">
-        <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
-      </div>
-    </div>`;
-  el.querySelector(".show").addEventListener("click",()=>openModal(item));
-  return el;
-}
-
-// Modal
-function openModal(item){
-  const crimesText = Array.isArray(item.crimes) && item.crimes.length ? item.crimes.join(", ") : "N/A";
-  const rewardText = Number.isFinite(item.reward) ? item.reward.toLocaleString() : "0";
-  const ageText = item.age ? `${item.age} yrs` : "N/A";
-  const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
-  const complexionText = item.complexion || "N/A";
-  const withFinderText = item.with_finder === "Yes" ? "Yes" : "No";
-  const statusText = (item.status || "Unseen").toString();
-
-  $("#modalTitle").textContent = item.name + " — Details";
-  $("#modalBody").innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <img src="${escapeHtml(item.photo_url || '')}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${escapeHtml(item.name || '')}">
-      <div class="md:col-span-2 text-sm space-y-1">
-        <p><b>Crimes:</b> ${crimesText}</p>
-        <p><b>Last seen:</b> ${item.last_seen_location} at ${fmt(item.last_seen_time)}</p>
-        <p><b>Reward:</b> ৳${rewardText}</p>
-        <p><b>Age:</b> ${ageText}</p>
-        <p><b>Height:</b> ${heightText}</p>
-        <p><b>Complexion:</b> ${complexionText}</p>
-        <p><b>Status:</b> ${statusText}</p>
-        <p><b>With Finder on Last Report:</b> ${withFinderText}</p>
-        <p class="text-gray-500 dark:text-gray-400">${escapeHtml(item.note || "")}</p>
-        <div>
-          <button id="seenBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">I have seen this person</button>
-        </div>
-        <div id="seenWrap" class="hidden mt-3 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-          <div class="font-semibold mb-2">Report Last Seen (Notifies police)</div>
-          <input id="seen_time" type="datetime-local" class="w-full mb-2 p-2 border rounded bg-white dark:bg-gray-900">
-          <div class="flex gap-2 mb-2">
-            <input id="seen_location" placeholder="Type address or use my location" class="flex-1 p-2 border rounded bg-white dark:bg-gray-900">
-            <button id="geoSeen" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">Use my location</button>
-          </div>
-          <label class="flex items-center gap-2 text-sm">
-            <input id="still_with_finder" type="checkbox" class="w-4 h-4"> Still with finder
-          </label>
-          <div class="text-right mt-2">
-            <button id="submitSeen" class="px-3 py-1 bg-sky-400 text-black rounded">Send Notification</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  $("#backdrop").classList.remove("hidden");
-  $("#backdrop").classList.add("flex");
-  $("#seenBtn").onclick = ()=> $("#seenWrap").classList.toggle("hidden");
-  $("#geoSeen").onclick = ()=> fillWithGeo($("#seen_location"));
-  $("#submitSeen").onclick = async ()=>{
-    const submitBtn = $("#submitSeen");
-    const lastSeenTime = $("#seen_time").value;
-    const lastSeenLocation = $("#seen_location").value.trim();
-    const stillWithFinder = $("#still_with_finder").checked;
-
-    if (!lastSeenTime) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Missing Information',
-        text: 'Please provide when you last saw this person.',
-        confirmButtonColor: '#F59E0B'
-      });
-      return;
-    }
-
-    if (!lastSeenLocation) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Missing Location',
-        text: 'Please provide the last seen location or use your current position.',
-        confirmButtonColor: '#F59E0B'
-      });
-      return;
-    }
-
-    const payload = {
-      last_seen_time: lastSeenTime,
+  function normalizeRow(row) {
+    const crimes = row.crimes_committed ? String(row.crimes_committed).split(/\s*,\s*/).filter(Boolean) : [];
+    const extractNumber = (value) => { if (!value) return null; const m = String(value).match(/(\d{2,3})/); return m ? Number(m[1]) : null; };
+    const lastSeenSource = row.last_seen_reported_at || row.wanted_since || row.created_at;
+    const lastSeenIso = lastSeenSource ? new Date(lastSeenSource).toISOString() : null;
+    const lastSeenLocation = row.last_seen_reported_location || row.last_known_location || "Unknown";
+    const withFinder = row.last_seen_with_finder || "No";
+    return {
+      id: row.criminal_id ?? row.id ?? null,
+      name: row.name ?? "Unknown",
+      photo_url: resolvePhoto(row.photo_url),
       last_seen_location: lastSeenLocation,
-      still_with_finder: stillWithFinder,
-      reporter_contact: null
+      last_seen_time: lastSeenIso,
+      crimes, reward: Number(row.reward_amount ?? 0),
+      age: extractNumber(row.age_range), height_cm: extractNumber(row.height),
+      complexion: row.hair_color ?? "",
+      note: [row.description ?? "", row.distinguishing_marks ?? ""].filter(Boolean).join(" "),
+      status: row.status || "Unseen", with_finder: withFinder
     };
+  }
 
+  async function loadWantedCriminals() {
     try {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Sending...';
-
-      const response = await fetch(`${API_BASE || ''}/api/wanted-criminals/${item.id}/sighting`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        const detail = errorBody.detail || errorBody.message || `Request failed with status ${response.status}`;
-        throw new Error(detail);
-      }
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Notification Sent',
-        text: 'Thanks for reporting. Police have been notified of the sighting.',
-        confirmButtonColor: '#3B82F6'
-      });
-
-      closeModal();
-      await loadWantedCriminals();
+      const res = await fetch(resolveApiUrl('/api/wanted-criminals'), { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
+      const rows = Array.isArray(payload) ? payload : payload.wanted_criminals || [];
+      wantedData = rows.map(normalizeRow);
+      render(wantedData);
     } catch (error) {
-      console.error('Failed to submit sighting:', error);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Submission Failed',
-        text: error.message || 'Unable to submit the sighting right now.',
-        confirmButtonColor: '#EF4444'
-      });
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send Notification';
+      console.error("Error loading wanted criminals:", error);
+      wantedData = [];
+      render([]);
     }
-  };
-}
-
-async function fillWithGeo(inputEl) {
-  if (!inputEl) return;
-  if (!('geolocation' in navigator)) {
-    await Swal.fire({
-      icon: 'warning',
-      title: 'Unsupported Feature',
-      text: 'Geolocation is not available in this browser.',
-      confirmButtonColor: '#F59E0B'
-    });
-    return;
   }
 
-  try {
-    const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      });
-    });
-    const { latitude, longitude } = position.coords;
-    inputEl.value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-    await Swal.fire({
-      icon: 'success',
-      title: 'Location Added',
-      text: 'We filled in your current coordinates.',
-      confirmButtonColor: '#10B981'
-    });
-  } catch (error) {
-    let message = 'Unable to retrieve your location.';
-    if (error && typeof error.code === 'number') {
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          message = 'Location permission was denied. Please allow access and try again.';
-          break;
-        case error.POSITION_UNAVAILABLE:
-          message = 'Location information is unavailable right now.';
-          break;
-        case error.TIMEOUT:
-          message = 'The request to get location timed out. Please try again.';
-          break;
-        default:
-          message = 'An unexpected error occurred while fetching location.';
+  function render(list) {
+    const grid = $("#wantedGrid");
+    grid.innerHTML = "";
+    if (!list.length) {
+      grid.innerHTML = `
+        <div class="ms-empty ms-grid--span-3">
+          <svg class="ms-icon ms-empty__icon" aria-hidden="true"><use href="#ms-shield"/></svg>
+          <p>No wanted criminals on file right now.</p>
+        </div>`;
+      return;
+    }
+    list.forEach(it => grid.appendChild(card(it)));
+  }
+
+  function card(item) {
+    const el = document.createElement("article");
+    el.className = "ms-card ms-card--no-pad ms-card--accent-red";
+    const crimesText = Array.isArray(item.crimes) && item.crimes.length ? item.crimes.join(", ") : "N/A";
+    const rewardText = Number.isFinite(item.reward) ? item.reward.toLocaleString() : "0";
+    const ageText = item.age ? `${item.age} yrs` : "N/A";
+    const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
+    const statusText = (item.status || "Unseen").toString();
+    const normalizedStatus = statusText.trim().toLowerCase();
+    let pillClass = "ms-pill--red", pillLabel = "Unseen";
+    if (normalizedStatus === "seen")      { pillClass = "ms-pill--green"; pillLabel = "Seen"; }
+    else if (normalizedStatus === "captured") { pillClass = "ms-pill--ink"; pillLabel = "Captured"; }
+    else if (normalizedStatus) { pillLabel = statusText.replace(/_/g, " "); }
+    el.innerHTML = `
+      <img class="ms-card__cover" src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" onerror="this.src='contents/placeholder.jpg'">
+      <div class="ms-card__body">
+        <header class="ms-row ms-row--between">
+          <div>
+            <h3 class="ms-card__title">${escapeHtml(item.name || 'Unknown')}</h3>
+            <p class="ms-card__sub">${escapeHtml(crimesText)}</p>
+          </div>
+          <span class="ms-pill ${pillClass}"><span class="ms-pill__dot"></span>${escapeHtml(pillLabel)}</span>
+        </header>
+        <dl class="ms-card__facts">
+          <div><dt>Reward</dt><dd>৳${escapeHtml(rewardText)}</dd></div>
+          <div><dt>Last seen</dt><dd>${escapeHtml(item.last_seen_location || '—')}</dd></div>
+          <div><dt>Time</dt><dd>${escapeHtml(fmt(item.last_seen_time))}</dd></div>
+          <div><dt>Age / Height</dt><dd>${escapeHtml(ageText)} · ${escapeHtml(heightText)}</dd></div>
+        </dl>
+        <button type="button" class="ms-btn ms-btn--danger ms-btn--sm ms-btn--block show">View details</button>
+      </div>`;
+    el.querySelector(".show").addEventListener("click", () => openModal(item));
+    return el;
+  }
+
+  function openModal(item) {
+    const crimesText = Array.isArray(item.crimes) && item.crimes.length ? item.crimes.join(", ") : "N/A";
+    const rewardText = Number.isFinite(item.reward) ? item.reward.toLocaleString() : "0";
+    const ageText = item.age ? `${item.age} yrs` : "N/A";
+    const heightText = item.height_cm ? `${item.height_cm} cm` : "N/A";
+    const complexionText = item.complexion || "N/A";
+    const withFinderText = item.with_finder === "Yes" ? "Yes" : "No";
+    const statusText = (item.status || "Unseen").toString();
+    $("#modalTitle").textContent = item.name + " — Details";
+    $("#modalBody").innerHTML = `
+      <div class="ms-modal__grid">
+        <img class="ms-modal__cover" src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}">
+        <div class="ms-modal__copy">
+          <p><b>Crimes:</b> ${crimesText}</p>
+          <p><b>Last seen:</b> ${item.last_seen_location} at ${fmt(item.last_seen_time)}</p>
+          <p><b>Reward:</b> ৳${rewardText}</p>
+          <p><b>Age:</b> ${ageText}</p>
+          <p><b>Height:</b> ${heightText}</p>
+          <p><b>Complexion:</b> ${complexionText}</p>
+          <p><b>Status:</b> ${statusText}</p>
+          <p><b>With finder on last report:</b> ${withFinderText}</p>
+          <p class="ms-card__sub">${escapeHtml(item.note || "")}</p>
+          <button id="seenBtn" class="ms-btn ms-btn--primary">I have seen this person</button>
+          <div id="seenWrap" class="ms-card ms-card--nested" hidden>
+            <p class="ms-card__title">Report last seen (notifies police)</p>
+            <label class="ms-field"><span class="ms-field__label">Time</span><input id="seen_time" type="datetime-local" class="ms-input"></label>
+            <label class="ms-field"><span class="ms-field__label">Location</span>
+              <span class="ms-field__control">
+                <input id="seen_location" class="ms-input" placeholder="Type an address or use my location">
+                <button type="button" id="geoSeen" class="ms-btn ms-btn--ghost ms-btn--sm">Use my location</button>
+              </span>
+            </label>
+            <label class="ms-row"><input id="still_with_finder" type="checkbox"> <span>Still with finder</span></label>
+            <button id="submitSeen" class="ms-btn ms-btn--primary ms-btn--block">Submit sighting</button>
+          </div>
+        </div>
+      </div>`;
+    $("#backdrop").hidden = false;
+    $("#seenBtn").onclick = () => { $("#seenWrap").hidden = !$("#seenWrap").hidden; };
+    $("#geoSeen").onclick = () => getCurrentCoords()
+      .then(c => { $("#seen_location").value = c; })
+      .catch(e => Swal.fire({ icon: 'error', title: 'Location error', text: e.message }));
+    $("#submitSeen").onclick = async () => {
+      const payload = {
+        seen_time: $("#seen_time").value || null,
+        seen_location: $("#seen_location").value.trim(),
+        still_with_finder: $("#still_with_finder").checked
+      };
+      if (!payload.seen_location) {
+        Swal.fire({ icon: 'warning', title: 'Location required', text: 'Please enter or capture a location.' });
+        return;
       }
-    }
-    await Swal.fire({
-      icon: 'error',
-      title: 'Location Error',
-      text: message,
-      confirmButtonColor: '#EF4444'
+      try {
+        const response = await fetch(resolveApiUrl(`/api/wanted-criminals/${item.id}/sighting`), {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || data.message || 'Could not submit sighting');
+        }
+        Swal.fire({ icon: 'success', title: 'Sighting recorded', text: 'Police have been notified.' });
+        closeModal();
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: 'Could not submit', text: err.message });
+      }
+    };
+  }
+
+  const closeModal = () => { $("#backdrop").hidden = true; };
+  $("#closeModal").addEventListener("click", closeModal);
+  $("#backdrop").addEventListener("click", (e) => { if (e.target.id === "backdrop") closeModal(); });
+
+  function getCurrentCoords() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("Geolocation not supported"));
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(`${pos.coords.latitude}, ${pos.coords.longitude}`),
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     });
   }
-}
 
-function closeModal(){ $("#backdrop").classList.add("hidden"); }
-$("#closeModal").addEventListener("click", closeModal);
-$("#backdrop").addEventListener("click", e=>{ if(e.target.id==="backdrop") closeModal(); });
-
-// Search
-function filterItem(it){
-  const q = $("#searchWanted").value.trim().toLowerCase();
-  if(!q) return true;
-  return (it.name || "").toLowerCase().includes(q) ||
-         (it.last_seen_location || "").toLowerCase().includes(q) ||
-         (Array.isArray(it.crimes) ? it.crimes.join(" ") : "").toLowerCase().includes(q);
-}
-$("#searchWanted").addEventListener("input", ()=> render(wantedData.filter(filterItem)));
-$("#refreshWanted").addEventListener("click", ()=> loadWantedCriminals());
-
-// Initial load
-document.addEventListener("DOMContentLoaded", () => {
-  render([]);
-  loadWantedCriminals();
-});
-
-// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
-const reportDropdownMenu = document.getElementById('report-dropdown-menu');
-const reportDropdown = document.getElementById('report-dropdown');
-
-// 1. Event listener for clicking the button to TOGGLE the menu
-document.getElementById('report-button').addEventListener('click', (e) => {
-    e.preventDefault(); 
-    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
-    reportDropdownMenu.classList.toggle('hidden');
-});
-
-// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
-document.addEventListener('click', (e) => {
-    // If the menu is visible AND the click target is NOT inside the entire dropdown container
-    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
-        reportDropdownMenu.classList.add('hidden');
-    }
-});
-
-// 3. Add click listener to close menu when an item is selected 
-reportDropdownMenu.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-        reportDropdownMenu.classList.add('hidden');
-    });
-});
-// Removed mouseover and mouseout handlers as requested.
-// --- END UPDATED DROPDOWN LOGIC ---
-
-</script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('wantedGrid')) loadWantedCriminals();
+  });
+  </script>
 </body>
 </html>

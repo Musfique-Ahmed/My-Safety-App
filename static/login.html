@@ -3,428 +3,125 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - My Safety</title>
-  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      /* Update only color variables */
-      --main-blue: #3b82f6;
-      --main-green: #10b981;
-      --main-cyan: #8b5cf6;
-      --main-dark: #111827;
-      --main-light: #1f2937;
-      --main-gradient: linear-gradient(135deg, #111827 0%, #1f2937 100%);
-      --accent-gradient: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
-    }
-
-    /* Update background colors */
-    body {
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      font-family: 'Montserrat', Arial, sans-serif;
-      background: var(--main-gradient);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .container {
-      background: #1a1a1a;
-      border-radius: 20px;
-      box-shadow: 0 8px 32px 0 rgba(27, 78, 138, 0.18);
-      display: flex;
-      width: 800px;
-      max-width: 95vw;
-      min-height: 450px;
-      overflow: hidden;
-    }
-
-    .login-section {
-      flex: 1;
-      padding: 40px 30px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: rgba(26, 26, 26, 0.97);
-    }
-
-    .login-section .logo {
-      display: flex;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-
-    .login-section .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 10px;
-      border: 2px solid var(--main-blue);
-    }
-
-    .login-section .logo-text {
-      color: #ffffff;
-      font-weight: bold;
-      font-size: 1.2rem;
-      letter-spacing: 1px;
-    }
-
-    .login-section .avatar {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: var(--main-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 25px;
-      border: 2px solid var(--main-blue);
-    }
-
-    .login-section .avatar svg {
-      width: 40px;
-      height: 40px;
-      fill: var(--main-blue);
-    }
-
-    .login-section form {
-      width: 100%;
-      max-width: 280px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    .input-group {
-      position: relative;
-    }
-
-    .input-group input {
-      width: 100%;
-      padding: 12px 16px 12px 42px;
-      border-radius: 25px;
-      border: 1.5px solid var(--main-cyan);
-      background: #2a2a2a;
-      color: #ffffff;
-      font-size: 1rem;
-      outline: none;
-      transition: border 0.2s, background 0.2s;
-      box-sizing: border-box;
-    }
-
-    .input-group input:focus {
-      background: #333333;
-      border: 1.5px solid var(--main-green);
-    }
-
-    .input-group .icon {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--main-cyan);
-      font-size: 1.1rem;
-      pointer-events: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .login-section button {
-      width: 100%;
-      padding: 12px;
-      background: var(--accent-gradient);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background 0.2s;
-    }
-
-    .login-section button:hover {
-      background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
-    }
-
-    .login-section .options {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 10px;
-      font-size: 0.95rem;
-      color: var(--main-blue);
-    }
-
-    .login-section .options label {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      cursor: pointer;
-    }
-
-    .login-section .options a {
-      color: var(--main-green);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    .login-section .options a:hover {
-      color: var(--main-blue);
-      text-decoration: underline;
-    }
-
-    .login-section .signup-link {
-      text-align: center;
-      margin-top: 25px;
-      color: var(--main-blue);
-      font-size: 0.97rem;
-    }
-
-    .login-section .signup-link a {
-      color: var(--main-cyan);
-      font-weight: bold;
-      text-decoration: none;
-      margin-left: 5px;
-      transition: color 0.2s;
-    }
-
-    .login-section .signup-link a:hover {
-      color: var(--main-green);
-      text-decoration: underline;
-    }
-
-    .error-message {
-      color: #ff4d6d;
-      text-align: center;
-      margin-top: 10px;
-      font-size: 0.98rem;
-    }
-
-    .welcome-section {
-      flex: 1.3;
-      background: linear-gradient(120deg, #111827 0%, #1f2937 100%);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 60px 50px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .welcome-section .nav {
-      position: absolute;
-      top: 30px;
-      right: 50px;
-      display: flex;
-      gap: 25px;
-      align-items: center;
-    }
-
-    .welcome-section .nav a {
-      color: var(--main-blue);
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 1rem;
-      opacity: 0.85;
-      transition: opacity 0.2s;
-    }
-
-    .welcome-section .nav a:hover {
-      opacity: 1;
-      text-decoration: underline;
-    }
-
-    .welcome-section .nav .sign-in-btn {
-      background: var(--main-green);
-      color: #fff;
-      padding: 7px 22px;
-      border-radius: 20px;
-      font-weight: bold;
-      margin-left: 10px;
-      border: none;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .welcome-section .nav .sign-in-btn:hover {
-      background: var(--main-blue);
-      color: #fff;
-    }
-
-    .welcome-section .welcome-title {
-      color: #fff;
-      font-size: 2.7rem;
-      font-weight: bold;
-      margin-bottom: 18px;
-      margin-top: 60px;
-      letter-spacing: 1px;
-      background: var(--accent-gradient);
-      padding: 12px 32px;
-      border-radius: 18px;
-      display: inline-block;
-      box-shadow: 0 4px 24px 0 rgba(27,78,138,0.10);
-    }
-
-    .welcome-section .welcome-desc {
-      color: #a0a0a0;
-      font-size: 1.1rem;
-      max-width: 350px;
-      margin-bottom: 30px;
-      line-height: 1.6;
-    }
-
-    .welcome-section .signup-now {
-      color: var(--main-blue);
-      font-size: 1rem;
-      margin-top: 20px;
-    }
-
-    .welcome-section .signup-now a {
-      color: var(--main-green);
-      font-weight: bold;
-      text-decoration: none;
-      margin-left: 5px;
-      transition: color 0.2s;
-    }
-
-    .welcome-section .signup-now a:hover {
-      color: var(--main-blue);
-      text-decoration: underline;
-    }
-
-    .welcome-section .swirl-bg {
-      position: absolute;
-      top: 50%;
-      left: 55%;
-      transform: translate(-50%, -50%);
-      width: 400px;
-      height: 300px;
-      z-index: 0;
-      pointer-events: none;
-      opacity: 0.7;
-      filter: blur(2px);
-    }
-
-    @media (max-width: 900px) {
-      .container {
-        flex-direction: column;
-        width: 98vw;
-        min-height: 100vh;
-        border-radius: 0;
-      }
-
-      .welcome-section {
-        padding: 40px 20px;
-        min-height: 250px;
-      }
-
-      .welcome-section .nav {
-        right: 20px;
-        top: 20px;
-      }
-
-      .login-section {
-        padding: 30px 10px;
-      }
-    }
-  </style>
+  <title>Log in · MySafety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
 </head>
 <body>
-  <div class="container">
-    <div class="login-section">
-      <div class="logo">
-        <div class="logo-icon">
-          <img src="contents/image.png" alt="User Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
-          <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="32" cy="32" r="130" fill="#7b2ff2"/></svg>
-        </div>
-        <span class="logo-text" style="font-size:2rem;">My Safety</span>
-      </div>
-      <div class="avatar">
-        <!-- User icon SVG -->
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/></svg>
-      </div>
-      <form id="loginForm" autocomplete="off" style="width:100%;display:flex;flex-direction:column;align-items:center;">
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/email.jpg" alt="Username Icon" style="width:18px; height:18px; object-fit:contain;">
+  <div id="ms-root" class="ms-auth">
+    <div class="ms-auth__panel">
+      <a href="/" class="ms-auth__brand">
+        <svg class="ms-icon" aria-hidden="true"><use href="#ms-shield"/></svg>
+        <span>My<strong>Safety</strong></span>
+      </a>
+      <h1 class="ms-auth__title">Welcome back</h1>
+      <p class="ms-auth__sub">Sign in to triage alerts, file reports, or follow live cases in your area.</p>
+
+      <form id="loginForm" class="ms-auth__form" autocomplete="on" novalidate>
+        <label class="ms-field">
+          <span class="ms-field__label">Email</span>
+          <span class="ms-field__control">
+            <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-user"/></svg>
+            <input type="email" id="email" name="email" class="ms-input" placeholder="you@example.com" required autocomplete="email">
           </span>
-          <input type="text" id="email" name="email" placeholder="Email" required>
-        </div>
-        <div class="input-group" style="width:100%;max-width:260px;margin-bottom:16px;">
-          <span class="icon">
-            <img src="contents/password.jpeg" alt="Username Icon" style="width:18px; height:18px; object-fit:contain;">
+        </label>
+        <label class="ms-field">
+          <span class="ms-field__label">Password</span>
+          <span class="ms-field__control">
+            <svg class="ms-icon ms-field__icon" aria-hidden="true"><use href="#ms-shield"/></svg>
+            <input type="password" id="password" name="password" class="ms-input" placeholder="••••••••" required autocomplete="current-password">
           </span>
-          <input type="password" id="password" name="password" placeholder="Password" required>
+        </label>
+        <div class="ms-auth__row">
+          <label class="ms-auth__check">
+            <input type="checkbox" name="remember" checked>
+            <span>Keep me signed in</span>
+          </label>
+          <a href="/signup" class="ms-auth__link">Need an account?</a>
         </div>
-        <button type="submit" style="max-width:260px;">LOGIN</button>
-        <div class="options" style="max-width:260px;">
-          <label><input type="checkbox" name="remember"> Remember me</label>
-        </div>
-        <div class="error-message" id="error-message"></div>
+        <button type="submit" class="ms-btn ms-btn--primary ms-btn--block" id="login-submit">Log in</button>
+        <div class="ms-auth__error" id="error-message" role="alert" hidden></div>
       </form>
-      <div class="signup-link">
-        Not a member?
-        <a href="signup.html">Sign up now</a>
-      </div>
-    </div>
-    <div class="welcome-section">
-      <!--
-      <div class="nav">
-        <a href="#">ABOUT</a>
-        <a href="#">FEATURES</a>
-        <a href="#">CONTACT</a>
-        <a href="#">SIGN IN</a>
-      </div>
-      -->
-      <div class="welcome-title">Welcome</div>
-      <div class="welcome-desc">
-        Your journey starts here. Log in to access the latest crime records and find the safest routes through your city.
-      </div>
-      <div class="signup-now">
-        Not a member?
-        <a href="signup.html">Sign up now</a>
-      </div>
 
+      <div class="ms-auth__divider"><span>or</span></div>
+      <p class="ms-auth__alt">
+        New to the console?
+        <a href="/signup" class="ms-auth__link">Create an account</a>
+      </p>
     </div>
+
+    <aside class="ms-auth__side">
+      <div class="ms-auth__side-glow" aria-hidden="true"></div>
+      <div class="ms-auth__side-content">
+        <p class="ms-eyebrow">Civic Operations Console</p>
+        <h2 class="ms-auth__side-title">A live view of safety across Dhaka.</h2>
+        <ul class="ms-auth__list">
+          <li><span class="ms-pill ms-pill--red">Active</span> 12 alerts streaming in the last hour</li>
+          <li><span class="ms-pill ms-pill--amber">Pending</span> 34 reports awaiting verification</li>
+          <li><span class="ms-pill ms-pill--green">Cleared</span> 218 cases closed this week</li>
+        </ul>
+        <p class="ms-auth__fineprint">Authenticated by MySafety Operations · v2.0</p>
+      </div>
+    </aside>
   </div>
-  <script src="/static/assets/js/api-base.js"></script>
-  <script>
-  document.getElementById('loginForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorMsg = document.getElementById('error-message');
 
-    try {
-      const response = await fetch(resolveApiUrl('/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const result = await response.json();
-      if (response.ok) {
-        try {
-          if (result.token) localStorage.setItem('auth_token', result.token);
-          if (result.user) localStorage.setItem('currentUser', JSON.stringify(result.user));
-        } catch (e) {}
-        window.location.href = "/dashboard";
-      } else {
-        errorMsg.textContent = result.detail || "Login failed";
-      }
-    } catch (err) {
-      errorMsg.textContent = "Server error";
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  (function () {
+    var form = document.getElementById('loginForm');
+    var errEl = document.getElementById('error-message');
+    var submit = document.getElementById('login-submit');
+
+    function showError(msg) {
+      errEl.textContent = msg;
+      errEl.hidden = false;
     }
-  });
+    function clearError() { errEl.hidden = true; errEl.textContent = ''; }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError();
+      var email = document.getElementById('email').value.trim();
+      var password = document.getElementById('password').value;
+      if (!email || !password) { showError('Email and password are required.'); return; }
+
+      submit.disabled = true;
+      submit.textContent = 'Signing in…';
+
+      try {
+        var resp = await fetch(resolveApiUrl('/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: password })
+        });
+        var result = await resp.json().catch(function () { return {}; });
+        if (resp.ok) {
+          try {
+            if (result.token) localStorage.setItem('auth_token', result.token);
+            if (result.user)  localStorage.setItem('currentUser', JSON.stringify(result.user));
+            if (window.MS && window.MS.setUser) window.MS.setUser(result.user || null);
+          } catch (_) {}
+          // Privileged users go to the operations console; citizens to the dashboard.
+          var u = result.user || {};
+          var role = (u.role_hint || 'User');
+          window.location.href = (['admin','officer','detective','staff'].indexOf(role) !== -1) ? '/admin' : '/dashboard';
+        } else {
+          showError(result.detail || ('Sign-in failed (' + resp.status + ')'));
+          submit.disabled = false;
+          submit.textContent = 'Log in';
+        }
+      } catch (err) {
+        showError('Network error. Check your connection and try again.');
+        submit.disabled = false;
+        submit.textContent = 'Log in';
+      }
+    });
+  })();
   </script>
 </body>
 </html>

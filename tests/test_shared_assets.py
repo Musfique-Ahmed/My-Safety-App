@@ -111,6 +111,21 @@ class TestEscapeJs:
         assert "&quot;" in s or "&#34;" in s
 
 
-class TestHeaderJs:
+class TestConsoleJs:
+    """console.js replaced the legacy header.js — the shared chrome is now
+    built once and auto-injected on every page. The role guard and the
+    sprite inject live in this file."""
+
     def test_file_exists(self):
-        assert (ASSETS_DIR / "header.js").is_file()
+        assert (ASSETS_DIR / "console.js").is_file()
+
+    def test_has_role_guard(self):
+        text = (ASSETS_DIR / "console.js").read_text(encoding="utf-8")
+        assert "_runRoleGuard" in text
+        assert "/admin" in text
+        assert "/dashboard" in text
+
+    def test_has_sprite_inject(self):
+        text = (ASSETS_DIR / "console.js").read_text(encoding="utf-8")
+        assert "_injectSprite" in text
+        assert "<symbol" in text

@@ -1,792 +1,368 @@
 <!DOCTYPE html>
-<html lang="en" class="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>My Safety – Missing Persons</title>
+  <title>Missing Persons · MySafety</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
+</head>
+<body>
+  <div id="ms-root"></div>
 
-  <!-- Tailwind + Icons -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
+  <template id="ms-page-template">
+    <section class="ms-section">
+      <header class="ms-page-header">
+        <div>
+          <p class="ms-eyebrow">Public register</p>
+          <h1 class="ms-page-header__title">Missing persons</h1>
+          <p class="ms-page-header__sub">Every active case across Dhaka Metropolitan. Tap a card to see the full record and submit a sighting.</p>
+        </div>
+        <div class="ms-page-header__actions">
+          <a href="/report-missing" class="ms-btn ms-btn--primary">
+            <svg class="ms-icon" aria-hidden="true"><use href="#ms-alert-triangle"/></svg>
+            <span>Report a missing person</span>
+          </a>
+        </div>
+      </header>
+
+      <div id="missingGrid" class="ms-grid ms-grid--3" aria-live="polite"></div>
+    </section>
+  </template>
+
+  <!-- Modal (preserved from the original — full feature set) -->
+  <div id="backdrop" class="ms-modal-back" hidden>
+    <div class="ms-modal ms-modal--wide">
+      <header class="ms-modal__head">
+        <h2 id="modalTitle" class="ms-modal__title">Details</h2>
+        <button id="closeModal" class="ms-modal__close" aria-label="Close">
+          <svg class="ms-icon" aria-hidden="true"><use href="#ms-x"/></svg>
+        </button>
+      </header>
+      <div id="modalBody" class="ms-modal__body"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="/static/assets/js/api-base.js"></script>
   <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  "use strict";
 
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    /* Shadow button style */
-    .shadow-button {
-      border-radius: 9999px;
-      padding: 0.5rem 1rem;
-      background-color: rgba(147, 51, 234, 0.2);
-      color: #d8b4fe;
-      font-weight: 600;
-      box-shadow: 
-        -4px -4px 8px rgba(255, 255, 255, 0.05),
-        4px 4px 8px rgba(0, 0, 0, 0.5);
-      transition: all 0.2s ease-in-out;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-    }
-    .light .shadow-button {
-      background-color: #f3f4f6;
-      color: #4c1d95;
-      box-shadow: 
-        -4px -4px 8px rgba(255, 255, 255, 1),
-        4px 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    .shadow-button:hover {
-      box-shadow: 
-        -2px -2px 4px rgba(255, 255, 255, 0.1), 
-        2px 2px 4px rgba(0, 0, 0, 0.6);
-      transform: scale(0.98);
-    }
-    .light .shadow-button:hover {
-      box-shadow: 
-        -2px -2px 4px rgba(255, 255, 255, 0.8), 
-        2px 2px 4px rgba(0, 0, 0, 0.15);
-    }
-  </style>
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+  const API_BASE = window.location.origin.includes(":8000") ? "" : "http://127.0.0.1:8000";
+  const $ = (sel) => document.querySelector(sel);
 
-<!-- ===== HEADER ===== -->
-<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
-  <div class="flex items-center space-x-3">
-    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
-      <i data-lucide="shield" class="w-8 h-8"></i>
-    </div>
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
-  </div>
+  let missingData = [];
 
-  <nav class="hidden lg:flex items-center space-x-4">
-        <a href="index.html" class="shadow-button text-sm">
-            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
-        </a>
-        
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
-        <div id="report-dropdown" class="relative">
-            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
-            </button>
-            <div id="report-dropdown-menu" 
-                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
-                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
-                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
-                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Crime
-                </a>
-                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
-                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Missing Person
-                </a>
-            </div>
-        </div>
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
-        
-        <a href="wanted_criminal.html" class="shadow-button text-sm">
-            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
-        </a>
-        <a href="missing_person.html" class="shadow-button text-sm">
-            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
-        </a>
-    </nav>
+  const escapeHtml = (str) => String(str).replace(/[&<>"'`=\/]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    "'": '&#39;', '`': '&#96;', '=': '&#61;', '/': '&#47;'
+  }[char] || char));
 
-    <div class="flex items-center space-x-4 relative" style="z-index:105;">
-        <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg z-[106] relative" title="Send Panic Alert" style="margin-right:0.5rem;">
-            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-        </button>
-
-        <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-            <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
-            <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
-        </button>
-
-        <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none z-[107] relative" style="position:relative;">
-            <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">U</div>
-            <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
-        </button>
-
-        <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden z-[108]" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" style="position:absolute;">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p class="font-semibold text-gray-900 dark:text-white">Hi, User!</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">user@mysafety.com</p>
-            </div>
-            <!--
-            <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
-                Chat with Admin
-            </a>
-            -->
-            <button onclick="window.location.href='login.html'" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
-                <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
-                Logout
-            </button>
-        </div>
-    </div>
-</header>
-
-<!-- ===== CONTENT ===== -->
-<div class="container max-w-5xl mx-auto p-6">
-  <h1 class="text-2xl font-bold mb-4">Missing Persons</h1>
-  <div id="missingGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
-</div>
-
-<!-- Modal -->
-<div id="backdrop" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50">
-  <div class="modal bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl max-w-2xl w-11/12">
-    <header class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 p-4">
-      <h2 id="modalTitle" class="text-lg font-bold">Details</h2>
-      <button id="closeModal" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-800">Close</button>
-    </header>
-    <div id="modalBody" class="p-4"></div>
-  </div>
-</div>
-
-<script>
-"use strict";
-
-const API_BASE = window.location.origin.includes(":8000")
-  ? ""
-  : "http://127.0.0.1:8000";
-
-lucide.createIcons();
-
-let missingData = [];
-
-const $ = (sel) => document.querySelector(sel);
-
-const escapeHtml = (str) => String(str).replace(/[&<>"'`=\/]/g, (char) => ({
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-  '`': '&#96;',
-  '=': '&#61;',
-  '/': '&#47;'
-}[char] || char));
-
-const fmt = (value) => {
-  if (!value) return "Unknown";
-  const date = typeof value === "string" ? new Date(value) : value;
-  return isNaN(date.valueOf()) ? "Unknown" : date.toLocaleString();
-};
-
-const resolvePhoto = (url) => {
-  if (!url) return "contents/placeholder.jpg";
-  if (url.startsWith("http")) return url;
-  if (url.startsWith("/")) return url;
-  if (url.startsWith("static/")) return `/${url}`;
-  return `/static/${url}`;
-};
-
-const secondsToHHMMSS = (seconds) => {
-  const total = Math.max(0, Math.floor(Number(seconds) || 0));
-  const h = String(Math.floor(total / 3600)).padStart(2, "0");
-  const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
-  const s = String(total % 60).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-};
-
-const parseTimeField = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "number") return secondsToHHMMSS(value);
-  const trimmed = String(value).trim();
-  if (/^\d+(\.\d+)?$/.test(trimmed)) return secondsToHHMMSS(Number(trimmed));
-  if (trimmed.includes(":")) return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
-  return null;
-};
-
-const parseHometown = (text) => {
-  if (!text) return null;
-  const match = String(text).match(/Hometown:\s*([^.\n]+)/i);
-  return match ? match[1].trim() : null;
-};
-
-const normalizeRow = (row) => {
-  const date = row.last_seen_date ? String(row.last_seen_date) : null;
-  const time = parseTimeField(row.last_seen_time);
-  let iso = null;
-  if (date) {
-    const candidate = new Date(`${date}T${time || "00:00:00"}`);
-    if (!isNaN(candidate.valueOf())) iso = candidate.toISOString();
-  }
-  if (!iso && row.created_at) {
-    const created = new Date(row.created_at);
-    if (!isNaN(created.valueOf())) iso = created.toISOString();
-  }
-
-  const weight = row.weight
-    ? parseFloat(String(row.weight).replace(/[^\d.]/g, "")) || null
-    : null;
-
-  const stillWithFinderValue = (() => {
-    const source = row.still_with_finder;
-    if (source === null || source === undefined) return false;
-    if (typeof source === "string") {
-      const normalized = source.trim().toLowerCase();
-      return normalized === "yes" || normalized === "true" || normalized === "1";
-    }
-    if (typeof source === "number") {
-      return source === 1;
-    }
-    return Boolean(source);
-  })();
-
-  return {
-    id: row.missing_id,
-    name: row.name || "Unknown",
-    nickname: row.distinguishing_marks || null,
-    photo_url: resolvePhoto(row.photo_url),
-    hometown: parseHometown(row.description) || row.contact_person || "—",
-    last_seen_location: row.last_seen_location || "Unknown",
-    last_seen_time: iso,
-    description: row.clothing_description || row.description || "",
-    finding_location: row.finding_location || null,
-    finder_name: row.finder_name || null,
-    finder_phone: row.finder_phone || null,
-    finder_email: row.finder_email || null,
-    status: row.status || "Missing",
-    still_with_finder: stillWithFinderValue,
-    age: row.age ?? null,
-    weight_kg: weight,
-    hair_color: row.hair_color || "—"
+  const fmt = (value) => {
+    if (!value) return "Unknown";
+    const date = typeof value === "string" ? new Date(value) : value;
+    return isNaN(date.valueOf()) ? "Unknown" : date.toLocaleString();
   };
-};
 
-const showStatus = (message, icon = "database") => {
-  const grid = $("#missingGrid");
-  grid.innerHTML = `
-    <div class="col-span-full text-center text-gray-500 dark:text-gray-400 py-12">
-      <i data-lucide="${icon}" class="w-10 h-10 mx-auto mb-3"></i>
-      <p>${message}</p>
-    </div>`;
-  lucide.createIcons();
-};
+  const resolvePhoto = (url) => {
+    if (!url) return "contents/placeholder.jpg";
+    if (url.startsWith("http")) return url;
+    if (url.startsWith("/")) return url;
+    if (url.startsWith("static/")) return `/${url}`;
+    return `/static/${url}`;
+  };
 
-const render = (list = missingData) => {
-  const grid = $("#missingGrid");
-  grid.innerHTML = "";
+  const secondsToHHMMSS = (seconds) => {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = String(Math.floor(total / 3600)).padStart(2, "0");
+    const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+    const s = String(total % 60).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  };
 
-  if (!list.length) {
-    showStatus("No missing persons found.", "database-off");
-    return;
-  }
+  const parseTimeField = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "number") return secondsToHHMMSS(value);
+    const trimmed = String(value).trim();
+    if (/^\d+(\.\d+)?$/.test(trimmed)) return secondsToHHMMSS(Number(trimmed));
+    if (trimmed.includes(":")) return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+    return null;
+  };
 
-  list.forEach((item) => grid.appendChild(card(item)));
-  lucide.createIcons();
-};
+  const parseHometown = (text) => {
+    if (!text) return null;
+    const match = String(text).match(/Hometown:\s*([^.\n]+)/i);
+    return match ? match[1].trim() : null;
+  };
 
-const card = (item) => {
-  const el = document.createElement("div");
-  el.className =
-    "rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow";
-  const statusLower = (item.status || "").toLowerCase();
-  const statusClass = statusLower === "found"
-    ? "bg-green-100 text-green-700"
-    : statusLower === "missing"
-      ? "bg-yellow-100 text-yellow-700"
-      : "bg-gray-200 text-gray-700";
-  const finderBadgeText = item.still_with_finder ? "With finder" : "Not with finder";
-  el.innerHTML = `
-    <img src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" class="w-full h-40 object-cover" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
-    <div class="p-4">
-      <div class="flex justify-between items-center mb-2">
-        <div class="font-semibold">${escapeHtml(item.name || '')} <span class="text-sm text-gray-500">(${escapeHtml(item.nickname || "—")})</span></div>
-        <span class="px-2 py-0.5 text-xs ${statusClass} rounded-full">
-          ${escapeHtml(item.status || "Unknown")}
-        </span>
-      </div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Hometown: ${escapeHtml(item.hometown || "—")}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">Last seen: ${escapeHtml(item.last_seen_location || '')} · ${escapeHtml(fmt(item.last_seen_time))}</div>
-      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Finder status: ${escapeHtml(finderBadgeText)}</div>
-      <div class="mt-2">
-        <button class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm show">Show details</button>
-      </div>
-    </div>`;
-  el.querySelector(".show").addEventListener("click", () => openModal(item));
-  return el;
-};
+  const normalizeRow = (row) => {
+    const date = row.last_seen_date ? String(row.last_seen_date) : null;
+    const time = parseTimeField(row.last_seen_time);
+    let iso = null;
+    if (date) {
+      const candidate = new Date(`${date}T${time || "00:00:00"}`);
+      if (!isNaN(candidate.valueOf())) iso = candidate.toISOString();
+    }
+    if (!iso && row.created_at) {
+      const created = new Date(row.created_at);
+      if (!isNaN(created.valueOf())) iso = created.toISOString();
+    }
+    const weight = row.weight ? parseFloat(String(row.weight).replace(/[^\d.]/g, "")) || null : null;
+    const stillWithFinderValue = (() => {
+      const source = row.still_with_finder;
+      if (source === null || source === undefined) return false;
+      if (typeof source === "string") {
+        const normalized = source.trim().toLowerCase();
+        return normalized === "yes" || normalized === "true" || normalized === "1";
+      }
+      if (typeof source === "number") return source === 1;
+      return Boolean(source);
+    })();
+    return {
+      id: row.missing_id,
+      name: row.name || "Unknown",
+      nickname: row.distinguishing_marks || null,
+      photo_url: resolvePhoto(row.photo_url),
+      hometown: parseHometown(row.description) || row.contact_person || "—",
+      last_seen_location: row.last_seen_location || "Unknown",
+      last_seen_time: iso,
+      description: row.clothing_description || row.description || "",
+      finding_location: row.finding_location || null,
+      finder_name: row.finder_name || null,
+      finder_phone: row.finder_phone || null,
+      finder_email: row.finder_email || null,
+      status: row.status || "Missing",
+      still_with_finder: stillWithFinderValue,
+      age: row.age ?? null,
+      weight_kg: weight,
+      hair_color: row.hair_color || "—"
+    };
+  };
 
-const loadMissingPersons = async () => {
-  showStatus("Loading missing persons…", "loader-2");
-  try {
-    const response = await fetch(`${API_BASE}/api/missing-persons`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    const rows = Array.isArray(payload) ? payload : payload.missing_persons || [];
-    missingData = rows.map(normalizeRow);
-    render();
-  } catch (error) {
-    console.error("Error loading missing persons:", error);
-    showStatus("Unable to load data from the server.", "alert-triangle");
-  }
-};
+  const showStatus = (message) => {
+    const grid = $("#missingGrid");
+    grid.innerHTML = `
+      <div class="ms-empty ms-grid--span-3">
+        <svg class="ms-icon ms-empty__icon" aria-hidden="true"><use href="#ms-search"/></svg>
+        <p>${escapeHtml(message)}</p>
+      </div>`;
+  };
 
-const openModal = (item) => {
-  $("#modalTitle").textContent = `${item.name} — Details`;
-  $("#modalBody").innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <img src="${escapeHtml(item.photo_url || '')}" class="rounded-lg w-full h-48 object-cover md:col-span-1" alt="${escapeHtml(item.name || '')}" onerror="this.src='https://picsum.photos/seed/${encodeURIComponent(item.name || '')}/600/400'">
-      <div class="md:col-span-2 text-sm space-y-1">
-        <p><b>Nickname:</b> ${escapeHtml(item.nickname || "—")}</p>
-        <p><b>Age:</b> ${escapeHtml(item.age ?? "—")} yrs | <b>Weight:</b> ${escapeHtml(item.weight_kg ?? "—")} kg | <b>Hair:</b> ${escapeHtml(item.hair_color || "—")}</p>
-        <p><b>Hometown:</b> ${escapeHtml(item.hometown || "—")}</p>
-        <p><b>Status:</b> ${escapeHtml(item.status || "Missing")}</p>
-        <p><b>Last seen:</b> ${escapeHtml(item.last_seen_location)} at ${fmt(item.last_seen_time)}</p>
-        <p><b>Finding location (latest):</b> ${escapeHtml(item.finding_location || "—")}</p>
-        <p><b>Finder:</b> ${escapeHtml(item.finder_name || "—")} (${escapeHtml(item.finder_phone || "—")})</p>
-        ${item.finder_email ? `<p><b>Email:</b> ${escapeHtml(item.finder_email)}</p>` : ""}
-        <p class="text-gray-500 dark:text-gray-400">${escapeHtml(item.description || "")}</p>
-        <div>
-          <button id="foundBtn" class="mt-2 px-3 py-1 bg-green-500 text-white rounded">${item.finding_location || item.finder_name ? "Update Finder Report" : "Report Found"}</button>
-        </div>
-        <div id="foundForm" class="hidden mt-3 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-          <div class="text-sm text-gray-500 mb-2">Tip: Location works only on https:// or http://localhost</div>
-          <label class="block text-sm">Where did you find this person?</label>
-          <input id="foundLocation" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Type location or use GPS">
-          <label class="flex items-center gap-2 text-sm mb-2">
-            <input type="checkbox" id="useGps" class="w-4 h-4"> Use my current location
-          </label>
-          <div id="geoMsg" class="text-xs text-gray-500 mb-2"></div>
-          <label class="block text-sm">Your Name</label>
-          <input id="finderName" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Your full name">
-          <label class="block text-sm">Your Phone</label>
-          <input id="finderPhone" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Phone number">
-          <label class="block text-sm">Your Email (optional)</label>
-          <input id="finderEmail" class="w-full p-2 border rounded bg-white dark:bg-gray-900 mb-2" placeholder="Email">
-          <div id="stillWrap" class="mt-4">
-            <div id="stillQuestion" class="mb-2 text-sm text-yellow-600 dark:text-yellow-300"></div>
-            <button id="toggleFinderBtn" class="px-3 py-1 rounded text-white"></button>
+  const render = (list = missingData) => {
+    const grid = $("#missingGrid");
+    grid.innerHTML = "";
+    if (!list.length) { showStatus("No missing persons found."); return; }
+    list.forEach((item) => grid.appendChild(card(item)));
+  };
+
+  const card = (item) => {
+    const el = document.createElement("article");
+    el.className = "ms-card ms-card--no-pad";
+    const statusLower = (item.status || "").toLowerCase();
+    const accent = statusLower === "found" ? "ms-card--accent-green" :
+                   statusLower === "missing" ? "ms-card--accent-amber" :
+                   "ms-card--accent-blue";
+    el.classList.add(accent);
+    const statusPill = statusLower === "found" ? "ms-pill--green" :
+                       statusLower === "missing" ? "ms-pill--amber" :
+                       "ms-pill--ink";
+    const finderBadgeText = item.still_with_finder ? "With finder" : "Not with finder";
+    el.innerHTML = `
+      <img class="ms-card__cover" src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" onerror="this.src='contents/placeholder.jpg'">
+      <div class="ms-card__body">
+        <header class="ms-row ms-row--between">
+          <div>
+            <h3 class="ms-card__title">${escapeHtml(item.name || 'Unknown')}</h3>
+            <p class="ms-card__sub">${escapeHtml(item.nickname || '—')}</p>
           </div>
-          <button id="submitFound" class="mt-4 px-3 py-1 bg-purple-600 text-white rounded w-full">Submit Report</button>
-        </div>
-      </div>
-    </div>`;
-
-  const backdrop = $("#backdrop");
-  backdrop.classList.remove("hidden");
-  backdrop.classList.add("flex");
-
-  const foundForm = $("#foundForm");
-  const foundBtn = $("#foundBtn");
-  const foundLocationInput = $("#foundLocation");
-  const finderNameInput = $("#finderName");
-  const finderPhoneInput = $("#finderPhone");
-  const finderEmailInput = $("#finderEmail");
-  const toggleFinderBtn = $("#toggleFinderBtn");
-  const stillQuestion = $("#stillQuestion");
-
-  let stillWithFinder = Boolean(item.still_with_finder);
-
-  const updateFinderToggleUI = () => {
-    if (stillWithFinder) {
-      toggleFinderBtn.textContent = "Mark as not with finder";
-      toggleFinderBtn.classList.remove("bg-gray-500");
-      toggleFinderBtn.classList.add("bg-green-600");
-      stillQuestion.innerHTML = "Currently marked as <b>with the finder</b>. Click the button to change.";
-    } else {
-      toggleFinderBtn.textContent = "Mark as still with finder";
-      toggleFinderBtn.classList.remove("bg-green-600");
-      toggleFinderBtn.classList.add("bg-gray-500");
-      stillQuestion.innerHTML = "Is this person still with you? Click to mark as still with the finder.";
-    }
+          <span class="ms-pill ${statusPill}"><span class="ms-pill__dot"></span>${escapeHtml(item.status || 'Unknown')}</span>
+        </header>
+        <dl class="ms-card__facts">
+          <div><dt>Hometown</dt><dd>${escapeHtml(item.hometown || '—')}</dd></div>
+          <div><dt>Last seen</dt><dd>${escapeHtml(item.last_seen_location || '—')}</dd></div>
+          <div><dt>Time</dt><dd>${escapeHtml(fmt(item.last_seen_time))}</dd></div>
+          <div><dt>Finder</dt><dd>${escapeHtml(finderBadgeText)}</dd></div>
+        </dl>
+        <button type="button" class="ms-btn ms-btn--ghost ms-btn--sm ms-btn--block show">View details</button>
+      </div>`;
+    el.querySelector(".show").addEventListener("click", () => openModal(item));
+    return el;
   };
 
-  const showForm = () => {
-    foundForm.classList.remove("hidden");
-  };
-
-  foundLocationInput.value = item.finding_location || "";
-  finderNameInput.value = item.finder_name || "";
-  finderPhoneInput.value = item.finder_phone || "";
-  finderEmailInput.value = item.finder_email || "";
-
-  updateFinderToggleUI();
-
-  if (item.finding_location || item.finder_name || item.finder_phone) {
-    showForm();
-  }
-
-  foundBtn.onclick = () => {
-    if (foundForm.classList.contains("hidden")) {
-      showForm();
-    } else {
-      foundForm.classList.add("hidden");
-    }
-  };
-
-  $("#useGps").addEventListener("change", async (e) => {
-    const msg = $("#geoMsg");
-    if (e.target.checked) {
-      msg.textContent = "Getting your location…";
-      try {
-        const coords = await getCurrentCoords();
-        foundLocationInput.value = coords;
-        msg.textContent = "Location filled from GPS.";
-      } catch (err) {
-        msg.textContent = "Couldn’t get location: " + err.message;
-        e.target.checked = false;
-      }
-    } else {
-      msg.textContent = "";
-    }
-  });
-
-  toggleFinderBtn.addEventListener("click", (event) => {
-    event.preventDefault();
-    stillWithFinder = !stillWithFinder;
-    updateFinderToggleUI();
-  });
-
-  $("#submitFound").onclick = async () => {
-    const location = foundLocationInput.value.trim();
-    const name = finderNameInput.value.trim();
-    const phone = finderPhoneInput.value.trim();
-    const email = finderEmailInput.value.trim();
-
-    if (!location) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Location Required',
-        text: 'Please add a location or enable GPS before submitting.',
-        confirmButtonColor: '#F59E0B'
-      });
-      return;
-    }
-    if (!name || !phone) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Contact Details Needed',
-        text: 'Please provide your name and phone number.',
-        confirmButtonColor: '#F59E0B'
-      });
-      return;
-    }
-
-    const submitBtn = $("#submitFound");
-    const originalLabel = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting…";
-
+  const loadMissingPersons = async () => {
+    showStatus("Loading missing persons…");
     try {
-      const response = await fetch(`${API_BASE}/api/missing-persons/${item.id}/found`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          finding_location: location,
-          finder_name: name,
-          finder_phone: phone,
-          finder_email: email || null,
-          still_with_finder: stillWithFinder
-        })
-      });
-
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message = payload.detail || payload.message || 'Unable to save finder report.';
-        throw new Error(message);
-      }
-
-      const updated = normalizeRow(payload.missing_person);
-      const idx = missingData.findIndex((entry) => entry.id === updated.id);
-      if (idx >= 0) {
-        missingData[idx] = updated;
-      } else {
-        missingData.push(updated);
-      }
+      const response = await fetch(resolveApiUrl("/api/missing-persons"), { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const rows = Array.isArray(payload) ? payload : payload.missing_persons || [];
+      missingData = rows.map(normalizeRow);
       render();
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Report Submitted',
-        text: 'Finder details saved successfully.',
-        confirmButtonColor: '#10B981'
-      });
-
-      closeModal();
     } catch (error) {
-      console.error('Failed to submit finder report:', error);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Could not save report',
-        text: error.message || 'An unexpected error occurred.',
-        confirmButtonColor: '#EF4444'
-      });
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalLabel;
+      console.error("Error loading missing persons:", error);
+      showStatus("Unable to load data from the server.");
     }
   };
-};
 
-const getCurrentCoords = () =>
-  new Promise((resolve, reject) => {
-    if (!("geolocation" in navigator)) return reject(new Error("Geolocation not supported."));
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
+  const openModal = (item) => {
+    $("#modalTitle").textContent = `${item.name} — Details`;
+    $("#modalBody").innerHTML = `
+      <div class="ms-modal__grid">
+        <img class="ms-modal__cover" src="${escapeHtml(item.photo_url || '')}" alt="${escapeHtml(item.name || '')}" onerror="this.src='contents/placeholder.jpg'">
+        <div class="ms-modal__copy">
+          <p><b>Nickname:</b> ${escapeHtml(item.nickname || "—")}</p>
+          <p><b>Age:</b> ${escapeHtml(item.age ?? "—")} yrs · <b>Weight:</b> ${escapeHtml(item.weight_kg ?? "—")} kg · <b>Hair:</b> ${escapeHtml(item.hair_color || "—")}</p>
+          <p><b>Hometown:</b> ${escapeHtml(item.hometown || "—")}</p>
+          <p><b>Status:</b> ${escapeHtml(item.status || "Missing")}</p>
+          <p><b>Last seen:</b> ${escapeHtml(item.last_seen_location)} at ${fmt(item.last_seen_time)}</p>
+          <p><b>Finding location (latest):</b> ${escapeHtml(item.finding_location || "—")}</p>
+          <p><b>Finder:</b> ${escapeHtml(item.finder_name || "—")} (${escapeHtml(item.finder_phone || "—")})</p>
+          ${item.finder_email ? `<p><b>Email:</b> ${escapeHtml(item.finder_email)}</p>` : ""}
+          <p class="ms-card__sub">${escapeHtml(item.description || "")}</p>
+          <button id="foundBtn" class="ms-btn ms-btn--primary">${item.finding_location || item.finder_name ? "Update finder report" : "Report found"}</button>
+          <div id="foundForm" class="ms-card ms-card--nested" hidden>
+            <p class="ms-card__sub">Tip: GPS works on https:// or http://localhost</p>
+            <label class="ms-field"><span class="ms-field__label">Where did you find this person?</span>
+              <input id="foundLocation" class="ms-input" placeholder="Type a location or use GPS">
+            </label>
+            <label class="ms-row">
+              <input type="checkbox" id="useGps"> <span>Use my current location</span>
+            </label>
+            <div id="geoMsg" class="ms-card__sub"></div>
+            <label class="ms-field"><span class="ms-field__label">Your name</span><input id="finderName" class="ms-input" placeholder="Your full name"></label>
+            <label class="ms-field"><span class="ms-field__label">Your phone</span><input id="finderPhone" class="ms-input" placeholder="Phone number"></label>
+            <label class="ms-field"><span class="ms-field__label">Your email (optional)</span><input id="finderEmail" class="ms-input" placeholder="Email"></label>
+            <div id="stillWrap" class="ms-card__sub"></div>
+            <div id="stillQuestion" class="ms-card__sub"></div>
+            <button id="toggleFinderBtn" class="ms-btn ms-btn--ghost ms-btn--sm">Toggle finder status</button>
+            <button id="submitFound" class="ms-btn ms-btn--primary ms-btn--block">Submit report</button>
+          </div>
+        </div>
+      </div>`;
 
-const closeModal = () => $("#backdrop").classList.add("hidden");
+    const backdrop = $("#backdrop");
+    backdrop.hidden = false;
 
-document.getElementById("closeModal").addEventListener("click", closeModal);
-document.getElementById("backdrop").addEventListener("click", (e) => {
-  if (e.target.id === "backdrop") closeModal();
-});
+    const foundForm = $("#foundForm");
+    const foundBtn = $("#foundBtn");
+    const foundLocationInput = $("#foundLocation");
+    const finderNameInput = $("#finderName");
+    const finderPhoneInput = $("#finderPhone");
+    const finderEmailInput = $("#finderEmail");
+    const toggleFinderBtn = $("#toggleFinderBtn");
+    const stillQuestion = $("#stillQuestion");
+    let stillWithFinder = Boolean(item.still_with_finder);
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadMissingPersons();
-});
+    const updateFinderToggleUI = () => {
+      if (stillWithFinder) {
+        toggleFinderBtn.textContent = "Mark as not with finder";
+        toggleFinderBtn.classList.remove("ms-btn--ghost");
+        toggleFinderBtn.classList.add("ms-btn--primary");
+        stillQuestion.innerHTML = "Currently marked as <b>with the finder</b>. Click to change.";
+      } else {
+        toggleFinderBtn.textContent = "Mark as still with finder";
+        toggleFinderBtn.classList.add("ms-btn--ghost");
+        toggleFinderBtn.classList.remove("ms-btn--primary");
+        stillQuestion.innerHTML = "Is this person still with you? Click to mark as still with the finder.";
+      }
+    };
+    foundLocationInput.value = item.finding_location || "";
+    finderNameInput.value = item.finder_name || "";
+    finderPhoneInput.value = item.finder_phone || "";
+    finderEmailInput.value = item.finder_email || "";
+    updateFinderToggleUI();
+    if (item.finding_location || item.finder_name || item.finder_phone) foundForm.hidden = false;
 
-// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
-const reportDropdownMenu = document.getElementById('report-dropdown-menu');
-const reportDropdown = document.getElementById('report-dropdown');
+    foundBtn.onclick = () => { foundForm.hidden = !foundForm.hidden; };
 
-// 1. Event listener for clicking the button to TOGGLE the menu
-document.getElementById('report-button').addEventListener('click', (e) => {
-    e.preventDefault(); 
-    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
-    reportDropdownMenu.classList.toggle('hidden');
-});
-
-// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
-document.addEventListener('click', (e) => {
-    // If the menu is visible AND the click target is NOT inside the entire dropdown container
-    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
-        reportDropdownMenu.classList.add('hidden');
-    }
-});
-
-// 3. Add click listener to close menu when an item is selected 
-reportDropdownMenu.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-        reportDropdownMenu.classList.add('hidden');
-    });
-});
-// Removed mouseover and mouseout handlers as requested.
-// --- END UPDATED DROPDOWN LOGIC ---
-
-// --- USER MENU DROPDOWN LOGIC ---
-const userMenuButton = document.getElementById('user-menu-button');
-const userMenu = document.getElementById('user-menu');
-
-// Toggle user menu when clicking the button
-userMenuButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    userMenu.classList.toggle('hidden');
-});
-
-// Close user menu when clicking outside
-document.addEventListener('click', (e) => {
-    if (!userMenu.classList.contains('hidden') && !userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
-        userMenu.classList.add('hidden');
-    }
-});
-
-// Theme toggle functionality
-document.getElementById('theme-toggle').addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-});
-
-function resolveAuthenticatedUser() {
-  const candidates = [
-    window.currentUser,
-    window.CURRENT_USER,
-    window.AUTH_USER,
-    window.USER,
-    window.loggedInUser,
-    window.user
-  ];
-
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== 'object') {
-      continue;
-    }
-    const userId = Number(candidate.user_id ?? candidate.id ?? candidate.pk ?? candidate.uid);
-    if (Number.isFinite(userId) && userId > 0) {
-      return {
-        user_id: userId,
-        snapshot: {
-          user_id: userId,
-          username: candidate.username ?? candidate.name ?? candidate.full_name ?? null,
-          email: candidate.email ?? candidate.mail ?? null,
-          role_hint: candidate.role_hint ?? candidate.role ?? null
+    $("#useGps").addEventListener("change", async (e) => {
+      const msg = $("#geoMsg");
+      if (e.target.checked) {
+        msg.textContent = "Getting your location…";
+        try {
+          const coords = await getCurrentCoords();
+          foundLocationInput.value = coords;
+          msg.textContent = "Location filled from GPS.";
+        } catch (err) {
+          msg.textContent = "Could not get location: " + err.message;
+          e.target.checked = false;
         }
-      };
-    }
-  }
+      } else { msg.textContent = ""; }
+    });
 
-  const storageKeys = ['mysafety_user', 'mysafetyCurrentUser', 'currentUser', 'user'];
-  for (const key of storageKeys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) {
-        continue;
+    toggleFinderBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      stillWithFinder = !stillWithFinder;
+      updateFinderToggleUI();
+    });
+
+    $("#submitFound").onclick = async () => {
+      const location = foundLocationInput.value.trim();
+      const name = finderNameInput.value.trim();
+      const phone = finderPhoneInput.value.trim();
+      const email = finderEmailInput.value.trim();
+
+      if (!location) {
+        await Swal.fire({ icon: 'warning', title: 'Location required', text: 'Please add a location or enable GPS before submitting.' });
+        return;
       }
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') {
-        continue;
+      if (!name || !phone) {
+        await Swal.fire({ icon: 'warning', title: 'Contact details needed', text: 'Please provide your name and phone number.' });
+        return;
       }
-      const userId = Number(parsed.user_id ?? parsed.id ?? parsed.pk ?? parsed.uid);
-      if (Number.isFinite(userId) && userId > 0) {
-        return {
-          user_id: userId,
-          snapshot: {
-            user_id: userId,
-            username: parsed.username ?? parsed.name ?? parsed.full_name ?? null,
-            email: parsed.email ?? null,
-            role_hint: parsed.role_hint ?? parsed.role ?? null
-          }
-        };
-      }
-    } catch (error) {
-      console.warn('Unable to parse stored user info:', error);
-    }
-  }
-
-  return { user_id: null, snapshot: null };
-}
-
-function getGeolocation(timeoutMs = 8000) {
-  return new Promise(resolve => {
-    if (!('geolocation' in navigator)) {
-      resolve({ location: null, label: null, error: 'Geolocation not supported' });
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      resolve({ location: null, label: null, error: 'Geolocation request timed out' });
-    }, timeoutMs);
-
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        clearTimeout(timer);
-        resolve({
-          location: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            captured_at: new Date(position.timestamp).toISOString()
-          },
-          label: 'GPS coordinates captured',
-          error: null
+      const submitBtn = $("#submitFound");
+      const originalLabel = submitBtn.textContent;
+      submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
+      try {
+        const response = await fetch(resolveApiUrl(`/api/missing-persons/${item.id}/found`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ finding_location: location, finder_name: name, finder_phone: phone, finder_email: email || null, still_with_finder: stillWithFinder })
         });
-      },
-      error => {
-        clearTimeout(timer);
-        resolve({ location: null, label: null, error: error.message || 'Unable to obtain location' });
-      },
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
-    );
-  });
-}
-
-// Panic button functionality (sends alert to backend)
-const panicButton = document.getElementById('panic-btn');
-if (panicButton) {
-  panicButton.addEventListener('click', async event => {
-    event.preventDefault();
-    if (panicButton.dataset.loading === 'true') {
-      return;
-    }
-
-    panicButton.dataset.loading = 'true';
-    panicButton.classList.add('opacity-70', 'cursor-not-allowed');
-
-    Swal.fire({
-      title: 'Sending panic alert…',
-      text: 'We are notifying nearby responders.',
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => {
-        Swal.showLoading();
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.detail || payload.message || 'Unable to save finder report.');
+        const updated = normalizeRow(payload.missing_person);
+        const idx = missingData.findIndex((entry) => entry.id === updated.id);
+        if (idx >= 0) missingData[idx] = updated; else missingData.push(updated);
+        render();
+        await Swal.fire({ icon: 'success', title: 'Report submitted', text: 'Finder details saved successfully.' });
+        closeModal();
+      } catch (error) {
+        await Swal.fire({ icon: 'error', title: 'Could not save report', text: error.message || 'An unexpected error occurred.' });
+      } finally {
+        submitBtn.disabled = false; submitBtn.textContent = originalLabel;
       }
+    };
+  };
+
+  const closeModal = () => { $("#backdrop").hidden = true; };
+
+  $("#closeModal").addEventListener("click", closeModal);
+  $("#backdrop").addEventListener("click", (e) => { if (e.target.id === "backdrop") closeModal(); });
+
+  function getCurrentCoords() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("Geolocation not supported"));
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(`${pos.coords.latitude}, ${pos.coords.longitude}`),
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     });
+  }
 
-    try {
-      const userContext = resolveAuthenticatedUser();
-      const geo = await getGeolocation();
-
-      const payload = {
-        alert_type: 'panic_button',
-        description: `Panic button triggered from ${document.title || 'My Safety portal'}.`,
-        severity: 'High',
-        metadata: {
-          page: window.location.pathname,
-          user_agent: navigator.userAgent,
-          location_error: geo.error,
-          triggered_at: new Date().toISOString()
-        }
-      };
-
-      if (Number.isFinite(userContext.user_id) && userContext.user_id > 0) {
-        payload.user_id = userContext.user_id;
-        if (userContext.snapshot) {
-          payload.metadata.user_snapshot = userContext.snapshot;
-        }
-      }
-
-      if (geo.location) {
-        payload.location = {
-          latitude: geo.location.latitude,
-          longitude: geo.location.longitude,
-          accuracy: geo.location.accuracy,
-          captured_at: geo.location.captured_at
-        };
-      }
-
-      if (geo.label) {
-        payload.address_label = geo.label;
-      }
-
-      const response = await fetch(`${API_BASE}/api/emergency-alert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const detail = result.detail || result.message || `Request failed with status ${response.status}`;
-        throw new Error(detail);
-      }
-
-      Swal.close();
-      await Swal.fire({
-        icon: 'success',
-        title: 'Panic Alert Sent',
-        text: 'Emergency services have been notified.',
-        confirmButtonColor: '#10B981'
-      });
-    } catch (error) {
-      console.error('Failed to send panic alert:', error);
-      Swal.close();
-      await Swal.fire({
-        icon: 'error',
-        title: 'Unable to send alert',
-        text: error.message || 'Please try again or contact support.',
-        confirmButtonColor: '#EF4444'
-      });
-    } finally {
-      panicButton.dataset.loading = 'false';
-      panicButton.classList.remove('opacity-70', 'cursor-not-allowed');
-    }
+  // Boot: wait for chrome to render the template into #ms-page, then load data.
+  document.addEventListener('DOMContentLoaded', function () {
+    // console.js already auto-mounted the chrome on this page (because it
+    // sees <div id="ms-root">). After that, #missingGrid exists inside the
+    // page body, so we can fetch and render.
+    if (document.getElementById('missingGrid')) loadMissingPersons();
   });
-}
-// --- END USER MENU DROPDOWN LOGIC ---
-
-</script>
+  </script>
 </body>
 </html>

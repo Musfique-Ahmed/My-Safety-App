@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - My Safety</title>
-  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
   <style>
     :root {
       --dark-bg: #0f0f0f;
@@ -1100,6 +1103,9 @@
     }
     /* End Custom Modal Styles */
   </style>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -1126,7 +1132,7 @@
         <div id="dropdown-menu" class="dropdown-menu">
             <div class="profile-info">
                 <!-- ADDED Admin Name -->
-                <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Inspector John Doe</div>
+                <div id="ms-admin-name" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Administrator</div>
                 <p>Role: <strong>Super Admin</strong></p>
                 <p>ID: <strong>ADM-90210</strong></p>
                 <p>Email: <strong>admin@mysafety.com</strong></p>
@@ -5790,6 +5796,25 @@
     } else {
       loadCrimesOverview();
     }
-    </script>
+    
+    // === ms-admin-name patch (added by redesign) ===
+    (function () {
+      try {
+        var raw = localStorage.getItem('currentUser');
+        if (!raw) return;
+        var u = JSON.parse(raw);
+        var nameEl = document.getElementById('ms-admin-name');
+        if (nameEl && u) nameEl.textContent = u.name || u.username || u.email || 'Administrator';
+        var nameContainer = nameEl && nameEl.parentElement;
+        if (nameContainer) {
+          var ps = nameContainer.querySelectorAll('p');
+          var role = (u && u.role_hint) || 'Admin';
+          if (ps[0]) ps[0].innerHTML = 'Role: <strong>' + (role.charAt(0).toUpperCase() + role.slice(1)) + '</strong>';
+          if (ps[1] && u && (u.user_id || u.id)) ps[1].innerHTML = 'ID: <strong>USR-' + String(u.user_id || u.id).padStart(5, '0') + '</strong>';
+          if (ps[2] && u && u.email) ps[2].innerHTML = 'Email: <strong>' + u.email + '</strong>';
+        }
+      } catch (e) {}
+    })();
+</script>
   </body>
 </html>

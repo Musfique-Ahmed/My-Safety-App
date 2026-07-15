@@ -1,154 +1,54 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Safety - Report Crime</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide/dist/umd/lucide.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="/static/assets/js/api-base.js"></script>
-    <script src="/static/assets/js/escape.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'primary-dark': '#111827',
-                        'card-dark': '#1F2937',
-                        'input-dark': '#374151',
-                        'accent-blue': '#3B82F6',
-                        'disabled-gray': '#6B7280',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .shadow-button {
-            border-radius: 9999px;
-            padding: 0.75rem 1.5rem;
-            background-color: #fff;
-            color: #4c1d95;
-            font-weight: 600;
-            box-shadow:
-                -4px -4px 8px rgb(255, 255, 255),
-                4px 4px 8px rgba(255, 255, 255, 0.5);
-            transition: all 0.2s ease-in-out;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-        }
-        .shadow-button:hover {
-            box-shadow:
-                -2px -2px 4px rgba(255, 255, 255, 0.1),
-                2px 2px 4px rgba(0, 0, 0, 0.6);
-            transform: scale(0.98);
-            background-color: #f3f4f6;
-        }
-        .tab-content {
-            transition: opacity 0.3s ease-in-out;
-        }
-        .tab-disabled {
-            pointer-events: none;
-            opacity: 0.5;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Crime · MySafety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/assets/css/console.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
+  <style>
+    /* minimal helpers for the legacy form (rest comes from console.css) */
+    .ms-form-card { padding: 1.5rem 2rem; }
+    .ms-form-card fieldset { border: 0; padding: 0; margin: 0 0 1.5rem 0; }
+    .ms-form-card legend { font-size: 1.125rem; font-weight: 600; padding: 0; margin: 0 0 0.75rem 0; color: var(--ink-1); }
+    .ms-form-card .ms-grid--form { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+    @media (min-width: 768px) { .ms-form-card .ms-grid--form { grid-template-columns: 1fr 1fr; } }
+    .ms-form-card .ms-grid--form > .col-span-full { grid-column: 1 / -1; }
+    .ms-form-card label > span { display: block; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 0.4rem; }
+    .ms-form-card input[type=text], .ms-form-card input[type=number], .ms-form-card input[type=date], .ms-form-card input[type=time], .ms-form-card input[type=datetime-local], .ms-form-card input[type=email], .ms-form-card input[type=tel], .ms-form-card select, .ms-form-card textarea {
+      width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;
+      background: var(--bg-canvas); color: var(--ink-1);
+      border: 1px solid var(--border-hair); font: inherit; outline: none;
+      transition: border-color 0.15s;
+    }
+    .ms-form-card input:focus, .ms-form-card select:focus, .ms-form-card textarea:focus { border-color: var(--accent-hi); }
+    .ms-form-card .ms-tabbar { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border-hair); margin-bottom: 1.5rem; }
+    .ms-form-card .ms-tabbar button {
+      background: transparent; border: 0; padding: 0.6rem 1rem; cursor: pointer;
+      color: var(--ink-2); font: 500 0.95rem Inter, system-ui, sans-serif;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .ms-form-card .ms-tabbar button.is-active { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
+    .ms-form-card .ms-tabbar button[disabled] { opacity: 0.4; pointer-events: none; }
+    .ms-form-card .ms-file-row { display: flex; gap: 0.5rem; align-items: center; }
+    .ms-form-card .ms-file-row .ms-file-thumb { width: 48px; height: 48px; border-radius: 8px; background: var(--bg-canvas); border: 1px solid var(--border-hair); object-fit: cover; }
+  </style>
 </head>
-<body class="bg-primary-dark text-white min-h-screen font-sans p-4 sm:p-8">
-
-<header class="sticky top-0 z-50 bg-white dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between shadow-md">
-  <div class="flex items-center space-x-3">
-    <div class="flex items-center justify-center text-purple-600 dark:text-purple-500">
-      <i data-lucide="shield" class="w-8 h-8"></i>
-    </div>
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">My Safety</h1>
-  </div>
-  <nav class="hidden lg:flex items-center space-x-4">
-        <a href="index.html" class="shadow-button text-sm">
-            <i data-lucide="route" class="w-4 h-4 mr-2"></i>Safe Area
-        </a>
-        
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN START (Removed onmouseover/mouseout) --- -->
-        <div id="report-dropdown" class="relative">
-            <button id="report-button" class="shadow-button text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                <i data-lucide="siren" class="w-4 h-4 mr-2"></i>Report to Police
-            </button>
-            <div id="report-dropdown-menu" 
-                 class="absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden" 
-                 role="menu" aria-orientation="vertical" aria-labelledby="report-button">
-                <a href="report_crime.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-t-xl">
-                    <i data-lucide="message-square" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Crime
-                </a>
-                <a href="report_missing_person.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-white transition-colors rounded-b-xl">
-                    <i data-lucide="user-minus" class="w-5 h-5 mr-3 text-purple-500"></i>
-                    Report a Missing Person
-                </a>
-            </div>
+<body>
+  <div id="ms-root"></div>
+  <template id="ms-page-template">
+    <section class="ms-section">
+      <header class="ms-page-header">
+        <div>
+          <p class="ms-eyebrow">File a report</p>
+          <h1 class="ms-page-header__title">Report a crime</h1>
+          <p class="ms-page-header__sub">All fields are secure and routed to the assigned station automatically.</p>
         </div>
-        <!-- --- MODIFIED: REPORT TO POLICE DROPDOWN END --- -->
-        
-        <a href="wanted_criminal.html" class="shadow-button text-sm">
-            <i data-lucide="users" class="w-4 h-4 mr-2"></i>Wanted Criminals
-        </a>
-        <a href="missing_person.html" class="shadow-button text-sm">
-            <i data-lucide="search" class="w-4 h-4 mr-2"></i>Missing Persons
-        </a>
-    </nav>
-  <div class="flex items-center space-x-4 relative">
-    <button id="panic-btn" class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-lg shadow-lg" title="Send Panic Alert">
-      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-    </button>
-    <button id="theme-toggle" class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-      <i data-lucide="sun" class="w-6 h-6 block dark:hidden"></i>
-      <i data-lucide="moon" class="w-6 h-6 hidden dark:block"></i>
-    </button>
-    <div class="relative">
-      <button id="user-menu-button" class="flex items-center space-x-2 p-1 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition-colors focus:outline-none">
-        <div class="w-8 h-8 flex items-center justify-center text-xl font-semibold rounded-full bg-white text-purple-600">U</div>
-        <i data-lucide="chevron-down" class="w-4 h-4 hidden sm:block"></i>
-      </button>
-      <div id="user-menu" class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 hidden">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-          <p class="font-semibold text-gray-900 dark:text-white">Hi, User!</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">user@mysafety.com</p>
-        </div>
-        <!--
-        <a href="user_chatbox.html" class="flex items-center p-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <i data-lucide="message-circle" class="w-5 h-5 mr-3"></i>
-          Chat with Admin
-        </a>
-        -->
-        <button onclick="window.location.href='login.html'" class="w-full text-left flex items-center p-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-b-xl">
-          <i data-lucide="log-out" class="w-5 h-5 mr-3"></i>
-          Logout
-        </button>
-      </div>
-    </div>
-  </div>
-</header>
-
-<!-- Main Container -->
-<div class="max-w-6xl mx-auto">
-    <h1 class="text-4xl font-extrabold mb-2 text-white">Report Crime</h1>
-    <p class="text-gray-400 mb-8">Securely submit details about a new crime or provide information on known suspects.</p>
-
-    <!-- Tab Navigation/Toggle -->
-    <div class="flex border-b border-gray-700 mb-10">
-        <button id="tab-new-crime" onclick="showTab('new-crime')" class="tab-button py-3 px-6 text-sm sm:text-base font-semibold border-b-2 border-accent-blue text-accent-blue transition duration-200 hover:text-white focus:outline-none">
-            Add New Crime
-        </button>
-        <button id="tab-suspect-info" onclick="showTab('suspect-info')" class="tab-button tab-disabled py-3 px-6 text-sm sm:text-base font-semibold border-b-2 border-transparent text-gray-400 transition duration-200 hover:text-white focus:outline-none ml-4">
-            Suspect Information
-        </button>
-    </div>
-
+      </header>
+      <article class="ms-card ms-form-card">
     <!-- Forms Container (using one form for the entire process) -->
     <form id="crime-report-form" class="space-y-12">
 
@@ -404,37 +304,16 @@
             </div>
         </section>
         
-    </form>
-</div>
-
-<script>
-  // Lucide icons
-  lucide.createIcons();
-
-  // User menu toggle
-  const userMenuButton = document.getElementById("user-menu-button");
-  const userMenu = document.getElementById("user-menu");
-  userMenuButton.addEventListener("click", () => {
-    userMenu.classList.toggle("hidden");
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
-      userMenu.classList.add("hidden");
-    }
-  });
-
-  // Theme toggle
-  const themeToggle = document.getElementById("theme-toggle");
-  themeToggle.addEventListener("click", () => {
-    document.documentElement.classList.toggle("dark");
-    if (document.documentElement.classList.contains("dark")) {
-      localStorage.theme = "dark";
-    } else {
-      localStorage.theme = "light";
-    }
-    lucide.createIcons();
-  });
+      </article>
+    </section>
+  </template>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/static/assets/js/api-base.js"></script>
+  <script src="/static/assets/js/escape.js"></script>
+  <script src="/static/assets/js/console.js"></script>
+  <script>
+  /* User menu and theme toggle are owned by console.js (the redesigned chrome).
+     The legacy #user-menu-button / #user-menu / #theme-toggle wiring was removed. */
 
   // Data for Bangladesh Districts and Crime Types
   const bangladeshDistricts = [
@@ -794,33 +673,8 @@
     });
   });
 
-// --- UPDATED DROPDOWN LOGIC (Reporting Menu: Click-Only) ---
-const reportDropdownMenu = document.getElementById('report-dropdown-menu');
-const reportDropdown = document.getElementById('report-dropdown');
-
-// 1. Event listener for clicking the button to TOGGLE the menu
-document.getElementById('report-button').addEventListener('click', (e) => {
-    e.preventDefault(); 
-    e.stopPropagation(); // Stop propagation so the document click handler doesn't immediately close it
-    reportDropdownMenu.classList.toggle('hidden');
-});
-
-// 2. Global click handler to CLOSE the menu when clicking anywhere else on the document
-document.addEventListener('click', (e) => {
-    // If the menu is visible AND the click target is NOT inside the entire dropdown container
-    if (!reportDropdownMenu.classList.contains('hidden') && !reportDropdown.contains(e.target)) {
-        reportDropdownMenu.classList.add('hidden');
-    }
-});
-
-// 3. Add click listener to close menu when an item is selected 
-reportDropdownMenu.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-        reportDropdownMenu.classList.add('hidden');
-    });
-});
-// Removed mouseover and mouseout handlers as requested.
-// --- END UPDATED DROPDOWN LOGIC ---
+// Reporting menu (#report-dropdown) is owned by console.js (the redesigned topbar).
+// The legacy wiring was removed because the elements no longer exist in the chrome.
 
 </script>
 </body>

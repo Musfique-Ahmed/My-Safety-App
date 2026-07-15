@@ -13,11 +13,11 @@ from datetime import datetime
 import mysql.connector
 
 CFG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'mysafetydb',
-    'port': 3306,
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', ''),
+    'database': os.getenv('DB_NAME', 'mysafetydb'),
+    'port': int(os.getenv('DB_PORT', '3306')),
 }
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'migrations')

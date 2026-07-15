@@ -3,8 +3,9 @@
  * Loaded by every page that calls the FastAPI backend. Pages should call
  * `resolveApiUrl(path)` for any fetch URL (returns absolute or root-relative
  * path) and the global `fetch` wrapper automatically attaches the bearer
- * token from localStorage.auth_token for non-GET requests to /api/admin/*
- * and /api/chat/*. Public reads (e.g. /api/crimes GET) stay un-authenticated.
+ * token from localStorage.auth_token for any request to /api/admin/* and
+ * /api/chat/*. Public reads elsewhere (e.g. /api/crimes GET) stay
+ * un-authenticated.
  */
 (function () {
   var base = '';
@@ -25,8 +26,7 @@
   var _nativeFetch = window.fetch ? window.fetch.bind(window) : null;
 
   function _needsAuth(method, url) {
-    var m = (method || 'GET').toUpperCase();
-    if (m === 'GET' || m === 'HEAD') return false;
+    // /api/admin/* and /api/chat/* always require auth, regardless of method.
     return /\/api\/(admin|chat)\//.test(url);
   }
 
