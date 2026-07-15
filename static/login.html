@@ -106,10 +106,35 @@
             if (result.user)  localStorage.setItem('currentUser', JSON.stringify(result.user));
             if (window.MS && window.MS.setUser) window.MS.setUser(result.user || null);
           } catch (_) {}
-          // Privileged users go to the operations console; citizens to the dashboard.
+          // Decide where to send the user. Honour `?next=` and the
+          // sessionStorage marker set by the role guard when an anonymous
+          // visitor was bounced here from /admin. Both must be a privileged
+          // destination (admin console) and the user must be privileged, OR
+          // any other path on the same origin.
           var u = result.user || {};
           var role = (u.role_hint || 'User');
-          window.location.href = (['admin','officer','detective','staff'].indexOf(role) !== -1) ? '/admin' : '/dashboard';
+          var privileged = (['admin','officer','detective','staff'].indexOf(role) !== -1);
+          function _safeNext(raw) {
+            try {
+              if (!raw) return null;
+              var u2 = new URL(raw, window.location.origin);
+              if (u2.origin !== window.location.origin) return null;
+              var p = u2.pathname.toLowerCase();
+              var onAdmin = (p === '/admin' || p === '/admin-dashboard' || p.indexOf('/admin/') === 0);
+              if (onAdmin && !privileged) return null;
+              return u2.pathname + u2.search + u2.hash;
+            } catch (e) { return null; }
+          }
+          var params = new URLSearchParams(window.location.search);
+          var next = _safeNext(params.get('next')) || _safeNext(sessionStorage.getItem('post_login_redirect'));
+          try { sessionStorage.removeItem('post_login_redirect'); } catch (e) {}
+          if (next) {
+            window.location.href = next;
+          } else if (privileged) {
+            window.location.href = '/admin';
+          } else {
+            window.location.href = '/dashboard';
+          }
         } else {
           showError(result.detail || ('Sign-in failed (' + resp.status + ')'));
           submit.disabled = false;

@@ -393,16 +393,74 @@
 
 
   // ---------------------------------------------------------------------------
-  // 7. Role guard — citizens on /admin get redirected to /dashboard.
+  // 7. Role guard — runs on every page load.
+  //    - Unauthenticated visitors hitting /admin or /admin-dashboard get sent
+  //      to /login (admin dashboard is never freely accessible).
+  //    - Authenticated non-privileged users on /admin get sent to /dashboard.
   // ---------------------------------------------------------------------------
   function _runRoleGuard() {
-    if (!_user) return; // logged out: backend will 401/redirect as appropriate
     var path = (window.location.pathname || '').toLowerCase();
     var adminPaths = ['/admin', '/admin-dashboard'];
     var onAdmin = adminPaths.indexOf(path) !== -1;
-    if (onAdmin && !isPrivileged()) {
+    if (!onAdmin) return;
+    if (!_user) {
+      // Anonymous admin page hit → force login. Preserve where they were
+      // trying to go so login can send them back after auth.
+      try { sessionStorage.setItem('post_login_redirect', path); } catch (e) {}
+      window.location.replace('/login');
+      return;
+    }
+    if (!isPrivileged()) {
       window.location.replace('/dashboard');
     }
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // 7b. Gate CTAs by `data-ms-requires="auth|privileged"` attribute. Used by
+  //     the home hero and any other page that has buttons whose destination
+  //     should not be visible to logged-out / non-privileged visitors.
+  //     - `auth`       → only render when user is logged in
+  //     - `privileged` → only render when user is admin/officer/detective/staff
+  //     When the requirement isn't met we replace the CTA with a "Log in"
+  //     link pointing to /login (preserving the original destination in
+  //     ?next= so login can send them back).
+  // ---------------------------------------------------------------------------
+  function _gateCTAs() {
+    var nodes = document.querySelectorAll('[data-ms-requires]');
+    if (!nodes.length) return;
+    nodes.forEach(function (el) {
+      var need = el.getAttribute('data-ms-requires');
+      var ok = (need === 'auth')       ? !!_user
+             : (need === 'privileged') ? isPrivileged()
+             : true;
+      if (ok) return;
+      var href = el.getAttribute('href') || '/login';
+      var label = (need === 'privileged') ? 'Log in as staff' : 'Log in to continue';
+      // Replace with a ghost button that funnels into login + return.
+      var replacement = document.createElement('a');
+      replacement.href = '/login?next=' + encodeURIComponent(href);
+      replacement.className = 'ms-btn ms-btn--ghost ms-btn--sm';
+      replacement.setAttribute('data-ms-replacement-for', need);
+      replacement.innerHTML = el.innerHTML;
+      var span = replacement.querySelector('span');
+      if (span) span.textContent = label;
+      else replacement.appendChild(document.createTextNode(label));
+      el.parentNode.replaceChild(replacement, el);
+    });
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // 7c. Hide the "Station" spine tick for visitors who are not logged in.
+  //     The rail is the user's primary navigation; showing a tick that
+  //     requires admin auth and then redirecting on click is confusing.
+  //     Hide it entirely until they sign in.
+  // ---------------------------------------------------------------------------
+  function _gateSpine() {
+    var tick = document.querySelector('.ms-rail__tick[href="/admin"]');
+    if (!tick) return;
+    if (!_user || !isPrivileged()) tick.style.display = 'none';
   }
 
 
@@ -572,7 +630,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     _ready(function () {
       // Role guard runs on every page (even those without #ms-root, like the
-      // admin dashboard). Citizens hitting /admin get redirected to /dashboard.
+      // admin dashboard). Anonymous visitors on /admin get sent to /login;
+      // logged-in non-privileged users on /admin get sent to /dashboard.
       _user = _loadUser();
       _runRoleGuard();
 
@@ -586,6 +645,11 @@
       } else {
         renderChrome();
       }
+      // After the chrome (and any template content) is in the DOM, gate
+      // hero CTAs by auth/privileged status and hide the Station spine
+      // tick for visitors who can't actually use it.
+      _gateCTAs();
+      _gateSpine();
     });
   });
 })();

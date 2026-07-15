@@ -18,14 +18,14 @@
     <section class="ms-hero">
       <div class="ms-hero__copy">
         <p class="ms-eyebrow">Civic Operations Console</p>
-        <h1 class="ms-hero__title">A live picture of safety, across <span class="ms-hero__hl">Dhaka Metropolitan</span>.</h1>
+        <h1 class="ms-hero__title">A live picture of safety, across <span class="ms-hero__hl">Bangladesh</span>.</h1>
         <p class="ms-hero__sub">Triage reports, broadcast alerts, and follow cases from FIR to closure — in one workspace.</p>
         <div class="ms-hero__cta">
-          <a href="/admin" class="ms-btn ms-btn--primary">
+          <a href="/admin" class="ms-btn ms-btn--primary" data-ms-requires="privileged">
             <svg class="ms-icon" aria-hidden="true"><use href="#ms-briefcase"/></svg>
             <span>Open the console</span>
           </a>
-          <a href="/dashboard" class="ms-btn ms-btn--ghost">
+          <a href="/dashboard" class="ms-btn ms-btn--ghost" data-ms-requires="auth">
             <svg class="ms-icon" aria-hidden="true"><use href="#ms-globe-icon"/></svg>
             <span>Plan a route</span>
           </a>
@@ -48,15 +48,9 @@
       </div>
 
       <div class="ms-hero__globe">
-        <div class="ms-globe" id="ms-globe" role="img" aria-label="Live alert map centred on Dhaka"></div>
-        <div class="ms-globe__legend" aria-hidden="true">
-          <span><span class="ms-legend-dot ms-legend-dot--red"></span>Active</span>
-          <span><span class="ms-legend-dot ms-legend-dot--amber"></span>Pending</span>
-          <span><span class="ms-legend-dot ms-legend-dot--blue"></span>Informational</span>
-          <span><span class="ms-legend-dot ms-legend-dot--green"></span>Cleared</span>
-        </div>
+        <div class="ms-globe" id="ms-globe" role="img" aria-label="Live alert map of Bangladesh"></div>
         <div class="ms-globe__callout">
-          <span class="ms-pill ms-pill--ink">Centre: 23.81° N · 90.41° E</span>
+          <span class="ms-pill ms-pill--ink">Centroid: 23.65° N · 90.35° E</span>
         </div>
       </div>
     </section>
