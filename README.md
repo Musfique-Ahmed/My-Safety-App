@@ -73,23 +73,44 @@ We appreciate the contributions from our amazing team members:
 
 ```
 My-Safety-App/
-├── main.py                     # FastAPI backend server
+├── app/                                # FastAPI backend package
+│   ├── __init__.py                     # re-exports `app` for `uvicorn app:app`
+│   ├── main.py                         # FastAPI app + ~50 route handlers + static mounts
+│   ├── admin_main.py                   # sub-app mounted at /admin-api
+│   ├── core/
+│   │   ├── config.py                   # BASE_DIR, paths, JWT_SECRET, DB env reads
+│   │   └── security.py                 # was auth.py — JWT issue/decode + bcrypt + FastAPI deps
+│   ├── db/
+│   │   ├── __init__.py                 # was db.py — fetch_one/fetch_all/execute/...
+│   │   └── engine.py                   # NEW: SQLAlchemy engine + DB URL builder
+│   ├── api/
+│   │   └── routers/                    # reserved for the next-pass per-domain split
+│   └── schemas/                        # Pydantic models, split by domain
+│       ├── auth.py  chat.py  crime.py
+│       ├── emergency.py  missing.py  wanted.py
+│       └── __init__.py                 # re-exports the public surface
 ├── static/
-│   ├── index.html              # Main dashboard
-│   ├── login.html              # User authentication
-│   ├── signup.html             # User registration
-│   ├── missing_person.html     # Missing persons page
-│   ├── report_crime.html       # Crime reporting form
-│   ├── report_missing_person.html # Missing person form
-│   ├── user_chatbox.html       # Community chat
-│   ├── wanted_criminals.html   # Wanted criminals database
-│   └── assets/
-│       ├── css/
-│       ├── js/
-│       └── images/
-├── requirements.txt            # Python dependencies
+│   ├── templates/                      # HTML templates (home, login, admin dashboard, ...)
+│   ├── assets/{css,js}/                # frontend assets (console.css, console.js, ...)
+│   ├── contents/                       # served via `/contents` alias
+│   └── uploads/                        # evidence file uploads
+├── migrations/                         # SQL migrations 000-005
+├── scripts/
+│   ├── db/                             # apply_migration.py, run_migration_and_db_test.py, ...
+│   ├── e2e/                            # e2e_smoke.py, browser_smoke.py, ...
+│   └── README.md
+├── tests/                              # pytest suite (102 passed, 2 skipped)
+├── pyproject.toml                      # project metadata + pytest config
+├── requirements.txt
+├── main.py / auth.py / db.py / main_admin.py   # backward-compat shims
 └── README.md
 ```
+
+`main.py`, `auth.py`, `db.py`, and `main_admin.py` at the repository root
+are **backward-compat shims** that re-export the canonical names from the
+`app.*` package. Existing imports (`from main import app`, `from auth import
+create_access_token`, etc.) continue to work; new code should import from
+`app.*` directly.
 
 ## 🚀 Getting Started
 
@@ -115,11 +136,14 @@ My-Safety-App/
 
 3. **Start the FastAPI backend server**
    ```bash
-   # Run the FastAPI server
+   # Recommended (uses the app/ package layout directly):
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+   # Or run the package's __main__ entry-point:
+   python -m app.main
+
+   # Legacy entry point still works — thin shim at root re-exports `app`:
    python main.py
-   
-   # Or using uvicorn directly
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 4. **Access the application**
@@ -129,8 +153,8 @@ My-Safety-App/
 
 ### Quick Start
 1. Copy `.env.example` to `.env` and set a real `JWT_SECRET` (≥32 random bytes).
-2. Run `python scripts/run_migration_and_db_test.py` to apply migrations 001–004 and verify the schema.
-3. Run `python main.py` to start the backend server
+2. Run `python scripts/db/run_migration_and_db_test.py` to apply migrations 001–004 and verify the schema.
+3. Run `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` (or `python -m app.main`) to start the backend server.
 4. Open http://localhost:8000 in your browser
 5. Create an account or login
 6. Explore the interactive map
@@ -155,11 +179,15 @@ curl http://localhost:8000/api/admin/users \
 
 ## 📄 Admin sub-app (`/admin-api`)
 
-`main_admin.py` is mounted under `/admin-api`. Legacy CRUD paths that live only in that file (e.g. `/api/admin/admin-activity-log`, `/api/admin/api-logs`) are reachable as `/admin-api/api/admin/...`. The default admin dashboard calls only endpoints that exist in `main.py`, so no client changes are required.
+`app/admin_main.py` (formerly `main_admin.py`) is mounted under `/admin-api`.
+Legacy CRUD paths that live only in that file (e.g. `/api/admin/admin-activity-log`,
+`/api/admin/api-logs`) are reachable as `/admin-api/api/admin/...`. The default
+admin dashboard calls only endpoints that exist in `app/main.py`, so no client
+changes are required.
 
 ## 🔧 Backend API
 
-The FastAPI backend (`main.py`) provides:
+The FastAPI backend (`app/main.py`) provides:
 
 ### API Endpoints
 - **Authentication**: Login/logout/register endpoints
@@ -265,15 +293,15 @@ The application is fully responsive and optimized for:
 
 ### Local Development
 ```bash
-# Start development server
-python main.py
+# Recommended: uvicorn against the app/ package
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Production Deployment
 ```bash
 # Using Gunicorn
 pip install gunicorn
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
 
 # Using Docker (create Dockerfile)
 docker build -t my-safety-app .
