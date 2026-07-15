@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import os
 import logging
 from pydantic import BaseModel, validator
@@ -59,6 +59,12 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Some templates reference images with bare relative paths like
+# `contents/image.png` instead of `/static/contents/image.png`. Aliasing
+# `/contents` to the same directory keeps those image sources resolving
+# without rewriting every template.
+app.mount("/contents", StaticFiles(directory="static/contents"), name="contents")
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = "static/uploads"
@@ -281,13 +287,57 @@ async def get_signup_page():
 
 @app.get("/admin")
 async def get_admin_dashboard_page():
-    """Serve the admin dashboard page"""
-    return HTMLResponse(content=_read_html("static/admin_dashboard.html"))
+    """Serve the admin dashboard page.
+
+    NOTE: `static/admin_dashboard.html` is a redirect stub pointing at
+    `/admin-dashboard`. The real dashboard lives in
+    `static/admin_dashboard21.html`; serving the stub here would loop.
+    """
+    return HTMLResponse(content=_read_html("static/admin_dashboard21.html"))
 
 @app.get("/admin-dashboard")
 async def get_admin_dashboard_alt():
-    """Alternative route to admin dashboard"""
-    return HTMLResponse(content=_read_html("static/admin_dashboard.html"))
+    """Alternative route to admin dashboard (same target as /admin)."""
+    return HTMLResponse(content=_read_html("static/admin_dashboard21.html"))
+
+# ---- Compatibility redirects -------------------------------------------------
+# Several templates still link to underscore filenames like
+# `report_crime.html` or `missing_person.html`. The canonical routes use
+# dashes (`/report-crime`, etc.). These redirects preserve old links and let
+# the user navigate by either naming convention without 404s.
+# ---------------------------------------------------------------------------
+
+_REDIRECT_MAP = {
+    "/report_crime.html":    "/report-crime",
+    "/missing_person.html":  "/missing-person",
+    "/wanted_criminal.html": "/wanted-criminals",
+    "/user_chatbox.html":    "/chatbox",
+    "/report_missing_person.html": "/report-missing",
+    "/login.html":   "/login",
+    "/signup.html":  "/signup",
+    "/index.html":   "/dashboard",
+    "/home.html":    "/home",
+}
+
+
+@app.get("/report_crime.html", include_in_schema=False)
+async def _redir_report_crime():     return RedirectResponse("/report-crime", status_code=307)
+@app.get("/missing_person.html", include_in_schema=False)
+async def _redir_missing_person():   return RedirectResponse("/missing-person", status_code=307)
+@app.get("/wanted_criminal.html", include_in_schema=False)
+async def _redir_wanted_criminal():  return RedirectResponse("/wanted-criminals", status_code=307)
+@app.get("/user_chatbox.html", include_in_schema=False)
+async def _redir_user_chatbox():     return RedirectResponse("/chatbox", status_code=307)
+@app.get("/report_missing_person.html", include_in_schema=False)
+async def _redir_report_missing():   return RedirectResponse("/report-missing", status_code=307)
+@app.get("/login.html", include_in_schema=False)
+async def _redir_login_html():       return RedirectResponse("/login", status_code=307)
+@app.get("/signup.html", include_in_schema=False)
+async def _redir_signup_html():      return RedirectResponse("/signup", status_code=307)
+@app.get("/index.html", include_in_schema=False)
+async def _redir_index_html():       return RedirectResponse("/dashboard", status_code=307)
+@app.get("/home.html", include_in_schema=False)
+async def _redir_home_html():        return RedirectResponse("/home", status_code=307)
 
 # ==================== USER AUTHENTICATION ENDPOINTS ====================
 
