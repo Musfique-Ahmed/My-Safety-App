@@ -1161,7 +1161,7 @@
       <button class="tab-btn" onclick="showTab('add-crime', event)">Add Crime</button>
   <button class="tab-btn" onclick="showTab('verify-reports', event)">Verify Reports</button>
   <button class="tab-btn" onclick="showTab('case-management', event)">Case Management</button>
-  <!--<button class="tab-btn" onclick="showTab('chat', event)">Chat</button>-->
+  <button class="tab-btn" onclick="showTab('chat', event)">Chat</button>
   <button class="tab-btn" onclick="showTab('emergency', event)">Emergency</button>
   <button class="tab-btn" onclick="showTab('analytics', event)">Analytics</button>
     </div>
@@ -1775,37 +1775,31 @@
       <div class="section-card">
         <h2 class="section-title">User Communication</h2>
         <p class="section-description">Chat with users who have submitted reports.</p>
-        
+
         <div class="chat-container">
           <div class="chat-sidebar">
             <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Active Conversations</h3>
-            <div class="chat-user active" data-user-id="john-doe" onclick="selectUser('john-doe', event)">
-              <div style="font-weight: 600;">John Doe</div>
-              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-001</div>
-            </div>
-            <div class="chat-user" data-user-id="jane-smith" onclick="selectUser('jane-smith', event)">
-              <div style="font-weight: 600;">Jane Smith</div>
-              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-002</div>
-            </div>
-            <div class="chat-user" data-user-id="mike-johnson" onclick="selectUser('mike-johnson', event)">
-              <div style="font-weight: 600;">Mike Johnson</div>
-              <div style="font-size: 0.875rem; color: var(--text-secondary);">Report: UR-003</div>
+            <div id="admin-chat-conversation-list">
+              <!-- Populated dynamically by loadAdminConversations() -->
+              <p style="font-size: 0.875rem; color: var(--text-secondary);">Loading…</p>
             </div>
           </div>
-          
+
           <div class="chat-main">
             <div class="chat-header">
-              <div style="font-weight: 600;" id="chat-header-name">John Doe</div>
-              <div style="font-size: 0.875rem; color: var(--text-secondary);" id="chat-header-report">Report ID: UR-001</div>
+              <div style="font-weight: 600;" id="chat-header-name">Select a conversation</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);" id="chat-header-report">—</div>
             </div>
-            
+
             <div class="chat-messages" id="chat-messages">
-              <!-- Messages will be loaded dynamically -->
+              <div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">
+                Select a conversation on the left to view messages.
+              </div>
             </div>
-            
+
             <div class="chat-input-container">
-              <input type="text" class="chat-input" id="chat-input" placeholder="Type your message...">
-              <button class="btn btn-primary" onclick="sendMessage()">
+              <input type="text" class="chat-input" id="admin-chat-input" placeholder="Type your reply…" disabled>
+              <button class="btn btn-primary" id="admin-chat-send" onclick="sendAdminChatMessage()" disabled>
                 <span>📤</span>
                 Send
               </button>
@@ -4073,8 +4067,7 @@
       }
       // Auto-scroll chat when opening chat tab
       if (tabName === 'chat') {
-        // Ensure the initial chat (John Doe) is selected and loaded
-        selectUser('john-doe'); 
+        loadAdminConversations();
       }
     }
 
@@ -4551,6 +4544,256 @@
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load case assignments right now.</td></tr>';
       }
     }
+
+    // ============================================================
+    // ADMIN CHAT — handlers for the Chat tab
+    // ============================================================
+
+    let adminChatCurrentUserId = null;
+    let adminChatCurrentReportId = null;
+    let adminChatPollInterval = null;
+
+    function _adminChatFmtTime(ts) {
+      if (!ts) return '';
+      try {
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        const diffMs = Date.now() - d.getTime();
+        const m = Math.floor(diffMs / 60000);
+        const h = Math.floor(diffMs / 3600000);
+        const days = Math.floor(diffMs / 86400000);
+        if (m < 1) return 'Just now';
+        if (m < 60) return m + ' min ago';
+        if (h < 24) return h + ' h ago';
+        if (days < 7) return days + ' d ago';
+        return d.toLocaleDateString();
+      } catch (e) { return ''; }
+    }
+
+    function _adminChatRenderConversationList(conversations) {
+      const list = document.getElementById('admin-chat-conversation-list');
+      if (!list) return;
+      if (!conversations || conversations.length === 0) {
+        list.innerHTML =
+          '<p style="font-size: 0.875rem; color: var(--text-secondary);">' +
+          'No conversations yet. Open a citizen\'s report and reply from the Chat tab.' +
+          '</p>';
+        return;
+      }
+      list.innerHTML = conversations.map(function (c) {
+        const isActive = String(c.user_id) === String(adminChatCurrentUserId)
+          && String(c.report_id || '') === String(adminChatCurrentReportId || '');
+        const unread = (c.unread_count && c.unread_count > 0)
+          ? ' <span style="background: var(--accent-red); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.7rem; margin-left: 4px;">' +
+            c.unread_count + '</span>' : '';
+        const reportLabel = c.report_id
+          ? 'Report: ' + escapeHtml(String(c.report_id))
+          : 'General support';
+        const username = escapeHtml(c.username || ('User #' + c.user_id));
+        return '<div class="chat-user' + (isActive ? ' active' : '') + '"' +
+               ' data-user-id="' + escapeHtml(String(c.user_id)) + '"' +
+               ' data-report-id="' + escapeHtml(String(c.report_id || '')) + '"' +
+               ' onclick="selectAdminConversation(this.dataset.userId, this.dataset.reportId)">' +
+               '<div style="font-weight: 600;">' + username + unread + '</div>' +
+               '<div style="font-size: 0.875rem; color: var(--text-secondary);">' + reportLabel + '</div>' +
+             '</div>';
+      }).join('');
+    }
+
+    function _adminChatRenderMessages(messages) {
+      const container = document.getElementById('chat-messages');
+      if (!container) return;
+      if (!messages || messages.length === 0) {
+        container.innerHTML =
+          '<div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">' +
+          'No messages in this conversation yet.' +
+          '</div>';
+        return;
+      }
+      container.innerHTML = messages.map(function (msg) {
+        const isAdmin = !!(msg.is_admin || msg.isAdmin);
+        const sender = isAdmin ? 'You (Staff)' : (msg.username || ('User #' + msg.user_id));
+        return '<div class="message ' + (isAdmin ? 'admin' : 'user') + '">' +
+                 '<div class="message-sender">' + escapeHtml(sender) + '</div>' +
+                 '<div>' + escapeHtml(msg.message || '') + '</div>' +
+                 '<span class="message-time">' + escapeHtml(_adminChatFmtTime(msg.created_at)) + '</span>' +
+               '</div>';
+      }).join('');
+      // Auto-scroll to bottom.
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function loadAdminConversations() {
+      try {
+        const list = document.getElementById('admin-chat-conversation-list');
+        if (list && !adminChatCurrentUserId) {
+          list.innerHTML = '<p style="font-size: 0.875rem; color: var(--text-secondary);">Loading…</p>';
+        }
+        const resp = await fetch(resolveApiUrl('/api/chat/conversations'), { cache: 'no-store' });
+        if (!resp.ok) throw new Error('conversations fetch failed: ' + resp.status);
+        const data = await resp.json();
+        const conversations = data.conversations || data || [];
+
+        _adminChatRenderConversationList(conversations);
+
+        // If no conversation is selected, pick the most recent one.
+        if (!adminChatCurrentUserId && conversations.length > 0) {
+          const first = conversations[0];
+          await selectAdminConversation(
+            String(first.user_id),
+            String(first.report_id || '')
+          );
+        }
+      } catch (err) {
+        console.error('loadAdminConversations', err);
+        const list = document.getElementById('admin-chat-conversation-list');
+        if (list) {
+          list.innerHTML =
+            '<p style="font-size: 0.875rem; color: var(--accent-red);">' +
+            'Could not load conversations. Check your connection and try again.' +
+            '</p>';
+        }
+      }
+    }
+
+    async function selectAdminConversation(userId, reportId) {
+      adminChatCurrentUserId = String(userId);
+      adminChatCurrentReportId = reportId ? String(reportId) : '';
+
+      // Highlight the active row in the sidebar.
+      document.querySelectorAll('#admin-chat-conversation-list .chat-user').forEach(function (el) {
+        const match = el.dataset.userId === adminChatCurrentUserId
+          && (el.dataset.reportId || '') === (adminChatCurrentReportId || '');
+        el.classList.toggle('active', match);
+      });
+
+      // Update the chat header.
+      const nameEl = document.getElementById('chat-header-name');
+      const reportEl = document.getElementById('chat-header-report');
+      const activeRow = document.querySelector(
+        '#admin-chat-conversation-list .chat-user.active'
+      );
+      if (activeRow) {
+        const fullName = activeRow.querySelector('div')?.textContent?.trim() || ('User #' + adminChatCurrentUserId);
+        if (nameEl) nameEl.textContent = fullName;
+      } else if (nameEl) {
+        nameEl.textContent = 'User #' + adminChatCurrentUserId;
+      }
+      if (reportEl) {
+        reportEl.textContent = adminChatCurrentReportId
+          ? ('Report ID: ' + adminChatCurrentReportId)
+          : 'General support';
+      }
+
+      // Enable compose controls.
+      const input = document.getElementById('admin-chat-input');
+      const sendBtn = document.getElementById('admin-chat-send');
+      if (input) input.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
+
+      await loadAdminMessages();
+
+      // Start polling for new messages on this conversation only.
+      if (adminChatPollInterval) clearInterval(adminChatPollInterval);
+      adminChatPollInterval = setInterval(function () {
+        if (adminChatCurrentUserId) loadAdminMessages(false);
+      }, 3000);
+    }
+
+    async function loadAdminMessages(showLoading) {
+      if (!adminChatCurrentUserId) return;
+      const container = document.getElementById('chat-messages');
+      if (showLoading && container) {
+        container.innerHTML =
+          '<div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem;">Loading…</div>';
+      }
+      try {
+        const url = resolveApiUrl(
+          '/api/chat/conversation/' + encodeURIComponent(adminChatCurrentUserId) +
+          (adminChatCurrentReportId
+            ? '?report_id=' + encodeURIComponent(adminChatCurrentReportId)
+            : '')
+        );
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('messages fetch failed: ' + resp.status);
+        const data = await resp.json();
+        _adminChatRenderMessages(data.messages || []);
+      } catch (err) {
+        console.error('loadAdminMessages', err);
+        if (container && showLoading) {
+          container.innerHTML =
+            '<div style="margin: auto; color: var(--accent-red); font-size: 0.9rem; text-align: center;">' +
+            'Could not load messages.' +
+            '</div>';
+        }
+      }
+    }
+
+    async function sendAdminChatMessage() {
+      const input = document.getElementById('admin-chat-input');
+      const sendBtn = document.getElementById('admin-chat-send');
+      if (!input) return;
+      const message = input.value.trim();
+      // No-op on empty input or no active conversation — don't surface a
+      // misleading "Failed to send" toast.
+      if (!message || !adminChatCurrentUserId) return;
+
+      if (sendBtn) sendBtn.disabled = true;
+      try {
+        const resp = await fetch(resolveApiUrl('/api/chat/send'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: Number(adminChatCurrentUserId),
+            message: message,
+            report_id: adminChatCurrentReportId || null,
+            is_admin: true
+          })
+        });
+        if (!resp.ok) throw new Error('send failed: ' + resp.status);
+        input.value = '';
+        await loadAdminMessages(false);
+      } catch (err) {
+        console.error('sendAdminChatMessage', err);
+        if (window.MS && window.MS.toast) {
+          window.MS.toast('Failed to send. Try again.', 'red');
+        } else {
+          alert('Failed to send. Try again.');
+        }
+      } finally {
+        if (sendBtn) sendBtn.disabled = false;
+      }
+    }
+
+    // Backwards-compat: the original HTML had a selectUser() / sendMessage()
+    // pair hardcoded for demo users. Some legacy scripts may still wire to
+    // those names; keep the entry points so we don't break anything else.
+    function selectUser(userId, evt) {
+      // evt is optional; here we just delegate to the real handler with no
+      // report_id scope.
+      return selectAdminConversation(userId, '');
+    }
+    function sendMessage() {
+      return sendAdminChatMessage();
+    }
+
+    // Wire the input's Enter key + the Send button.
+    document.addEventListener('DOMContentLoaded', function () {
+      const input = document.getElementById('admin-chat-input');
+      if (input) {
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendAdminChatMessage();
+          }
+        });
+      }
+    });
+
+    // Stop polling when the tab is hidden / closed.
+    window.addEventListener('beforeunload', function () {
+      if (adminChatPollInterval) clearInterval(adminChatPollInterval);
+    });
 
     // Complaint verification functions
     async function verifyComplaint(complaintId) {
