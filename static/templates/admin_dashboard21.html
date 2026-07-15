@@ -3,1113 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - My Safety</title>
+  <title>Admin · MySafety</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/assets/css/console.css">
-  <style>
-    :root {
-      --dark-bg: #0f0f0f;
-      --dark-surface: #1a1a1a;
-      --dark-card: #2a2a2a;
-      --text-primary: #ffffff;
-      --text-secondary: #a0a0a0;
-      --text-muted: #666666;
-      --accent-purple: #8b5cf6;
-      --accent-gray: #6b7280;
-      --accent-green: #10b981;
-      --accent-red: #ef4444;
-      --accent-blue: #3b82f6;
-      --border-color: #333333;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Inter', Arial, sans-serif;
-      background: var(--dark-bg);
-      color: var(--text-primary);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      /* FIX: Add padding at the bottom equal to the footer height (4rem is enough for 1rem padding top/bottom + margin) */
-      padding-bottom: 4rem; 
-    }
-    .header {
-      background: var(--dark-surface);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
-      position: relative; /* Needed for absolute positioning of the dropdown */
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: var(--accent-purple);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-    }
-    .logo-text {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--text-primary);
-    }
-    /* Profile Menu Styles */
-    .user-profile-menu {
-        position: relative;
-        z-index: 100;
-    }
-    .user-icon {
-        width: 40px;
-        height: 40px;
-        background: var(--accent-purple);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: 600;
-        cursor: pointer;
-        transition: box-shadow 0.2s;
-        border: 2px solid var(--accent-purple);
-    }
-    .user-icon:hover {
-        box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
-    }
-    .dropdown-menu {
-        position: absolute;
-        top: 50px; /* Position below the icon */
-        right: 0;
-        width: 250px;
-        background: var(--dark-surface);
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
-        opacity: 0;
-        visibility: hidden;
-        transform: translateY(-10px);
-        transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
-        padding: 1rem;
-    }
-    .dropdown-menu.active {
-        opacity: 1;
-        visibility: visible;
-        transform: translateY(0);
-    }
-    .profile-info {
-        padding-bottom: 1rem;
-        margin-bottom: 1rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-    .profile-info p {
-        font-size: 0.875rem;
-        color: var(--text-secondary);
-        margin-bottom: 0.25rem;
-    }
-    .profile-info strong {
-        color: var(--text-primary);
-        font-weight: 600;
-    }
-    .dropdown-menu .logout-btn {
-        width: 100%;
-        justify-content: center;
-        margin: 0;
-        padding: 0.75rem;
-    }
-    /* End Profile Menu Styles */
-
-
-    .nav-links {
-      display: none; 
-      gap: 2rem;
-      align-items: center;
-    }
-    .nav-links a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover {
-      color: var(--text-primary);
-    }
-    .logout-btn { 
-      background: var(--accent-red);
-      color: white;
-      border: 1px solid var(--accent-red);
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s;
-    }
-    .logout-btn:hover { 
-      background: #dc2626;
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-    }
-    .main-content {
-      padding: 2rem;
-      max-width: 1400px;
-      margin: 0 auto;
-      flex-grow: 1; 
-      width: 100%; 
-    }
-    .dashboard-title {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 0.5rem;
-    }
-    .dashboard-subtitle {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      margin-bottom: 2rem;
-    }
-    .admin-tabs {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-    .tab-btn {
-      background: transparent;
-      color: var(--text-secondary);
-      border: none;
-      padding: 1rem 1.5rem;
-      cursor: pointer;
-      font-weight: 500;
-      border-bottom: 2px solid transparent;
-      transition: all 0.2s;
-    }
-    .tab-btn.active {
-      color: var(--text-primary);
-      border-bottom-color: var(--accent-purple);
-    }
-    .tab-btn:hover {
-      color: var(--text-primary);
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    .section-card {
-      background: var(--dark-card);
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-    }
-    .section-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.5rem;
-    }
-    .section-description {
-      color: var(--text-secondary);
-      margin-bottom: 1.5rem;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    .form-section-title {
-      margin-top: 2rem;
-      margin-bottom: 0.75rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .form-hint {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      margin-top: 0.35rem;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-    .form-label {
-      color: var(--text-primary);
-      font-weight: 500;
-      margin-bottom: 0.5rem;
-    }
-    .form-input, .form-select, .form-textarea {
-      background: var(--dark-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 0.75rem;
-      color: var(--text-primary);
-      font-size: 1rem;
-    }
-    .form-input:focus, .form-select:focus, .form-textarea:focus {
-      outline: none;
-      border-color: var(--accent-purple);
-    }
-    .form-textarea {
-      resize: vertical;
-      min-height: 100px;
-    }
-    #analytics-overview {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
-    .analytics-card {
-      background: var(--dark-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      min-height: 140px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    }
-    .analytics-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 0.5rem;
-    }
-    .analytics-card .metric-icon {
-      font-size: 1.5rem;
-      line-height: 1;
-    }
-    .analytics-card .metric-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .analytics-card .metric-value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      line-height: 1.2;
-    }
-    .analytics-card .metric-sub {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-    .analytics-card .metric-trend {
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-    .analytics-card .metric-trend.positive {
-      color: var(--accent-green);
-    }
-    .analytics-card .metric-trend.negative {
-      color: var(--accent-red);
-    }
-    #activity-log {
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-    }
-    .activity-item {
-      background: var(--dark-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1rem 1.2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    }
-    .activity-item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .activity-item-type {
-      font-weight: 600;
-      color: var(--text-primary);
-      font-size: 0.95rem;
-    }
-    .activity-item-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .activity-item-description {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-    }
-    .activity-item-status {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .activity-item-meta {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-    }
-    .analytics-empty {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      padding: 1rem 0;
-    }
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .btn:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-    .btn-primary {
-      background: var(--accent-purple);
-      color: white;
-    }
-    .btn-primary:hover {
-      background: #7c3aed;
-    }
-    .btn-success {
-      background: var(--accent-green);
-      color: white;
-    }
-    .btn-success:hover {
-      background: #059669;
-    }
-    .btn-danger {
-      background: var(--accent-red);
-      color: white;
-    }
-    .btn-danger:hover {
-      background: #dc2626;
-    }
-    .btn-secondary {
-      background: var(--accent-gray);
-      color: white;
-    }
-    .btn-secondary:hover {
-      background: #4b5563;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: transparent;
-    }
-    th, td {
-      padding: 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border-color);
-    }
-    th {
-      color: var(--text-secondary);
-      font-weight: 500;
-      font-size: 0.875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    td {
-      color: var(--text-primary);
-    }
-    .status-badge {
-      /* FIX: Improved padding and border-radius for better visual appeal */
-      padding: 0.35rem 1rem; 
-      border-radius: 6px; 
-      font-size: 0.75rem;
-      font-weight: 600; /* Increased weight for visibility */
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      display: inline-block; /* Ensures padding works consistently */
-      min-width: 80px; /* Ensures all badges have a minimum width */
-      text-align: center;
-    }
-    .status-badge.status-clickable {
-      cursor: pointer;
-    }
-    .status-pending {
-      background: var(--accent-gray);
-      color: white;
-    }
-    .status-verified {
-      background: var(--accent-green);
-      color: white;
-    }
-    .status-in-progress {
-      background: var(--accent-purple);
-      color: white;
-    }
-    .status-resolved {
-      background: var(--accent-blue);
-      color: white;
-    }
-    .status-reported {
-      background: var(--accent-gray);
-      color: white;
-    }
-    .status-under-investigation {
-      background: var(--accent-purple);
-      color: white;
-    }
-    .status-case-closed {
-      background: var(--accent-green);
-      color: white;
-    }
-    .danger-badge {
-      display: inline-block;
-      padding: 0.3rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .danger-low {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--accent-green);
-    }
-    .danger-medium {
-      background: rgba(245, 158, 11, 0.18);
-      color: #fbbf24;
-    }
-    .danger-high {
-      background: rgba(239, 68, 68, 0.18);
-      color: var(--accent-red);
-    }
-    .danger-extreme {
-      background: rgba(139, 92, 246, 0.2);
-      color: var(--accent-purple);
-    }
-    .danger-unknown {
-      background: rgba(107, 114, 128, 0.2);
-      color: var(--accent-gray);
-    }
-    .sightings-history {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      max-height: 320px;
-      overflow-y: auto;
-    }
-    .sightings-history li {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.9rem;
-    }
-    .sightings-history .sighting-meta {
-      color: var(--text-secondary);
-      font-size: 0.8rem;
-    }
-    .timeline-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      max-height: 320px;
-      overflow-y: auto;
-    }
-    .timeline-item {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.9rem;
-    }
-    .timeline-status {
-      border-left: 4px solid var(--accent-purple);
-      padding-left: 0.75rem;
-    }
-    .timeline-assignment {
-      border-left: 4px solid var(--accent-blue);
-      padding-left: 0.75rem;
-    }
-    .timeline-meta {
-      color: var(--text-secondary);
-      font-size: 0.8rem;
-    }
-    .timeline-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      font-size: 0.95rem;
-    }
-    .timeline-notes {
-      margin: 0;
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-    }
-    .timeline-actor {
-      color: var(--accent-blue);
-    }
-    .timeline-modal {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-    .timeline-header h3 {
-      margin: 0;
-      font-size: 1.35rem;
-      font-weight: 600;
-    }
-    .timeline-header p {
-      margin: 0.25rem 0 0;
-      color: var(--text-secondary);
-    }
-    .timeline-summary ul,
-    .assignment-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .assignment-list li {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
-      padding: 0.65rem;
-      font-size: 0.9rem;
-    }
-    .timeline-section h4,
-    .timeline-summary h4 {
-      margin: 0 0 0.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-    }
-    .status-update-modal {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .status-update-modal h3 {
-      margin: 0;
-      font-size: 1.3rem;
-      font-weight: 600;
-    }
-    .status-update-meta {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-    }
-    .status-update-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-    }
-    .status-update-fields label {
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .status-update-error {
-      margin: 0;
-      color: var(--accent-red);
-      font-size: 0.85rem;
-      min-height: 1.1rem;
-    }
-    .action-btn {
-      background: transparent;
-      color: var(--text-secondary);
-      border: none;
-      padding: 0.5rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      transition: color 0.2s;
-    }
-    .action-btn:hover {
-      color: var(--text-primary);
-    }
-    .chat-container {
-      display: grid;
-      grid-template-columns: 300px 1fr;
-      gap: 1rem;
-      height: 500px; /* Locked height for the whole chat interface */
-    }
-    .chat-sidebar {
-      background: var(--dark-surface);
-      border-radius: 8px;
-      padding: 1rem;
-      overflow-y: auto;
-    }
-    .chat-user {
-      padding: 0.75rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin-bottom: 0.5rem;
-    }
-    .chat-user:hover, .chat-user.active {
-      background: var(--dark-card);
-    }
-    .chat-main {
-      background: var(--dark-surface);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); 
-      /* FIX: Add overflow hidden to clip content to the border radius */
-      overflow: hidden; 
-    }
-    .chat-header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-    .chat-messages {
-      flex: 1; 
-      padding: 1rem;
-      overflow-y: auto; /* Re-enabled scrolling for message history */
-      display: flex; 
-      flex-direction: column;
-      gap: 0.5rem; 
-    }
-    .chat-input-container {
-      padding: 1rem;
-      border-top: 1px solid var(--border-color);
-      display: flex; 
-      gap: 0.5rem;
-      align-items: center;
-      /* FIX: Ensure the background color covers the entire area right up to the bottom edge */
-      background: var(--dark-surface);
-    }
-    .chat-input {
-      flex: 1;
-      background: var(--dark-card);
-      border: 1px solid var(--border-color);
-      border-radius: 20px; 
-      padding: 0.75rem 1rem;
-      color: var(--text-primary);
-      font-size: 1rem;
-      transition: border-color 0.2s;
-    }
-    .chat-input:focus {
-      border-color: var(--accent-purple);
-    }
-    .message {
-      margin-bottom: 0.5rem; 
-      padding: 0.75rem 1rem;
-      border-radius: 12px;
-      max-width: 75%; 
-      line-height: 1.4;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
-    }
-    .message.admin {
-      background: var(--accent-purple);
-      color: white;
-      margin-left: auto;
-      /* Adjusted borders for a cleaner bubble look */
-      border-bottom-right-radius: 4px; 
-      border-top-right-radius: 12px;
-      border-top-left-radius: 12px;
-      border-bottom-left-radius: 12px;
-    }
-    .message.user {
-      background: var(--dark-card);
-      border: 1px solid var(--border-color);
-      margin-right: auto;
-      /* Adjusted borders for a cleaner bubble look */
-      border-bottom-left-radius: 4px; 
-      border-top-right-radius: 12px;
-      border-top-left-radius: 12px;
-      border-bottom-right-radius: 12px;
-    }
-    .message-sender {
-      font-weight: 600; 
-      font-size: 0.875rem;
-      margin-bottom: 0.25rem;
-    }
-    .message.user .message-sender {
-      color: var(--accent-purple); 
-    }
-    .message-time {
-      font-size: 0.7rem; 
-      color: var(--text-muted); 
-      margin-top: 0.3rem; 
-      display: block;
-      text-align: right;
-      opacity: 0.8;
-    }
-    .message.admin .message-time {
-      color: rgba(255, 255, 255, 0.6); 
-    }
-    /* Send button change for cleaner integration */
-    .chat-input-container .btn {
-      padding: 0.75rem 1rem;
-    }
-    .footer {
-      /* CRITICAL FIX: Ensures footer is always at the bottom of the viewport */
-      position: fixed; 
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      z-index: 999; 
-
-      background: var(--dark-surface);
-      padding: 1rem 2rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      border-top: 1px solid var(--border-color); 
-    }
-    .footer-icon {
-      width: 20px;
-      height: 20px;
-      background: var(--accent-purple);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 0.75rem;
-      font-weight: bold;
-    }
-
-    /* Custom Modal Styles (for non-blocking UI) */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        display: none; 
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-        opacity: 0;
-        transition: opacity 0.3s ease-in-out;
-    }
-
-    .modal-overlay.show {
-        display: flex;
-        opacity: 1;
-    }
-    
-    .modal-content {
-        background: var(--dark-card);
-        border-radius: 12px;
-        padding: 1.5rem;
-        width: 90%;
-        max-width: 400px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        transform: translateY(-20px);
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .modal-overlay.show .modal-content {
-        transform: translateY(0);
-    }
-
-    .modal-message {
-        font-size: 1.1rem;
-        margin-bottom: 1.5rem;
-        color: var(--text-primary);
-    }
-
-  .modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .modal-buttons.stacked {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .modal-buttons.stacked .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .stats-modal {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
-
-  .stats-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .stats-header h3 {
-    font-size: 1.35rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .stats-header p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .stats-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.85rem;
-  }
-
-  .stats-metric {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    padding: 0.85rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  .stats-metric span {
-    display: block;
-  }
-
-  .stats-metric .metric-label {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .stats-metric .metric-value {
-    font-size: 1.4rem;
-    font-weight: 600;
-  }
-
-  .stats-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.25rem;
-    align-items: stretch;
-  }
-
-  .stats-metrics-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .stats-chart {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 1rem;
-  }
-
-  .stats-chart h4 {
-    margin: 0 0 0.75rem 0;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .chart-wrapper {
-    position: relative;
-    height: 220px;
-  }
-
-  .stats-insights {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 0.9rem 1rem;
-  }
-
-  .stats-insights h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .stats-insights ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .stats-insights li {
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-  }
-
-  .stats-empty-state {
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    padding: 1.5rem 0;
-  }
-
-  .modal-content.modal-wide {
-    max-width: 1040px;
-    width: 95%;
-  }
-
-  .missing-modal {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .missing-modal .missing-header h3 {
-    margin: 0;
-    font-size: 1.45rem;
-    font-weight: 600;
-  }
-
-  .missing-modal .missing-header p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .missing-modal .missing-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1.75fr) minmax(240px, 1fr);
-    gap: 1rem;
-    align-items: stretch;
-  }
-
-  .missing-modal .missing-details {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 0.85rem;
-  }
-
-  .missing-modal .missing-details .stats-insights {
-    height: 100%;
-  }
-
-  .missing-modal .missing-details .missing-description {
-    grid-column: 1 / -1;
-  }
-
-  .missing-modal .missing-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .missing-photo-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 220px;
-  }
-
-  .missing-photo-card img {
-    width: 100%;
-    border-radius: 10px;
-    object-fit: cover;
-  }
-
-  .missing-photo-card.missing-photo-placeholder {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    text-align: center;
-  }
-
-  @media (max-width: 900px) {
-    .stats-layout {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 900px) {
-    .missing-modal .missing-body {
-      grid-template-columns: 1fr;
-    }
-  }
-
-    /* Adjust button styles for modal */
-    .modal-buttons .btn {
-        padding: 0.6rem 1.25rem;
-        font-size: 0.9rem;
-    }
-
-    .modal-buttons .btn-secondary {
-        background: var(--dark-surface);
-        color: var(--text-primary);
-    }
-    .modal-buttons .btn-secondary:hover {
-        background: var(--border-color);
-    }
-    /* End Custom Modal Styles */
-  </style>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C9BFF' stroke-width='2'><path d='M12 2 4 5v6c0 5 3.5 9.3 8 11 4.5-1.7 8-6 8-11V5l-8-3z'/></svg>">
   <script src="/static/assets/js/api-base.js"></script>
   <script src="/static/assets/js/escape.js"></script>
   <script src="/static/assets/js/console.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <!-- Custom Modal HTML Structure -->
+  <!-- Custom Modal HTML Structure — kept outside #ms-root so it overlays the chrome. -->
   <div id="custom-modal-overlay" class="modal-overlay" onclick="closeModal(event)">
     <div class="modal-content">
       <div id="modal-message" class="modal-message"></div>
@@ -1120,37 +26,22 @@
   </div>
   <!-- End Custom Modal HTML Structure -->
 
-  <div class="header">
-    <div class="logo">
-      <div class="logo-icon">🛡️</div>
-      <div class="logo-text">My Safety</div>
-    </div>
-    
-    <!-- Admin Profile Dropdown Menu -->
-    <div class="user-profile-menu">
-        <div class="user-icon" onclick="toggleMenu()">AD</div>
-        <div id="dropdown-menu" class="dropdown-menu">
-            <div class="profile-info">
-                <!-- ADDED Admin Name -->
-                <div id="ms-admin-name" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Administrator</div>
-                <p>Role: <strong>Super Admin</strong></p>
-                <p>ID: <strong>ADM-90210</strong></p>
-                <p>Email: <strong>admin@mysafety.com</strong></p>
-                <p>Status: <strong style="color: var(--accent-green);">Active</strong></p>
-            </div>
-            <!-- Logout button inside the dropdown -->
-            <a href="/static/login.html" class="logout-btn" onclick="handleLogout(event)">
-                <span>←</span>
-                Logout
-            </a>
-        </div>
-    </div>
-    <!-- End Admin Profile Dropdown Menu -->
-  </div>
+  <div id="ms-root"></div>
 
-  <div class="main-content">
-    <h1 class="dashboard-title">Admin Dashboard</h1>
-    <p class="dashboard-subtitle">Manage crimes, verify reports, update cases, and communicate with reporters.</p>
+  <template id="ms-page-template">
+  <section class="ms-section">
+    <header class="ms-page-header">
+      <div>
+        <p class="ms-eyebrow">Operations</p>
+        <h1 class="ms-page-header__title">Admin dashboard</h1>
+        <p class="ms-page-header__sub">Manage crimes, verify reports, update cases, and communicate with reporters.</p>
+      </div>
+      <div class="ms-page-header__actions">
+        <span id="ms-admin-pill" class="ms-pill ms-pill--blue"><span class="ms-pill__dot"></span>Loading session…</span>
+      </div>
+    </header>
+    <h2 class="dashboard-title" style="display:none">Admin Dashboard</h2>
+    <p class="dashboard-subtitle" style="display:none">Manage crimes, verify reports, update cases, and communicate with reporters.</p>
 
     <div class="admin-tabs">
       <button class="tab-btn active" onclick="showTab('overview', event)">Overview</button>
@@ -1314,7 +205,7 @@
             <div class="form-group">
               <label class="form-label">Photo</label>
               <input type="file" class="form-input" name="photo_file" accept="image/*">
-              <span style="color: var(--text-secondary); font-size: 0.8rem;">Accepted formats: JPG, PNG (max 5 MB)</span>
+              <span style="color: var(--ink-2); font-size: 0.8rem;">Accepted formats: JPG, PNG (max 5 MB)</span>
             </div>
           </div>
           
@@ -1778,21 +669,21 @@
 
         <div class="chat-container">
           <div class="chat-sidebar">
-            <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Active Conversations</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--ink-1);">Active Conversations</h3>
             <div id="admin-chat-conversation-list">
               <!-- Populated dynamically by loadAdminConversations() -->
-              <p style="font-size: 0.875rem; color: var(--text-secondary);">Loading…</p>
+              <p style="font-size: 0.875rem; color: var(--ink-2);">Loading…</p>
             </div>
           </div>
 
           <div class="chat-main">
             <div class="chat-header">
               <div style="font-weight: 600;" id="chat-header-name">Select a conversation</div>
-              <div style="font-size: 0.875rem; color: var(--text-secondary);" id="chat-header-report">—</div>
+              <div style="font-size: 0.875rem; color: var(--ink-2);" id="chat-header-report">—</div>
             </div>
 
             <div class="chat-messages" id="chat-messages">
-              <div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">
+              <div style="margin: auto; color: var(--ink-2); font-size: 0.9rem; text-align: center;">
                 Select a conversation on the left to view messages.
               </div>
             </div>
@@ -1820,7 +711,7 @@
         </div>
         
         <div style="margin-top: 2rem;">
-          <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Recent Activity Log</h3>
+          <h3 style="color: var(--ink-1); margin-bottom: 1rem;">Recent Activity Log</h3>
           <div id="activity-log">
             <!-- Activity log will be loaded here -->
           </div>
@@ -2186,7 +1077,7 @@
     function renderCrimeRows(crimes, tbody) {
       tbody.innerHTML = '';
       if (!Array.isArray(crimes) || !crimes.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No crime reports found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--ink-2);">No crime reports found.</td></tr>';
         return;
       }
 
@@ -2299,7 +1190,7 @@
 
     function renderComplaintsTable(records, tbody) {
       if (!Array.isArray(records) || !records.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No reports are awaiting verification right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--ink-2);">No reports are awaiting verification right now.</td></tr>';
         return;
       }
 
@@ -2876,7 +1767,7 @@
       const dataset = Array.isArray(criminals) ? criminals : [];
 
       if (!dataset.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No wanted criminals found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">No wanted criminals found.</td></tr>';
         return;
       }
 
@@ -2909,7 +1800,7 @@
                 <span>⚙️</span>
                 Manage
               </button>
-            ` : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+            ` : '<span style="color: var(--ink-2);">Unavailable</span>'}
           </td>
         `;
         tbody.appendChild(row);
@@ -2920,7 +1811,7 @@
       const dataset = Array.isArray(stations) ? stations : [];
 
       if (!dataset.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No police stations found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">No police stations found.</td></tr>';
         return;
       }
 
@@ -2941,7 +1832,7 @@
           <td>
             ${Number.isFinite(stationId)
               ? `<button class="action-btn" data-action="view-station" data-station-id="${stationId}"><span>👁️</span>View</button>`
-              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+              : '<span style="color: var(--ink-2);">Unavailable</span>'}
           </td>
         `;
         tbody.appendChild(row);
@@ -2952,7 +1843,7 @@
       const dataset = Array.isArray(records) ? records : [];
 
       if (!dataset.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">No missing person reports found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ink-2);">No missing person reports found.</td></tr>';
         return;
       }
 
@@ -2983,7 +1874,7 @@
           <td>
             ${Number.isFinite(missingId)
               ? `<button class="action-btn" data-action="view-missing" data-missing-id="${missingId}"><span>👁️</span>View</button>`
-              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+              : '<span style="color: var(--ink-2);">Unavailable</span>'}
           </td>
         `;
         tbody.appendChild(row);
@@ -3144,7 +2035,7 @@
       const dataset = Array.isArray(alerts) ? alerts : [];
 
       if (!dataset.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No emergency alerts at this time.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">No emergency alerts at this time.</td></tr>';
         return;
       }
 
@@ -3172,7 +2063,7 @@
         const canAssign = statusRaw !== 'dispatched' && statusRaw !== 'resolved';
         const assignLabel = alert.assigned_officer_id ? 'Reassign' : 'Assign';
         const assignmentNote = alert.assigned_officer_id
-          ? `<div style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.75rem;">Officer #${escapeHtml(String(alert.assigned_officer_id).padStart(3, '0'))}</div>`
+          ? `<div style="margin-top:0.35rem;color:var(--ink-2);font-size:0.75rem;">Officer #${escapeHtml(String(alert.assigned_officer_id).padStart(3, '0'))}</div>`
           : '';
 
         const row = document.createElement('tr');
@@ -3199,7 +2090,7 @@
                   ${assignLabel}
                 </button>
               `
-              : '<span style="color: var(--text-secondary);">Unavailable</span>'}
+              : '<span style="color: var(--ink-2);">Unavailable</span>'}
           </td>
         `;
         tbody.appendChild(row);
@@ -3223,17 +2114,17 @@
         <div style="display:flex;flex-direction:column;gap:0.9rem;">
           <div>
             <strong>${escapeHtml(displayId)}</strong>
-            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+            <div style="color: var(--ink-2); font-size: 0.85rem; margin-top: 0.25rem;">
               ${escapeHtml(formatEmergencyUserLabel(record))}
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--text-secondary);">
+          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--ink-2);">
             <div>Severity: <span class="danger-badge ${severityInfo.className}" style="font-size:0.7rem;">${escapeHtml(severityInfo.label)}</span></div>
             <div>Status: <span class="status-badge ${statusInfo.className}" style="font-size:0.7rem;">${escapeHtml(statusInfo.display)}</span></div>
           </div>
           <label for="emergency-officer-id" class="form-label" style="margin-bottom:0;">Officer ID</label>
           <input id="emergency-officer-id" type="number" min="1" class="form-input" placeholder="Enter responding officer ID" value="${record.assigned_officer_id ? escapeHtml(String(record.assigned_officer_id)) : ''}" />
-          <small style="color: var(--text-secondary);">Assign an available officer or detective to coordinate the response.</small>
+          <small style="color: var(--ink-2);">Assign an available officer or detective to coordinate the response.</small>
         </div>
       `;
 
@@ -3348,7 +2239,7 @@
         <div style="display:flex;flex-direction:column;gap:1.2rem;">
           <div>
             <h3 style="margin:0;">${escapeHtml(displayId)}</h3>
-            <p style="margin:0.3rem 0 0;color:var(--text-secondary);">Reported ${escapeHtml(formatDateTimeDisplay(record.created_at))}</p>
+            <p style="margin:0.3rem 0 0;color:var(--ink-2);">Reported ${escapeHtml(formatDateTimeDisplay(record.created_at))}</p>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
             <span class="danger-badge ${severityInfo.className}" style="font-size:0.75rem;">${escapeHtml(severityInfo.label)}</span>
@@ -3779,13 +2670,13 @@
         <div style="display:flex;flex-direction:column;gap:0.6rem;">
           <div>
             <strong>${escapeHtml(displayId)} · ${escapeHtml(record.name || 'Unknown')}</strong>
-            ${record.alias ? `<div style="color: var(--text-secondary); font-size: 0.88rem;">Alias: ${escapeHtml(record.alias)}</div>` : ''}
+            ${record.alias ? `<div style="color: var(--ink-2); font-size: 0.88rem;">Alias: ${escapeHtml(record.alias)}</div>` : ''}
           </div>
-          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--text-secondary);">
+          <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.88rem;color:var(--ink-2);">
             <div>Status: <span class="status-badge ${statusInfo.className}" style="font-size:0.7rem;">${escapeHtml(statusInfo.display)}</span></div>
             <div>Danger Level: <span class="danger-badge ${dangerInfo.className}" style="font-size:0.7rem;">${escapeHtml(dangerInfo.label)}</span></div>
           </div>
-          <p style="margin:0;font-size:0.9rem;color:var(--text-secondary);">
+          <p style="margin:0;font-size:0.9rem;color:var(--ink-2);">
             Remove this person from the active wanted list once they have been apprehended.
           </p>
         </div>
@@ -3893,9 +2784,9 @@
         <div style="display:flex;flex-direction:column;gap:0.75rem;">
           <div>
             <strong>${escapeHtml(displayId)} sighting history</strong>
-            <div style="color: var(--text-secondary); font-size: 0.88rem;">${escapeHtml(headerName)}</div>
+            <div style="color: var(--ink-2); font-size: 0.88rem;">${escapeHtml(headerName)}</div>
           </div>
-          <p style="margin:0;color:var(--text-secondary);font-size:0.85rem;">
+          <p style="margin:0;color:var(--ink-2);font-size:0.85rem;">
             Every submitted last seen report appears below. The newest entries show first.
           </p>
           <ul class="sightings-history">
@@ -4287,14 +3178,14 @@
         const crimes = Array.isArray(payload.crimes) ? payload.crimes : [];
 
         if (crimes.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No crime reports found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--ink-2);">No crime reports found.</td></tr>';
           return;
         }
 
         renderCrimeRows(crimes, tbody);
       } catch (error) {
         console.error('Error loading crimes from API:', error);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-red);">Unable to load crime reports right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--status-red);">Unable to load crime reports right now.</td></tr>';
       }
     }
 
@@ -4440,7 +3331,7 @@
         renderComplaintsTable(filtered, tbody);
       } catch (error) {
         console.error('Error loading complaints:', error);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--accent-red);">Unable to load reports right now. Please try again shortly.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--status-red);">Unable to load reports right now. Please try again shortly.</td></tr>';
       }
     }
 
@@ -4463,7 +3354,7 @@
         const records = Array.isArray(payload.cases) ? payload.cases : [];
 
         if (!records.length) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No cases are currently under investigation.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--ink-2);">No cases are currently under investigation.</td></tr>';
           return;
         }
 
@@ -4518,7 +3409,7 @@
               </button>`;
 
           const caseMeta = record.crime_type
-            ? `<div style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(record.crime_type)}</div>`
+            ? `<div style="color: var(--ink-2); font-size: 0.8rem;">${escapeHtml(record.crime_type)}</div>`
             : '';
 
           const row = document.createElement('tr');
@@ -4541,7 +3432,7 @@
         });
       } catch (error) {
         console.error('Error loading case assignments:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load case assignments right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--status-red);">Unable to load case assignments right now.</td></tr>';
       }
     }
 
@@ -4575,7 +3466,7 @@
       if (!list) return;
       if (!conversations || conversations.length === 0) {
         list.innerHTML =
-          '<p style="font-size: 0.875rem; color: var(--text-secondary);">' +
+          '<p style="font-size: 0.875rem; color: var(--ink-2);">' +
           'No conversations yet. Open a citizen\'s report and reply from the Chat tab.' +
           '</p>';
         return;
@@ -4584,7 +3475,7 @@
         const isActive = String(c.user_id) === String(adminChatCurrentUserId)
           && String(c.report_id || '') === String(adminChatCurrentReportId || '');
         const unread = (c.unread_count && c.unread_count > 0)
-          ? ' <span style="background: var(--accent-red); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.7rem; margin-left: 4px;">' +
+          ? ' <span style="background: var(--status-red); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.7rem; margin-left: 4px;">' +
             c.unread_count + '</span>' : '';
         const reportLabel = c.report_id
           ? 'Report: ' + escapeHtml(String(c.report_id))
@@ -4595,7 +3486,7 @@
                ' data-report-id="' + escapeHtml(String(c.report_id || '')) + '"' +
                ' onclick="selectAdminConversation(this.dataset.userId, this.dataset.reportId)">' +
                '<div style="font-weight: 600;">' + username + unread + '</div>' +
-               '<div style="font-size: 0.875rem; color: var(--text-secondary);">' + reportLabel + '</div>' +
+               '<div style="font-size: 0.875rem; color: var(--ink-2);">' + reportLabel + '</div>' +
              '</div>';
       }).join('');
     }
@@ -4605,7 +3496,7 @@
       if (!container) return;
       if (!messages || messages.length === 0) {
         container.innerHTML =
-          '<div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem; text-align: center;">' +
+          '<div style="margin: auto; color: var(--ink-2); font-size: 0.9rem; text-align: center;">' +
           'No messages in this conversation yet.' +
           '</div>';
         return;
@@ -4627,7 +3518,7 @@
       try {
         const list = document.getElementById('admin-chat-conversation-list');
         if (list && !adminChatCurrentUserId) {
-          list.innerHTML = '<p style="font-size: 0.875rem; color: var(--text-secondary);">Loading…</p>';
+          list.innerHTML = '<p style="font-size: 0.875rem; color: var(--ink-2);">Loading…</p>';
         }
         const resp = await fetch(resolveApiUrl('/api/chat/conversations'), { cache: 'no-store' });
         if (!resp.ok) throw new Error('conversations fetch failed: ' + resp.status);
@@ -4649,7 +3540,7 @@
         const list = document.getElementById('admin-chat-conversation-list');
         if (list) {
           list.innerHTML =
-            '<p style="font-size: 0.875rem; color: var(--accent-red);">' +
+            '<p style="font-size: 0.875rem; color: var(--status-red);">' +
             'Could not load conversations. Check your connection and try again.' +
             '</p>';
         }
@@ -4705,7 +3596,7 @@
       const container = document.getElementById('chat-messages');
       if (showLoading && container) {
         container.innerHTML =
-          '<div style="margin: auto; color: var(--text-secondary); font-size: 0.9rem;">Loading…</div>';
+          '<div style="margin: auto; color: var(--ink-2); font-size: 0.9rem;">Loading…</div>';
       }
       try {
         const url = resolveApiUrl(
@@ -4722,7 +3613,7 @@
         console.error('loadAdminMessages', err);
         if (container && showLoading) {
           container.innerHTML =
-            '<div style="margin: auto; color: var(--accent-red); font-size: 0.9rem; text-align: center;">' +
+            '<div style="margin: auto; color: var(--status-red); font-size: 0.9rem; text-align: center;">' +
             'Could not load messages.' +
             '</div>';
         }
@@ -5280,7 +4171,7 @@
 
       modalContainer.classList.add('modal-wide');
       modalButtons.classList.remove('stacked');
-      modalMessage.innerHTML = '<p style="margin: 0; color: var(--text-secondary);">Loading case timeline...</p>';
+      modalMessage.innerHTML = '<p style="margin: 0; color: var(--ink-2);">Loading case timeline...</p>';
       modalButtons.innerHTML = '';
       modalOverlay.classList.add('show');
 
@@ -5421,8 +4312,8 @@
       const currentRole = (user.role_hint || 'User').trim();
       modalMessage.innerHTML = `
         <h3 style="margin-bottom: 0.75rem;">Manage ${user.username || user.email || `USR-${String(numericId).padStart(3, '0')}`}</h3>
-        <p style="margin-bottom: 0.25rem; color: var(--text-secondary);">Current role: <strong>${currentRole}</strong></p>
-        <p style="color: var(--text-secondary);">Select a new role to assign to this user.</p>
+        <p style="margin-bottom: 0.25rem; color: var(--ink-2);">Current role: <strong>${currentRole}</strong></p>
+        <p style="color: var(--ink-2);">Select a new role to assign to this user.</p>
       `;
 
       modalButtons.innerHTML = '';
@@ -5515,7 +4406,7 @@
         const users = Array.isArray(payload.users) ? payload.users : [];
 
         if (users.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No users found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--ink-2);">No users found.</td></tr>';
           return;
         }
 
@@ -5530,7 +4421,7 @@
         renderUserRows(users, tbody);
       } catch (error) {
         console.error('Error loading users from API:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Unable to load users right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--status-red);">Unable to load users right now.</td></tr>';
       }
     }
 
@@ -5572,7 +4463,7 @@
         renderWantedCriminalRows(activeCriminals, tbody);
       } catch (error) {
         console.error('Error loading criminals:', error);
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load wanted criminals right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--status-red);">Unable to load wanted criminals right now.</td></tr>';
       }
     }
 
@@ -5583,7 +4474,7 @@
         return;
       }
 
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading stations…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">Loading stations…</td></tr>';
 
 
       try {
@@ -5608,7 +4499,7 @@
         renderPoliceStationRows(records, tbody);
       } catch (error) {
         console.error('Error loading stations:', error);
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load police stations right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--status-red);">Unable to load police stations right now.</td></tr>';
       }
     }
 
@@ -5619,7 +4510,7 @@
         return;
       }
 
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">Loading missing person reports…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ink-2);">Loading missing person reports…</td></tr>';
 
       try {
         const response = await fetch(resolveApiUrl('/api/missing-persons'), { cache: 'no-store' });
@@ -5643,7 +4534,7 @@
         renderMissingPersonRows(records, tbody);
       } catch (error) {
         console.error('Error loading missing persons:', error);
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--accent-red);">Unable to load missing person reports right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--status-red);">Unable to load missing person reports right now.</td></tr>';
       }
     }
 
@@ -5653,7 +4544,7 @@
         return;
       }
 
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading emergency alerts…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">Loading emergency alerts…</td></tr>';
 
       try {
         const response = await fetch(resolveApiUrl('/api/admin/emergencies?limit=100'), { cache: 'no-store' });
@@ -5688,14 +4579,14 @@
         });
 
         if (!normalizedAlerts.length) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No emergency alerts at this time.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--ink-2);">No emergency alerts at this time.</td></tr>';
           return;
         }
 
         renderEmergencyRows(normalizedAlerts, tbody);
       } catch (error) {
         console.error('Error loading emergency alerts:', error);
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Unable to load emergency alerts right now.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--status-red);">Unable to load emergency alerts right now.</td></tr>';
       }
     }
 
@@ -6059,5 +4950,23 @@
       } catch (e) {}
     })();
 </script>
+  </template>
+  <script>
+  // Run after console.js's DOMContentLoaded handler so the chrome exists
+  // before we try to fill the admin-name pill in the topbar.
+  document.addEventListener('DOMContentLoaded', function () {
+    var pill = document.getElementById('ms-admin-pill');
+    if (!pill) return;
+    try {
+      var raw = localStorage.getItem('currentUser');
+      var u = raw ? JSON.parse(raw) : null;
+      var name = (u && u.username) ? u.username : 'Administrator';
+      var role = (u && u.role_hint) ? u.role_hint : 'admin';
+      pill.textContent = name + ' · ' + role;
+    } catch (e) {
+      pill.textContent = 'Administrator · admin';
+    }
+  });
+  </script>
   </body>
 </html>
