@@ -1,0 +1,465 @@
+{
+  "base": "http://127.0.0.1:8000",
+  "roles": {
+    "admin": {
+      "role": "admin",
+      "email": "admin+3e8eb3@mysafety.local",
+      "login_ok": true,
+      "pages": {
+        "home": {
+          "path": "/",
+          "status": "ok",
+          "body_chars": 1432,
+          "title": "MySafety \u00b7 Civic Operations Console"
+        },
+        "bulletin_dashboard": {
+          "path": "/dashboard",
+          "status": "ok",
+          "body_chars": 1065,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "login": {
+          "path": "/login",
+          "status": "ok",
+          "body_chars": 425,
+          "title": "Log in \u00b7 MySafety"
+        },
+        "signup": {
+          "path": "/signup",
+          "status": "ok",
+          "body_chars": 428,
+          "title": "Sign up \u00b7 MySafety"
+        },
+        "report_crime": {
+          "path": "/report-crime",
+          "status": "ok",
+          "body_chars": 2507,
+          "title": "Report Crime \u00b7 MySafety"
+        },
+        "missing_person": {
+          "path": "/missing-person",
+          "status": "ok",
+          "body_chars": 353,
+          "title": "Missing Persons \u00b7 MySafety"
+        },
+        "wanted_criminals": {
+          "path": "/wanted-criminals",
+          "status": "ok",
+          "body_chars": 356,
+          "title": "Wanted List \u00b7 MySafety"
+        },
+        "chatbox": {
+          "path": "/chatbox",
+          "status": "ok",
+          "body_chars": 519,
+          "title": "Chat \u00b7 MySafety"
+        },
+        "admin_dashboard": {
+          "path": "/admin",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "admin_dashboard_alt": {
+          "path": "/admin-dashboard",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "report_missing": {
+          "path": "/report-missing",
+          "status": "ok",
+          "body_chars": 649,
+          "title": "Report Missing Person \u00b7 MySafety"
+        }
+      },
+      "console_errors": [
+        "[console.warning] reportForm not found"
+      ],
+      "broken_resources": [],
+      "interactions": {
+        "bulletin_submit": "error: Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button.btn-stamp\")\n",
+        "chat_send": "no textbox found",
+        "admin_tabs_clicked": [
+          "users",
+          "wanted criminals",
+          "police stations",
+          "missing persons",
+          "add crime",
+          "verify reports",
+          "case management",
+          "emergency",
+          "analytics"
+        ]
+      },
+      "token_set": true
+    },
+    "officer": {
+      "role": "officer",
+      "email": "officer+96be73@mysafety.local",
+      "login_ok": true,
+      "pages": {
+        "home": {
+          "path": "/",
+          "status": "ok",
+          "body_chars": 1436,
+          "title": "MySafety \u00b7 Civic Operations Console"
+        },
+        "bulletin_dashboard": {
+          "path": "/dashboard",
+          "status": "ok",
+          "body_chars": 1069,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "login": {
+          "path": "/login",
+          "status": "ok",
+          "body_chars": 425,
+          "title": "Log in \u00b7 MySafety"
+        },
+        "signup": {
+          "path": "/signup",
+          "status": "ok",
+          "body_chars": 428,
+          "title": "Sign up \u00b7 MySafety"
+        },
+        "report_crime": {
+          "path": "/report-crime",
+          "status": "ok",
+          "body_chars": 2511,
+          "title": "Report Crime \u00b7 MySafety"
+        },
+        "missing_person": {
+          "path": "/missing-person",
+          "status": "ok",
+          "body_chars": 357,
+          "title": "Missing Persons \u00b7 MySafety"
+        },
+        "wanted_criminals": {
+          "path": "/wanted-criminals",
+          "status": "ok",
+          "body_chars": 360,
+          "title": "Wanted List \u00b7 MySafety"
+        },
+        "chatbox": {
+          "path": "/chatbox",
+          "status": "ok",
+          "body_chars": 523,
+          "title": "Chat \u00b7 MySafety"
+        },
+        "admin_dashboard": {
+          "path": "/admin",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "admin_dashboard_alt": {
+          "path": "/admin-dashboard",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "report_missing": {
+          "path": "/report-missing",
+          "status": "ok",
+          "body_chars": 653,
+          "title": "Report Missing Person \u00b7 MySafety"
+        }
+      },
+      "console_errors": [
+        "[console.warning] reportForm not found"
+      ],
+      "broken_resources": [],
+      "interactions": {
+        "bulletin_submit": "error: Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button.btn-stamp\")\n",
+        "chat_send": "no textbox found",
+        "admin_tabs_clicked": [
+          "users",
+          "wanted criminals",
+          "police stations",
+          "missing persons",
+          "add crime",
+          "verify reports",
+          "case management",
+          "emergency",
+          "analytics"
+        ]
+      },
+      "token_set": true
+    },
+    "detective": {
+      "role": "detective",
+      "email": "detective+2930a6@mysafety.local",
+      "login_ok": true,
+      "pages": {
+        "home": {
+          "path": "/",
+          "status": "ok",
+          "body_chars": 1440,
+          "title": "MySafety \u00b7 Civic Operations Console"
+        },
+        "bulletin_dashboard": {
+          "path": "/dashboard",
+          "status": "ok",
+          "body_chars": 1073,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "login": {
+          "path": "/login",
+          "status": "ok",
+          "body_chars": 425,
+          "title": "Log in \u00b7 MySafety"
+        },
+        "signup": {
+          "path": "/signup",
+          "status": "ok",
+          "body_chars": 428,
+          "title": "Sign up \u00b7 MySafety"
+        },
+        "report_crime": {
+          "path": "/report-crime",
+          "status": "ok",
+          "body_chars": 2515,
+          "title": "Report Crime \u00b7 MySafety"
+        },
+        "missing_person": {
+          "path": "/missing-person",
+          "status": "ok",
+          "body_chars": 361,
+          "title": "Missing Persons \u00b7 MySafety"
+        },
+        "wanted_criminals": {
+          "path": "/wanted-criminals",
+          "status": "ok",
+          "body_chars": 364,
+          "title": "Wanted List \u00b7 MySafety"
+        },
+        "chatbox": {
+          "path": "/chatbox",
+          "status": "ok",
+          "body_chars": 527,
+          "title": "Chat \u00b7 MySafety"
+        },
+        "admin_dashboard": {
+          "path": "/admin",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "admin_dashboard_alt": {
+          "path": "/admin-dashboard",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "report_missing": {
+          "path": "/report-missing",
+          "status": "ok",
+          "body_chars": 657,
+          "title": "Report Missing Person \u00b7 MySafety"
+        }
+      },
+      "console_errors": [
+        "[console.warning] reportForm not found"
+      ],
+      "broken_resources": [],
+      "interactions": {
+        "bulletin_submit": "error: Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button.btn-stamp\")\n",
+        "chat_send": "no textbox found",
+        "admin_tabs_clicked": [
+          "users",
+          "wanted criminals",
+          "police stations",
+          "missing persons",
+          "add crime",
+          "verify reports",
+          "case management",
+          "emergency",
+          "analytics"
+        ]
+      },
+      "token_set": true
+    },
+    "staff": {
+      "role": "staff",
+      "email": "staff+21c993@mysafety.local",
+      "login_ok": true,
+      "pages": {
+        "home": {
+          "path": "/",
+          "status": "ok",
+          "body_chars": 1432,
+          "title": "MySafety \u00b7 Civic Operations Console"
+        },
+        "bulletin_dashboard": {
+          "path": "/dashboard",
+          "status": "ok",
+          "body_chars": 1065,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "login": {
+          "path": "/login",
+          "status": "ok",
+          "body_chars": 425,
+          "title": "Log in \u00b7 MySafety"
+        },
+        "signup": {
+          "path": "/signup",
+          "status": "ok",
+          "body_chars": 428,
+          "title": "Sign up \u00b7 MySafety"
+        },
+        "report_crime": {
+          "path": "/report-crime",
+          "status": "ok",
+          "body_chars": 2507,
+          "title": "Report Crime \u00b7 MySafety"
+        },
+        "missing_person": {
+          "path": "/missing-person",
+          "status": "ok",
+          "body_chars": 353,
+          "title": "Missing Persons \u00b7 MySafety"
+        },
+        "wanted_criminals": {
+          "path": "/wanted-criminals",
+          "status": "ok",
+          "body_chars": 356,
+          "title": "Wanted List \u00b7 MySafety"
+        },
+        "chatbox": {
+          "path": "/chatbox",
+          "status": "ok",
+          "body_chars": 519,
+          "title": "Chat \u00b7 MySafety"
+        },
+        "admin_dashboard": {
+          "path": "/admin",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "admin_dashboard_alt": {
+          "path": "/admin-dashboard",
+          "status": "ok",
+          "body_chars": 440,
+          "title": "Admin Dashboard - My Safety"
+        },
+        "report_missing": {
+          "path": "/report-missing",
+          "status": "ok",
+          "body_chars": 649,
+          "title": "Report Missing Person \u00b7 MySafety"
+        }
+      },
+      "console_errors": [
+        "[console.warning] reportForm not found"
+      ],
+      "broken_resources": [],
+      "interactions": {
+        "bulletin_submit": "error: Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button.btn-stamp\")\n",
+        "chat_send": "no textbox found",
+        "admin_tabs_clicked": [
+          "users",
+          "wanted criminals",
+          "police stations",
+          "missing persons",
+          "add crime",
+          "verify reports",
+          "case management",
+          "emergency",
+          "analytics"
+        ]
+      },
+      "token_set": true
+    },
+    "user": {
+      "role": "user",
+      "email": "User+cb1bd0@mysafety.local",
+      "login_ok": true,
+      "pages": {
+        "home": {
+          "path": "/",
+          "status": "ok",
+          "body_chars": 1402,
+          "title": "MySafety \u00b7 Civic Operations Console"
+        },
+        "bulletin_dashboard": {
+          "path": "/dashboard",
+          "status": "ok",
+          "body_chars": 1028,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "login": {
+          "path": "/login",
+          "status": "ok",
+          "body_chars": 425,
+          "title": "Log in \u00b7 MySafety"
+        },
+        "signup": {
+          "path": "/signup",
+          "status": "ok",
+          "body_chars": 428,
+          "title": "Sign up \u00b7 MySafety"
+        },
+        "report_crime": {
+          "path": "/report-crime",
+          "status": "ok",
+          "body_chars": 2470,
+          "title": "Report Crime \u00b7 MySafety"
+        },
+        "missing_person": {
+          "path": "/missing-person",
+          "status": "ok",
+          "body_chars": 316,
+          "title": "Missing Persons \u00b7 MySafety"
+        },
+        "wanted_criminals": {
+          "path": "/wanted-criminals",
+          "status": "ok",
+          "body_chars": 319,
+          "title": "Wanted List \u00b7 MySafety"
+        },
+        "chatbox": {
+          "path": "/chatbox",
+          "status": "ok",
+          "body_chars": 482,
+          "title": "Chat \u00b7 MySafety"
+        },
+        "admin_dashboard": {
+          "path": "/admin",
+          "status": "ok",
+          "body_chars": 1028,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "admin_dashboard_alt": {
+          "path": "/admin-dashboard",
+          "status": "ok",
+          "body_chars": 1028,
+          "title": "Citizen Dashboard \u00b7 MySafety"
+        },
+        "report_missing": {
+          "path": "/report-missing",
+          "status": "ok",
+          "body_chars": 612,
+          "title": "Report Missing Person \u00b7 MySafety"
+        }
+      },
+      "console_errors": [
+        "[console.error] Error loading crimes from API: TypeError: Failed to fetch\n    at window.fetch (http://127.0.0.1:8000/static/assets/js/api-base.js:51:30)\n    at loadCrimesOverview (http://127.0.0.1:8000/admin:4288:32)",
+        "[console.error] Error loading crimes from API: TypeError: Failed to fetch\n    at window.fetch (http://127.0.0.1:8000/static/assets/js/api-base.js:51:30)\n    at loadCrimesOverview (http://127.0.0.1:8000/admin-dashboar",
+        "[console.warning] reportForm not found"
+      ],
+      "broken_resources": [
+        "[failed] http://127.0.0.1:8000/api/crimes?limit=25  (net::ERR_ABORTED)",
+        "[failed] http://127.0.0.1:8000/api/crimes?limit=25  (net::ERR_ABORTED)"
+      ],
+      "interactions": {
+        "bulletin_submit": "error: Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button.btn-stamp\")\n",
+        "chat_send": "no textbox found",
+        "admin_tabs_clicked": []
+      },
+      "token_set": true
+    }
+  }
+}
