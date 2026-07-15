@@ -35,10 +35,24 @@ class _FakeResult:
 
 @pytest.fixture
 def patch_user(monkeypatch):
-    """Mock auth + main's DB access so admin routes don't touch MySQL."""
+    """Mock auth + main's DB access so admin routes don't touch MySQL.
+
+    The canonical implementations live in `app.db` (helpers) and
+    `app.db.engine` (SQLAlchemy engine). Both `app.core.security` and
+    `app.main` import the helpers, so patching the source module is
+    enough. The legacy `auth`/`db`/`main` shims re-export the same names
+    so we patch them too for completeness.
+    """
+    import app.core.security as security_mod
+    import app.db as app_db
+    import app.db.engine as app_db_engine
+    import app.main as app_main
+
+    # Legacy shims — kept so any test still importing from the root
+    # `auth`/`db`/`main` modules sees the patched values.
     import auth as auth_mod
     import db as db_mod
-    import main
+    import main as main_mod
 
     state = {"called": 0, "user": None}
 
@@ -46,24 +60,38 @@ def patch_user(monkeypatch):
         state["called"] += 1
         return state["user"]
 
+    # Source of truth: app.db.
+    monkeypatch.setattr(app_db, "fetch_one", fake)
+    monkeypatch.setattr(app_db, "fetch_all", lambda *a, **kw: [])
+    monkeypatch.setattr(app_db, "execute", lambda *a, **kw: 0)
+    monkeypatch.setattr(app_db, "insert_and_get_id", lambda *a, **kw: 0)
+
+    # Re-exports in app.core.security (the `from app.db import fetch_one`
+    # in security.py creates a module-level name we must also patch).
+    monkeypatch.setattr(security_mod, "fetch_one", fake)
+
+    # Legacy shims.
     monkeypatch.setattr(auth_mod, "fetch_one", fake)
     monkeypatch.setattr(db_mod, "fetch_one", fake)
     monkeypatch.setattr(db_mod, "fetch_all", lambda *a, **kw: [])
     monkeypatch.setattr(db_mod, "execute", lambda *a, **kw: 0)
     monkeypatch.setattr(db_mod, "insert_and_get_id", lambda *a, **kw: 0)
 
-    # Patches on main (it did `from db import ...`)
-    for name, replacement in (
-        ("fetch_one", fake),
-        ("fetch_all", lambda *a, **kw: []),
-        ("execute", lambda *a, **kw: 0),
-        ("insert_and_get_id", lambda *a, **kw: 0),
-    ):
-        if hasattr(main, name):
-            monkeypatch.setattr(main, name, replacement)
+    # Patches on main/app.main (it did `from db import ...`)
+    for mod in (main_mod, app_main):
+        for name, replacement in (
+            ("fetch_one", fake),
+            ("fetch_all", lambda *a, **kw: []),
+            ("execute", lambda *a, **kw: 0),
+            ("insert_and_get_id", lambda *a, **kw: 0),
+        ):
+            if hasattr(mod, name):
+                monkeypatch.setattr(mod, name, replacement)
     # Replace the SQLAlchemy engine used by main routes
-    if hasattr(main, "engine"):
-        monkeypatch.setattr(main.engine, "connect", lambda *a, **kw: _FakeConn())
+    if hasattr(app_main, "engine"):
+        monkeypatch.setattr(app_main.engine, "connect", lambda *a, **kw: _FakeConn())
+    if hasattr(app_db_engine, "engine"):
+        monkeypatch.setattr(app_db_engine.engine, "connect", lambda *a, **kw: _FakeConn())
 
     def _set(user):
         state["user"] = user

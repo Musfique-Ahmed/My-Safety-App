@@ -68,11 +68,19 @@ class TestTokens:
         assert decode_token(tampered) is None
 
     def test_expired_token_returns_none(self, monkeypatch):
-        # Force expiry to be in the past
+        # Force expiry to be in the past. The canonical constant lives in
+        # app.core.config, but security.py bound its own copy via
+        # `from app.core.config import JWT_EXPIRES_MINUTES`. Patch the
+        # source AND the re-export so `create_access_token` actually
+        # reads the patched value.
+        import app.core.config as config_mod
+        import app.core.security as security_mod
         import auth as auth_mod
 
+        monkeypatch.setattr(config_mod, "JWT_EXPIRES_MINUTES", -1)
+        monkeypatch.setattr(security_mod, "JWT_EXPIRES_MINUTES", -1)
         monkeypatch.setattr(auth_mod, "JWT_EXPIRES_MINUTES", -1)
-        tok = auth_mod.create_access_token(user_id=1)
+        tok = security_mod.create_access_token(user_id=1)
         assert decode_token(tok) is None
 
     def test_role_optional(self):
