@@ -106,7 +106,8 @@
     'phone': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>',
     'megaphone': '<path d="M3 11v2a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2z"/><path d="M16 8a4 4 0 0 1 0 8"/>',
     'arrow-right': '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
-    'refresh': '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'
+    'refresh': '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+    'lock': '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
   };
 
   function _injectSprite() {
@@ -436,17 +437,46 @@
              : true;
       if (ok) return;
       var href = el.getAttribute('href') || '/login';
-      var label = (need === 'privileged') ? 'Log in as staff' : 'Log in to continue';
-      // Replace with a ghost button that funnels into login + return.
-      var replacement = document.createElement('a');
-      replacement.href = '/login?next=' + encodeURIComponent(href);
-      replacement.className = 'ms-btn ms-btn--ghost ms-btn--sm';
-      replacement.setAttribute('data-ms-replacement-for', need);
-      replacement.innerHTML = el.innerHTML;
-      var span = replacement.querySelector('span');
-      if (span) span.textContent = label;
-      else replacement.appendChild(document.createTextNode(label));
-      el.parentNode.replaceChild(replacement, el);
+      var isCard = el.classList.contains('ms-card');
+      if (isCard) {
+        // For card-style CTAs, disable in-place: redirect to /login and
+        // stamp a small "Sign in required" sublabel so the card stays
+        // visible (good design — hiding it would just leave an empty
+        // grid) but signals auth is needed. The visual treatment is
+        // preserved.
+        el.setAttribute('href', '/login?next=' + encodeURIComponent(href));
+        el.classList.add('ms-card--locked');
+        el.setAttribute('aria-label', 'Sign in required — ' + (el.getAttribute('aria-label') || href));
+        // Append a small "Sign in" hint to the card's CTA row.
+        var cta = el.querySelector('.ms-card__cta');
+        if (cta) {
+          // Replace the trailing arrow with a lock + "Sign in".
+          while (cta.firstChild) cta.removeChild(cta.firstChild);
+          var lockSvg = '<svg class="ms-icon" aria-hidden="true">' +
+            '<use href="#ms-lock"/></svg>';
+          cta.insertAdjacentHTML('beforeend', '<span class="ms-card__cta-lock">' + lockSvg + '<span>Sign in</span></span>');
+          // Keep the original "Open form / Open chat" label as a subtle line.
+          var origText = el.querySelector('.ms-card__cta-orig');
+          if (!origText) {
+            var orig = document.createElement('span');
+            orig.className = 'ms-card__cta-orig';
+            orig.textContent = 'Log in to continue';
+            cta.parentNode.insertBefore(orig, cta);
+          }
+        }
+      } else {
+        // Button-style CTAs: replace with a "Log in" ghost button.
+        var label = (need === 'privileged') ? 'Log in as staff' : 'Log in to continue';
+        var replacement = document.createElement('a');
+        replacement.href = '/login?next=' + encodeURIComponent(href);
+        replacement.className = 'ms-btn ms-btn--ghost ms-btn--sm';
+        replacement.setAttribute('data-ms-replacement-for', need);
+        replacement.innerHTML = el.innerHTML;
+        var span = replacement.querySelector('span');
+        if (span) span.textContent = label;
+        else replacement.appendChild(document.createTextNode(label));
+        el.parentNode.replaceChild(replacement, el);
+      }
     });
   }
 

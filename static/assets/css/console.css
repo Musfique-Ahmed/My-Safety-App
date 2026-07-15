@@ -1099,6 +1099,31 @@ svg[class*="ms-icon"] {
   display: inline-flex; align-items: center; gap: 0.4rem;
   color: var(--accent-hi); font-size: 0.9rem; font-weight: 500; margin-top: 0.75rem;
 }
+/* Locked / sign-in-required card variant. Used by console.js when the
+   CTA targets a route that needs authentication. */
+.ms-card--locked { position: relative; }
+.ms-card--locked::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent 50%, rgba(10, 14, 26, 0.25) 100%);
+  border-radius: inherit;
+}
+.ms-card--locked .ms-card__lede { color: var(--ink-3); }
+.ms-card__cta-orig {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+  font-family: var(--t-mono);
+  letter-spacing: 0.02em;
+}
+.ms-card__cta-lock {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  color: var(--ink-2);
+  font-size: 0.9rem; font-weight: 500;
+}
+.ms-card__cta-lock .ms-icon { width: 14px; height: 14px; opacity: 0.8; }
+.ms-card--locked:hover .ms-card__cta-lock .ms-icon { opacity: 1; color: var(--accent-hi); }
 .ms-card__bar { height: 6px; background: var(--bg-canvas); border-radius: 999px; margin-top: 0.5rem; overflow: hidden; }
 .ms-card__bar::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: var(--status-blue); border-radius: 999px; }
 .ms-card__facts {
@@ -1244,6 +1269,7 @@ svg[class*="ms-icon"] {
   display: flex; align-items: center; justify-content: center;
   padding: 2rem;
 }
+.ms-modal-back[hidden] { display: none; }
 .ms-modal {
   background: var(--bg-surface);
   border: 1px solid var(--border-hair);
